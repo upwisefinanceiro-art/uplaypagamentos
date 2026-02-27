@@ -14,16 +14,365 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      contracts: {
+        Row: {
+          asaas_customer_id: string | null
+          created_at: string
+          description: string
+          end_date: string | null
+          id: string
+          installments: number
+          responsible_id: string
+          start_date: string
+          status: string
+          student_id: string
+          total_value: number
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          asaas_customer_id?: string | null
+          created_at?: string
+          description: string
+          end_date?: string | null
+          id?: string
+          installments?: number
+          responsible_id: string
+          start_date: string
+          status?: string
+          student_id: string
+          total_value: number
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          asaas_customer_id?: string | null
+          created_at?: string
+          description?: string
+          end_date?: string | null
+          id?: string
+          installments?: number
+          responsible_id?: string
+          start_date?: string
+          status?: string
+          student_id?: string
+          total_value?: number
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contracts_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          asaas_payment_id: string | null
+          boleto_barcode: string | null
+          boleto_url: string | null
+          contract_id: string
+          created_at: string
+          due_date: string
+          id: string
+          installment_number: number
+          paid_at: string | null
+          payment_method: string | null
+          pix_copy_paste: string | null
+          pix_qr_code: string | null
+          responsible_id: string
+          status: string
+          unit_id: string
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          asaas_payment_id?: string | null
+          boleto_barcode?: string | null
+          boleto_url?: string | null
+          contract_id: string
+          created_at?: string
+          due_date: string
+          id?: string
+          installment_number?: number
+          paid_at?: string | null
+          payment_method?: string | null
+          pix_copy_paste?: string | null
+          pix_qr_code?: string | null
+          responsible_id: string
+          status?: string
+          unit_id: string
+          updated_at?: string
+          value: number
+        }
+        Update: {
+          asaas_payment_id?: string | null
+          boleto_barcode?: string | null
+          boleto_url?: string | null
+          contract_id?: string
+          created_at?: string
+          due_date?: string
+          id?: string
+          installment_number?: number
+          paid_at?: string | null
+          payment_method?: string | null
+          pix_copy_paste?: string | null
+          pix_qr_code?: string | null
+          responsible_id?: string
+          status?: string
+          unit_id?: string
+          updated_at?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          active: boolean
+          cpf: string
+          created_at: string
+          full_name: string
+          id: string
+          phone: string | null
+          unit_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          cpf: string
+          created_at?: string
+          full_name: string
+          id: string
+          phone?: string | null
+          unit_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          cpf?: string
+          created_at?: string
+          full_name?: string
+          id?: string
+          phone?: string | null
+          unit_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      students: {
+        Row: {
+          active: boolean
+          birth_date: string | null
+          created_at: string
+          enrollment_id: string | null
+          full_name: string
+          id: string
+          responsible_id: string
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          birth_date?: string | null
+          created_at?: string
+          enrollment_id?: string | null
+          full_name: string
+          id?: string
+          responsible_id: string
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          birth_date?: string | null
+          created_at?: string
+          enrollment_id?: string | null
+          full_name?: string
+          id?: string
+          responsible_id?: string
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "students_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "students_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      units: {
+        Row: {
+          active: boolean
+          address: string | null
+          asaas_api_key: string | null
+          asaas_base_url: string | null
+          asaas_webhook_token: string | null
+          cnpj: string | null
+          created_at: string
+          id: string
+          name: string
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          address?: string | null
+          asaas_api_key?: string | null
+          asaas_base_url?: string | null
+          asaas_webhook_token?: string | null
+          cnpj?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          address?: string | null
+          asaas_api_key?: string | null
+          asaas_base_url?: string | null
+          asaas_webhook_token?: string | null
+          cnpj?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
-      [_ in never]: never
+      units_public: {
+        Row: {
+          active: boolean | null
+          address: string | null
+          cnpj: string | null
+          created_at: string | null
+          id: string | null
+          name: string | null
+          phone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          address?: string | null
+          cnpj?: string | null
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          address?: string | null
+          cnpj?: string | null
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
-      [_ in never]: never
+      get_user_unit_id: { Args: { _user_id: string }; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "ADMIN_MASTER" | "ADMIN_UNIDADE" | "RESPONSAVEL"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +499,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["ADMIN_MASTER", "ADMIN_UNIDADE", "RESPONSAVEL"],
+    },
   },
 } as const
