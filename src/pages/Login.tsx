@@ -40,8 +40,8 @@ const Login = () => {
     setLoading(true);
 
     const cleanCpf = cpf.replace(/\D/g, "");
-    if (cleanCpf.length !== 11) {
-      toast({ title: "CPF inválido", description: "Digite um CPF com 11 dígitos", variant: "destructive" });
+    if (cleanCpf.length < 1) {
+      toast({ title: "CPF inválido", description: "Digite um CPF válido", variant: "destructive" });
       setLoading(false);
       return;
     }
