@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const menuItems = [
   { path: "/admin", icon: LayoutDashboard, label: "Dashboard", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
@@ -25,9 +26,9 @@ const AdminLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { hasRole, signOut, profile } = useAuth();
 
-  // TODO: Get role from auth context
-  const userRole = "ADMIN_MASTER";
+  const userRole = hasRole("ADMIN_MASTER") ? "ADMIN_MASTER" : "ADMIN_UNIDADE";
 
   const filteredMenu = menuItems.filter((item) => item.roles.includes(userRole));
 
@@ -71,7 +72,7 @@ const AdminLayout = () => {
       {/* Footer */}
       <div className="p-3 border-t border-sidebar-border">
         <button
-          onClick={() => navigate("/login")}
+          onClick={async () => { await signOut(); navigate("/login"); }}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
         >
           <LogOut size={18} />

@@ -3,6 +3,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider } from "@/contexts/AuthContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 import Login from "./pages/Login";
 import AppLayout from "./components/layouts/AppLayout";
@@ -27,30 +29,40 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="/login" element={<Login />} />
+        <AuthProvider>
+          <Routes>
+            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/login" element={<Login />} />
 
-          {/* App do Responsável */}
-          <Route path="/app" element={<AppLayout />}>
-            <Route index element={<AppHome />} />
-            <Route path="pagamentos" element={<AppPayments />} />
-            <Route path="pagamentos/:id" element={<AppPaymentDetail />} />
-            <Route path="perfil" element={<AppProfile />} />
-          </Route>
+            {/* App do Responsável */}
+            <Route path="/app" element={
+              <ProtectedRoute requiredRoles={["RESPONSAVEL", "ADMIN_MASTER", "ADMIN_UNIDADE"]}>
+                <AppLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<AppHome />} />
+              <Route path="pagamentos" element={<AppPayments />} />
+              <Route path="pagamentos/:id" element={<AppPaymentDetail />} />
+              <Route path="perfil" element={<AppProfile />} />
+            </Route>
 
-          {/* Painel Admin */}
-          <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<AdminDashboard />} />
-            <Route path="unidades" element={<AdminUnits />} />
-            <Route path="usuarios" element={<AdminUsers />} />
-            <Route path="clientes" element={<AdminClients />} />
-            <Route path="contratos" element={<AdminContracts />} />
-            <Route path="cobrancas" element={<AdminCharges />} />
-          </Route>
+            {/* Painel Admin */}
+            <Route path="/admin" element={
+              <ProtectedRoute requiredRoles={["ADMIN_MASTER", "ADMIN_UNIDADE"]}>
+                <AdminLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<AdminDashboard />} />
+              <Route path="unidades" element={<AdminUnits />} />
+              <Route path="usuarios" element={<AdminUsers />} />
+              <Route path="clientes" element={<AdminClients />} />
+              <Route path="contratos" element={<AdminContracts />} />
+              <Route path="cobrancas" element={<AdminCharges />} />
+            </Route>
 
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
