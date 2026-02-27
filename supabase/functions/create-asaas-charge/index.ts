@@ -7,7 +7,8 @@ const corsHeaders = {
 };
 
 interface ChargeInput {
-  student_id: string;
+  responsible_id: string;
+  student_id?: string;
   contract_id?: string;
   value: number;
   due_date: string;
@@ -34,7 +35,6 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    // User-scoped client for auth verification
     const supabaseUser = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -49,22 +49,20 @@ Deno.serve(async (req) => {
     }
 
     const userId = claimsData.claims.sub as string;
-
-    // Admin client for DB operations
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
     // Parse input
     const body: ChargeInput = await req.json();
-    const { student_id, contract_id, value, due_date, billing_type, description } = body;
+    const { responsible_id, student_id, contract_id, value, due_date, billing_type, description } = body;
 
-    if (!student_id || !value || !due_date || !billing_type) {
+    if (!responsible_id || !value || !due_date || !billing_type) {
       return new Response(
-        JSON.stringify({ error: "Campos obrigatórios: student_id, value, due_date, billing_type" }),
+        JSON.stringify({ error: "Campos obrigatórios: responsible_id, value, due_date, billing_type" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // 2) Get user's unit_id from profile
+    // 2) Get user's unit_id
     const { data: userProfile, error: profileErr } = await supabaseAdmin
       .from("profiles")
       .select("unit_id")
@@ -94,31 +92,13 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 4) Base URL
     const baseUrl = unit.asaas_base_url || "https://sandbox.asaas.com/api/v3";
 
-    // 5) Get student and responsible info
-    const { data: student, error: studentErr } = await supabaseAdmin
-      .from("students")
-      .select("responsible_id, full_name")
-      .eq("id", student_id)
-      .eq("unit_id", unitId)
-      .single();
-
-    if (studentErr || !student) {
-      return new Response(
-        JSON.stringify({ error: "Aluno não encontrado nesta unidade" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const responsibleId = student.responsible_id;
-
-    // Get responsible profile
+    // 4) Get responsible profile
     const { data: responsible, error: respErr } = await supabaseAdmin
       .from("profiles")
       .select("full_name, cpf, phone, asaas_customer_id")
-      .eq("id", responsibleId)
+      .eq("id", responsible_id)
       .single();
 
     if (respErr || !responsible) {
@@ -128,7 +108,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 5b) Ensure Asaas customer exists
+    // 5) Ensure Asaas customer exists
     let asaasCustomerId = responsible.asaas_customer_id;
 
     if (!asaasCustomerId) {
@@ -160,11 +140,10 @@ Deno.serve(async (req) => {
 
       asaasCustomerId = customerData.id;
 
-      // Save customer ID to profile
       await supabaseAdmin
         .from("profiles")
         .update({ asaas_customer_id: asaasCustomerId })
-        .eq("id", responsibleId);
+        .eq("id", responsible_id);
     }
 
     // 6) Create charge in Asaas
@@ -207,7 +186,6 @@ Deno.serve(async (req) => {
     let boletoUrl: string | null = chargeData.bankSlipUrl || null;
     let checkoutUrl: string | null = null;
 
-    // For PIX, fetch QR code from dedicated endpoint
     if (billing_type === "PIX" && chargeData.id) {
       try {
         const pixRes = await fetch(`${baseUrl}/payments/${chargeData.id}/pixQrCode`, {
@@ -219,11 +197,10 @@ Deno.serve(async (req) => {
           pixCopyPaste = pixData.payload || null;
         }
       } catch {
-        // PIX QR code fetch failed, non-critical
+        // non-critical
       }
     }
 
-    // For CARD, the invoiceUrl serves as checkout
     if (billing_type === "CARD") {
       checkoutUrl = chargeData.invoiceUrl || null;
     }
@@ -232,7 +209,7 @@ Deno.serve(async (req) => {
     const paymentInsert: Record<string, unknown> = {
       unit_id: unitId,
       contract_id: contract_id || null,
-      responsible_id: responsibleId,
+      responsible_id: responsible_id,
       installment_number: 1,
       due_date,
       value,
@@ -260,7 +237,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 9) Return response
     return new Response(
       JSON.stringify({
         payment_id: payment.id,

@@ -44,9 +44,15 @@ interface PaymentRow {
   contract_id: string;
 }
 
+interface ResponsibleRow {
+  id: string;
+  full_name: string;
+}
+
 interface StudentRow {
   id: string;
   full_name: string;
+  responsible_id: string;
 }
 
 interface UnitRow {
@@ -66,6 +72,7 @@ const AdminCharges = () => {
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [units, setUnits] = useState<UnitRow[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
+  const [responsibles, setResponsibles] = useState<ResponsibleRow[]>([]);
   const [unitNames, setUnitNames] = useState<Record<string, string>>({});
   const [loadingData, setLoadingData] = useState(true);
 
@@ -75,6 +82,7 @@ const AdminCharges = () => {
   const [chargeResult, setChargeResult] = useState<ChargeResult | null>(null);
 
   // Form fields
+  const [selectedResponsible, setSelectedResponsible] = useState("");
   const [selectedStudent, setSelectedStudent] = useState("");
   const [chargeValue, setChargeValue] = useState("");
   const [chargeDueDate, setChargeDueDate] = useState("");
@@ -85,13 +93,18 @@ const AdminCharges = () => {
     setLoadingData(true);
     const [paymentsRes, studentsRes, unitsRes, profilesRes] = await Promise.all([
       supabase.from("payments").select("id, value, due_date, status, payment_method, pix_copy_paste, invoice_url, checkout_url, boleto_url, pix_qr_code, asaas_payment_id, responsible_id, unit_id, installment_number, contract_id").order("due_date", { ascending: false }),
-      supabase.from("students").select("id, full_name"),
+      supabase.from("students").select("id, full_name, responsible_id"),
       supabase.from("units").select("id, name"),
       supabase.from("profiles").select("id, full_name"),
     ]);
 
     if (paymentsRes.data) setPayments(paymentsRes.data as PaymentRow[]);
-    if (studentsRes.data) setStudents(studentsRes.data);
+    if (studentsRes.data) setStudents(studentsRes.data as StudentRow[]);
+    // Build responsibles list from profiles that have students
+    if (profilesRes.data && studentsRes.data) {
+      const respIds = new Set(studentsRes.data.map((s: any) => s.responsible_id));
+      setResponsibles(profilesRes.data.filter((p: any) => respIds.has(p.id)).map((p: any) => ({ id: p.id, full_name: p.full_name })));
+    }
     if (unitsRes.data) {
       setUnits(unitsRes.data);
       const map: Record<string, string> = {};
@@ -120,8 +133,12 @@ const AdminCharges = () => {
     return true;
   });
 
+  const filteredStudents = selectedResponsible
+    ? students.filter((s) => s.responsible_id === selectedResponsible)
+    : [];
+
   const handleCreateCharge = async () => {
-    if (!selectedStudent || !chargeValue || !chargeDueDate) {
+    if (!selectedResponsible || !chargeValue || !chargeDueDate) {
       toast({ title: "Preencha todos os campos obrigatórios", variant: "destructive" });
       return;
     }
@@ -131,7 +148,8 @@ const AdminCharges = () => {
 
     const { data, error } = await supabase.functions.invoke("create-asaas-charge", {
       body: {
-        student_id: selectedStudent,
+        responsible_id: selectedResponsible,
+        student_id: selectedStudent || undefined,
         value: parseFloat(chargeValue),
         due_date: chargeDueDate,
         billing_type: billingType,
@@ -157,6 +175,7 @@ const AdminCharges = () => {
   };
 
   const resetForm = () => {
+    setSelectedResponsible("");
     setSelectedStudent("");
     setChargeValue("");
     setChargeDueDate("");
@@ -183,16 +202,30 @@ const AdminCharges = () => {
             {!chargeResult ? (
               <div className="space-y-4 pt-2">
                 <div className="space-y-1.5">
-                  <Label>Aluno *</Label>
-                  <Select value={selectedStudent} onValueChange={setSelectedStudent}>
-                    <SelectTrigger><SelectValue placeholder="Selecione o aluno" /></SelectTrigger>
+                  <Label>Responsável *</Label>
+                  <Select value={selectedResponsible} onValueChange={(v) => { setSelectedResponsible(v); setSelectedStudent(""); }}>
+                    <SelectTrigger><SelectValue placeholder="Selecione o responsável" /></SelectTrigger>
                     <SelectContent>
-                      {students.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>
+                      {responsibles.map((r) => (
+                        <SelectItem key={r.id} value={r.id}>{r.full_name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
+
+                {filteredStudents.length > 0 && (
+                  <div className="space-y-1.5">
+                    <Label>Aluno (opcional)</Label>
+                    <Select value={selectedStudent} onValueChange={setSelectedStudent}>
+                      <SelectTrigger><SelectValue placeholder="Selecione o aluno" /></SelectTrigger>
+                      <SelectContent>
+                        {filteredStudents.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
