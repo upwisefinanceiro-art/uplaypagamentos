@@ -132,9 +132,11 @@ Deno.serve(async (req) => {
     let asaasCustomerId = responsible.asaas_customer_id;
 
     if (!asaasCustomerId) {
+      const cpfClean = responsible.cpf.replace(/\D/g, "");
       const customerPayload = {
         name: responsible.full_name,
-        cpfCnpj: responsible.cpf,
+        cpfCnpj: cpfClean,
+        email: `${cpfClean}@ensinup.app`,
         mobilePhone: responsible.phone || undefined,
       };
 
