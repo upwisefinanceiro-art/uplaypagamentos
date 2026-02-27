@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Login = () => {
   const [cpf, setCpf] = useState("");
@@ -13,6 +14,14 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signIn, user, roles, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    if (user && !authLoading) {
+      const isAdmin = roles.includes("ADMIN_MASTER") || roles.includes("ADMIN_UNIDADE");
+      navigate(isAdmin ? "/admin" : "/app", { replace: true });
+    }
+  }, [user, roles, authLoading, navigate]);
 
   const formatCPF = (value: string) => {
     const digits = value.replace(/\D/g, "").slice(0, 11);
@@ -31,47 +40,40 @@ const Login = () => {
     setLoading(true);
 
     const cleanCpf = cpf.replace(/\D/g, "");
-
-    // TODO: Replace with actual auth logic
-    // For demo purposes, route based on CPF
-    setTimeout(() => {
-      if (cleanCpf === "00000000000") {
-        toast({ title: "Bem-vindo, Admin Master!" });
-        navigate("/admin");
-      } else {
-        toast({ title: "Bem-vindo!" });
-        navigate("/app");
-      }
+    if (cleanCpf.length !== 11) {
+      toast({ title: "CPF inválido", description: "Digite um CPF com 11 dígitos", variant: "destructive" });
       setLoading(false);
-    }, 800);
+      return;
+    }
+
+    const { error } = await signIn(cleanCpf, password);
+
+    if (error) {
+      toast({ title: "Erro ao entrar", description: error, variant: "destructive" });
+      setLoading(false);
+      return;
+    }
+
+    toast({ title: "Bem-vindo!" });
+    // Redirect will happen via useEffect after roles load
+    setLoading(false);
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm animate-fade-in">
-        {/* Logo */}
         <div className="flex justify-center mb-8">
-          <img
-            src="/logo.png"
-            alt="EnsinUP Educação"
-            className="h-20 w-auto object-contain"
-          />
+          <img src="/logo.png" alt="EnsinUP Educação" className="h-20 w-auto object-contain" />
         </div>
 
-        {/* Title */}
         <div className="text-center mb-8">
           <h1 className="text-xl font-bold text-foreground">EnsinUP Pagamentos</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Acesse sua conta para continuar
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">Acesse sua conta para continuar</p>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleLogin} className="space-y-5">
           <div className="space-y-2">
-            <Label htmlFor="cpf" className="text-sm font-medium text-foreground">
-              CPF
-            </Label>
+            <Label htmlFor="cpf" className="text-sm font-medium text-foreground">CPF</Label>
             <Input
               id="cpf"
               type="text"
@@ -84,9 +86,7 @@ const Login = () => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password" className="text-sm font-medium text-foreground">
-              Senha
-            </Label>
+            <Label htmlFor="password" className="text-sm font-medium text-foreground">Senha</Label>
             <div className="relative">
               <Input
                 id="password"
@@ -107,11 +107,7 @@ const Login = () => {
             </div>
           </div>
 
-          <Button
-            type="submit"
-            className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
-            disabled={loading}
-          >
+          <Button type="submit" className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold" disabled={loading}>
             {loading ? (
               <span className="flex items-center gap-2">
                 <span className="h-4 w-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
@@ -126,9 +122,7 @@ const Login = () => {
           </Button>
         </form>
 
-        <p className="text-center text-xs text-muted-foreground mt-8">
-          © {new Date().getFullYear()} EnsinUP Educação
-        </p>
+        <p className="text-center text-xs text-muted-foreground mt-8">© {new Date().getFullYear()} EnsinUP Educação</p>
       </div>
     </div>
   );
