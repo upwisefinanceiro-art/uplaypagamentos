@@ -89,15 +89,18 @@ export type Database = {
           asaas_payment_id: string | null
           boleto_barcode: string | null
           boleto_url: string | null
+          checkout_url: string | null
           contract_id: string
           created_at: string
           due_date: string
           id: string
           installment_number: number
+          invoice_url: string | null
           paid_at: string | null
           payment_method: string | null
           pix_copy_paste: string | null
           pix_qr_code: string | null
+          raw_response: Json | null
           responsible_id: string
           status: string
           unit_id: string
@@ -108,15 +111,18 @@ export type Database = {
           asaas_payment_id?: string | null
           boleto_barcode?: string | null
           boleto_url?: string | null
+          checkout_url?: string | null
           contract_id: string
           created_at?: string
           due_date: string
           id?: string
           installment_number?: number
+          invoice_url?: string | null
           paid_at?: string | null
           payment_method?: string | null
           pix_copy_paste?: string | null
           pix_qr_code?: string | null
+          raw_response?: Json | null
           responsible_id: string
           status?: string
           unit_id: string
@@ -127,15 +133,18 @@ export type Database = {
           asaas_payment_id?: string | null
           boleto_barcode?: string | null
           boleto_url?: string | null
+          checkout_url?: string | null
           contract_id?: string
           created_at?: string
           due_date?: string
           id?: string
           installment_number?: number
+          invoice_url?: string | null
           paid_at?: string | null
           payment_method?: string | null
           pix_copy_paste?: string | null
           pix_qr_code?: string | null
+          raw_response?: Json | null
           responsible_id?: string
           status?: string
           unit_id?: string
@@ -169,6 +178,7 @@ export type Database = {
       profiles: {
         Row: {
           active: boolean
+          asaas_customer_id: string | null
           cpf: string
           created_at: string
           full_name: string
@@ -179,6 +189,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          asaas_customer_id?: string | null
           cpf: string
           created_at?: string
           full_name: string
@@ -189,6 +200,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          asaas_customer_id?: string | null
           cpf?: string
           created_at?: string
           full_name?: string

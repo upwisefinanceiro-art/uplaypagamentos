@@ -1,1 +1,10 @@
 project_id = "kfhjoffsqfnwiiwgelhl"
+
+[functions.create-user]
+verify_jwt = false
+
+[functions.seed-admin]
+verify_jwt = false
+
+[functions.create-asaas-charge]
+verify_jwt = false
