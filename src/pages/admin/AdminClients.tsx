@@ -1,24 +1,167 @@
-import { useState } from "react";
-import { Plus, Pencil, Eye } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, Pencil, Eye, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
-const mockClients = [
-  { id: "1", name: "Carlos Santos", cpf: "123.456.789-00", phone: "(31) 99999-0000", email: "carlos@email.com", unit: "Serra Verde", student: "João Silva" },
-  { id: "2", name: "Fernanda Costa", cpf: "987.654.321-00", phone: "(31) 98888-0000", email: "fernanda@email.com", unit: "Vespasiano", student: "Ana Costa" },
-];
+interface ClientRow {
+  id: string;
+  full_name: string;
+  cpf: string;
+  phone: string | null;
+  unit_id: string | null;
+  active: boolean;
+}
+
+interface StudentRow {
+  id: string;
+  full_name: string;
+  responsible_id: string;
+}
+
+interface UnitRow {
+  id: string;
+  name: string;
+}
 
 const AdminClients = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [clients, setClients] = useState<ClientRow[]>([]);
+  const [students, setStudents] = useState<StudentRow[]>([]);
+  const [units, setUnits] = useState<UnitRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [search, setSearch] = useState("");
+  const { toast } = useToast();
+  const { profile, hasRole } = useAuth();
+
+  // Form state
+  const [formName, setFormName] = useState("");
+  const [formCpf, setFormCpf] = useState("");
+  const [formPhone, setFormPhone] = useState("");
+  const [formPassword, setFormPassword] = useState("");
+  const [formStudentName, setFormStudentName] = useState("");
+  const [formUnitId, setFormUnitId] = useState("");
+
+  const fetchData = async () => {
+    setLoading(true);
+
+    // Fetch profiles that have RESPONSAVEL role
+    const [profilesRes, rolesRes, studentsRes, unitsRes] = await Promise.all([
+      supabase.from("profiles").select("id, full_name, cpf, phone, unit_id, active"),
+      supabase.from("user_roles").select("user_id, role").eq("role", "RESPONSAVEL"),
+      supabase.from("students").select("id, full_name, responsible_id"),
+      supabase.from("units").select("id, name"),
+    ]);
+
+    if (rolesRes.data && profilesRes.data) {
+      const respIds = new Set(rolesRes.data.map((r: any) => r.user_id));
+      setClients(profilesRes.data.filter((p: any) => respIds.has(p.id)) as ClientRow[]);
+    }
+    if (studentsRes.data) setStudents(studentsRes.data as StudentRow[]);
+    if (unitsRes.data) setUnits(unitsRes.data as UnitRow[]);
+
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  // Set default unit for ADMIN_UNIDADE
+  useEffect(() => {
+    if (profile?.unit_id && !formUnitId) {
+      setFormUnitId(profile.unit_id);
+    }
+  }, [profile]);
+
+  const resetForm = () => {
+    setFormName("");
+    setFormCpf("");
+    setFormPhone("");
+    setFormPassword("");
+    setFormStudentName("");
+    setFormUnitId(profile?.unit_id || "");
+  };
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formName || !formCpf || !formPassword) {
+      toast({ title: "Preencha os campos obrigatórios", description: "Nome, CPF e Senha são obrigatórios.", variant: "destructive" });
+      return;
+    }
+
+    const unitId = hasRole("ADMIN_MASTER") ? formUnitId : profile?.unit_id;
+    if (!unitId) {
+      toast({ title: "Selecione uma unidade", variant: "destructive" });
+      return;
+    }
+
+    setCreating(true);
+
+    const { data, error } = await supabase.functions.invoke("create-user", {
+      body: {
+        cpf: formCpf,
+        full_name: formName,
+        phone: formPhone || undefined,
+        password: formPassword,
+        role: "RESPONSAVEL",
+        unit_id: unitId,
+      },
+    });
+
+    if (error) {
+      toast({ title: "Erro ao criar cliente", description: error.message, variant: "destructive" });
+      setCreating(false);
+      return;
+    }
+
+    if (data?.error) {
+      toast({ title: "Erro", description: data.error, variant: "destructive" });
+      setCreating(false);
+      return;
+    }
+
+    // If student name provided, create student record
+    if (formStudentName && data?.user_id) {
+      await supabase.from("students").insert({
+        full_name: formStudentName,
+        responsible_id: data.user_id,
+        unit_id: unitId,
+      });
+    }
+
+    toast({ title: "Cliente criado com sucesso!" });
+    setCreating(false);
+    setDialogOpen(false);
+    resetForm();
+    fetchData();
+  };
+
+  const unitMap: Record<string, string> = {};
+  units.forEach((u) => (unitMap[u.id] = u.name));
+
+  const getStudents = (responsibleId: string) =>
+    students.filter((s) => s.responsible_id === responsibleId).map((s) => s.full_name).join(", ");
+
+  const filtered = clients.filter((c) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    const studentNames = getStudents(c.id).toLowerCase();
+    return c.full_name.toLowerCase().includes(q) || c.cpf.includes(q) || studentNames.includes(q);
+  });
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-foreground">Clientes (Responsáveis)</h1>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
           <DialogTrigger asChild>
             <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
               <Plus size={16} className="mr-2" />
@@ -29,71 +172,84 @@ const AdminClients = () => {
             <DialogHeader>
               <DialogTitle className="text-foreground">Novo Cliente</DialogTitle>
             </DialogHeader>
-            <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); setDialogOpen(false); }}>
-              <div className="space-y-2">
-                <Label className="text-foreground">Unidade</Label>
-                <Select>
-                  <SelectTrigger className="bg-input border-border text-foreground"><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent className="bg-card border-border">
-                    <SelectItem value="serra-verde">Serra Verde</SelectItem>
-                    <SelectItem value="vespasiano">Vespasiano</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <form className="space-y-4" onSubmit={handleCreate}>
+              {hasRole("ADMIN_MASTER") && (
+                <div className="space-y-2">
+                  <Label className="text-foreground">Unidade *</Label>
+                  <Select value={formUnitId} onValueChange={setFormUnitId}>
+                    <SelectTrigger className="bg-input border-border text-foreground">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                      {units.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2 col-span-2">
-                  <Label className="text-foreground">Nome do Responsável</Label>
-                  <Input className="bg-input border-border text-foreground" placeholder="Nome completo" />
+                  <Label className="text-foreground">Nome do Responsável *</Label>
+                  <Input className="bg-input border-border text-foreground" placeholder="Nome completo" value={formName} onChange={(e) => setFormName(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-foreground">CPF</Label>
-                  <Input className="bg-input border-border text-foreground" placeholder="000.000.000-00" />
+                  <Label className="text-foreground">CPF *</Label>
+                  <Input className="bg-input border-border text-foreground" placeholder="000.000.000-00" value={formCpf} onChange={(e) => setFormCpf(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-foreground">Telefone</Label>
-                  <Input className="bg-input border-border text-foreground" placeholder="(00) 00000-0000" />
-                </div>
-                <div className="space-y-2 col-span-2">
-                  <Label className="text-foreground">Email</Label>
-                  <Input className="bg-input border-border text-foreground" placeholder="email@exemplo.com" type="email" />
-                </div>
-                <div className="space-y-2 col-span-2">
-                  <Label className="text-foreground">Endereço</Label>
-                  <Input className="bg-input border-border text-foreground" placeholder="Rua, Nº, Bairro, Cidade, CEP" />
+                  <Input className="bg-input border-border text-foreground" placeholder="(00) 00000-0000" value={formPhone} onChange={(e) => setFormPhone(e.target.value)} />
                 </div>
                 <div className="space-y-2 col-span-2">
                   <Label className="text-foreground">Nome do Aluno</Label>
-                  <Input className="bg-input border-border text-foreground" placeholder="Nome do aluno" />
+                  <Input className="bg-input border-border text-foreground" placeholder="Nome do aluno" value={formStudentName} onChange={(e) => setFormStudentName(e.target.value)} />
                 </div>
                 <div className="space-y-2 col-span-2">
-                  <Label className="text-foreground">Senha Provisória</Label>
-                  <Input className="bg-input border-border text-foreground" type="password" placeholder="Senha inicial" />
+                  <Label className="text-foreground">Senha Provisória *</Label>
+                  <Input className="bg-input border-border text-foreground" type="password" placeholder="Senha inicial" value={formPassword} onChange={(e) => setFormPassword(e.target.value)} />
                 </div>
               </div>
-              <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">Salvar</Button>
+              <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" disabled={creating}>
+                {creating ? <><Loader2 size={16} className="animate-spin mr-2" /> Salvando...</> : "Salvar"}
+              </Button>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
       {/* Search */}
-      <Input className="bg-input border-border text-foreground" placeholder="Buscar por nome, CPF ou aluno..." />
+      <Input
+        className="bg-input border-border text-foreground"
+        placeholder="Buscar por nome, CPF ou aluno..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
 
-      <div className="space-y-3">
-        {mockClients.map((client) => (
-          <div key={client.id} className="glass-card p-4 flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-semibold text-foreground">{client.name}</h3>
-              <p className="text-xs text-muted-foreground">{client.cpf} • {client.unit}</p>
-              <p className="text-xs text-muted-foreground">Aluno: {client.student}</p>
+      {loading ? (
+        <div className="flex justify-center py-12"><Loader2 className="animate-spin text-muted-foreground" /></div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((client) => (
+            <div key={client.id} className="glass-card p-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">{client.full_name}</h3>
+                <p className="text-xs text-muted-foreground">{client.cpf} • {unitMap[client.unit_id || ""] || "—"}</p>
+                {getStudents(client.id) && (
+                  <p className="text-xs text-muted-foreground">Aluno(s): {getStudents(client.id)}</p>
+                )}
+              </div>
+              <div className="flex gap-1">
+                <button className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"><Eye size={14} /></button>
+                <button className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"><Pencil size={14} /></button>
+              </div>
             </div>
-            <div className="flex gap-1">
-              <button className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"><Eye size={14} /></button>
-              <button className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"><Pencil size={14} /></button>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+          {filtered.length === 0 && (
+            <div className="text-center py-12 text-muted-foreground text-sm">Nenhum cliente encontrado.</div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
