@@ -90,7 +90,7 @@ export type Database = {
           boleto_barcode: string | null
           boleto_url: string | null
           checkout_url: string | null
-          contract_id: string
+          contract_id: string | null
           created_at: string
           due_date: string
           id: string
@@ -112,7 +112,7 @@ export type Database = {
           boleto_barcode?: string | null
           boleto_url?: string | null
           checkout_url?: string | null
-          contract_id: string
+          contract_id?: string | null
           created_at?: string
           due_date: string
           id?: string
@@ -134,7 +134,7 @@ export type Database = {
           boleto_barcode?: string | null
           boleto_url?: string | null
           checkout_url?: string | null
-          contract_id?: string
+          contract_id?: string | null
           created_at?: string
           due_date?: string
           id?: string

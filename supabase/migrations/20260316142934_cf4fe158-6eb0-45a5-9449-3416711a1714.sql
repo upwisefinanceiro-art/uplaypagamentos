@@ -1,0 +1,1 @@
+ALTER TABLE public.payments ALTER COLUMN contract_id DROP NOT NULL;
