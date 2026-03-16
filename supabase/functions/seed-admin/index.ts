@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
-    const { secret } = await req.json();
+    const { secret, email, password, full_name } = await req.json();
     if (secret !== "ensinup-seed-2024") {
       return new Response(JSON.stringify({ error: "Invalid secret" }), {
         status: 403,
@@ -23,15 +23,16 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Check if admin already exists
-    const { data: existing } = await supabaseAdmin
-      .from("profiles")
-      .select("id")
-      .eq("cpf", "00000000000")
-      .maybeSingle();
+    const adminEmail = email || "00000000000@ensinup.app";
+    const adminPassword = password || "admin123";
+    const adminName = full_name || "Admin Master";
 
-    if (existing) {
-      return new Response(JSON.stringify({ message: "Admin já existe", user_id: existing.id }), {
+    // Check if user with this email already exists
+    const { data: { users: existingUsers } } = await supabaseAdmin.auth.admin.listUsers();
+    const existingUser = existingUsers?.find((u: any) => u.email === adminEmail);
+
+    if (existingUser) {
+      return new Response(JSON.stringify({ message: "Usuário já existe", user_id: existingUser.id, email: adminEmail }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -39,10 +40,10 @@ Deno.serve(async (req) => {
 
     // Create admin user
     const { data: newUser, error } = await supabaseAdmin.auth.admin.createUser({
-      email: "00000000000@ensinup.app",
-      password: "admin123",
+      email: adminEmail,
+      password: adminPassword,
       email_confirm: true,
-      user_metadata: { cpf: "00000000000", full_name: "Admin Master" },
+      user_metadata: { full_name: adminName },
     });
 
     if (error) throw error;
@@ -54,7 +55,7 @@ Deno.serve(async (req) => {
     });
 
     return new Response(
-      JSON.stringify({ success: true, user_id: newUser.user.id, email: "00000000000@ensinup.app", password: "admin123" }),
+      JSON.stringify({ success: true, user_id: newUser.user.id, email: adminEmail }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
