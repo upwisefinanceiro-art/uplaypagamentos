@@ -74,10 +74,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signIn = async (cpf: string, password: string) => {
-    const email = cpfToEmail(cpf);
+  const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { error: "CPF ou senha inválidos" };
+    if (error) return { error: "E-mail ou senha inválidos" };
     return { error: null };
   };
 

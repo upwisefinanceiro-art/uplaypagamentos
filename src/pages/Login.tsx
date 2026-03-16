@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
 const Login = () => {
-  const [cpf, setCpf] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -23,30 +23,17 @@ const Login = () => {
     }
   }, [user, roles, authLoading, navigate]);
 
-  const formatCPF = (value: string) => {
-    const digits = value.replace(/\D/g, "").slice(0, 11);
-    return digits
-      .replace(/(\d{3})(\d)/, "$1.$2")
-      .replace(/(\d{3})(\d)/, "$1.$2")
-      .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
-  };
-
-  const handleCPFChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setCpf(formatCPF(e.target.value));
-  };
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    const cleanCpf = cpf.replace(/\D/g, "");
-    if (cleanCpf.length < 1) {
-      toast({ title: "CPF inválido", description: "Digite um CPF válido", variant: "destructive" });
+    if (!email.trim()) {
+      toast({ title: "E-mail inválido", description: "Digite um e-mail válido", variant: "destructive" });
       setLoading(false);
       return;
     }
 
-    const { error } = await signIn(cleanCpf, password);
+    const { error } = await signIn(email, password);
 
     if (error) {
       toast({ title: "Erro ao entrar", description: error, variant: "destructive" });
@@ -55,7 +42,6 @@ const Login = () => {
     }
 
     toast({ title: "Bem-vindo!" });
-    // Redirect will happen via useEffect after roles load
     setLoading(false);
   };
 
@@ -73,13 +59,13 @@ const Login = () => {
 
         <form onSubmit={handleLogin} className="space-y-5">
           <div className="space-y-2">
-            <Label htmlFor="cpf" className="text-sm font-medium text-foreground">CPF</Label>
+            <Label htmlFor="email" className="text-sm font-medium text-foreground">E-mail</Label>
             <Input
-              id="cpf"
-              type="text"
-              placeholder="000.000.000-00"
-              value={cpf}
-              onChange={handleCPFChange}
+              id="email"
+              type="email"
+              placeholder="seu@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="h-11 bg-input border-border text-foreground placeholder:text-muted-foreground focus:ring-primary focus:border-primary"
               required
             />
