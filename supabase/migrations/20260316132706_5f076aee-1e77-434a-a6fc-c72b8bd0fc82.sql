@@ -1,0 +1,1 @@
+UPDATE public.profiles SET unit_id = 'e339ec3d-c27f-4676-9078-cd52dab7eede' WHERE id = '41ce548c-981f-49e0-a588-be1d53537fc3';
