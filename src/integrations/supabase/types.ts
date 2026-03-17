@@ -19,6 +19,7 @@ export type Database = {
           address: string | null
           address_number: string | null
           asaas_customer_id: string | null
+          birth_date: string | null
           city: string | null
           complement: string | null
           course_real_value: number | null
@@ -54,6 +55,7 @@ export type Database = {
           address?: string | null
           address_number?: string | null
           asaas_customer_id?: string | null
+          birth_date?: string | null
           city?: string | null
           complement?: string | null
           course_real_value?: number | null
@@ -89,6 +91,7 @@ export type Database = {
           address?: string | null
           address_number?: string | null
           asaas_customer_id?: string | null
+          birth_date?: string | null
           city?: string | null
           complement?: string | null
           course_real_value?: number | null
