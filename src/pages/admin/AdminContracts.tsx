@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, FileText, Loader2 } from "lucide-react";
+import { Plus, Loader2, UserPlus, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -58,6 +59,25 @@ const ESTADOS_BR = [
   "PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"
 ];
 
+function validarCPF(cpf: string): boolean {
+  const c = cpf.replace(/\D/g, "");
+  if (c.length !== 11 || /^(\d)\1+$/.test(c)) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += parseInt(c[i]) * (10 - i);
+  let rest = (sum * 10) % 11;
+  if (rest === 10) rest = 0;
+  if (rest !== parseInt(c[9])) return false;
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += parseInt(c[i]) * (11 - i);
+  rest = (sum * 10) % 11;
+  if (rest === 10) rest = 0;
+  return rest === parseInt(c[10]);
+}
+
+function validarEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 const AdminContracts = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [contracts, setContracts] = useState<ContractRow[]>([]);
@@ -70,10 +90,14 @@ const AdminContracts = () => {
   const { toast } = useToast();
   const { profile, hasRole } = useAuth();
 
+  // Responsible mode
+  const [responsibleMode, setResponsibleMode] = useState<"new" | "existing">("new");
+
   // Form state
   const [responsibleId, setResponsibleId] = useState("");
   const [studentId, setStudentId] = useState("");
   const [responsibleName, setResponsibleName] = useState("");
+  const [birthDate, setBirthDate] = useState("");
   const [rg, setRg] = useState("");
   const [cpf, setCpf] = useState("");
   const [phone, setPhone] = useState("");
@@ -85,6 +109,7 @@ const AdminContracts = () => {
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [zipCode, setZipCode] = useState("");
+  const [unitId, setUnitId] = useState("");
   const [description, setDescription] = useState("");
   const [startDate, setStartDate] = useState("");
   const [firstDueDate, setFirstDueDate] = useState("");
@@ -94,27 +119,27 @@ const AdminContracts = () => {
   const [dueDay, setDueDay] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [notes, setNotes] = useState("");
+  const [password, setPassword] = useState("");
 
   const selectedResponsible = responsibles.find(r => r.id === responsibleId);
   const selectedStudent = students.find(s => s.id === studentId);
-  const unitId = selectedResponsible?.unit_id || "";
-  const unitName = units.find(u => u.id === unitId)?.name || "";
+  const resolvedUnitId = responsibleMode === "existing" ? (selectedResponsible?.unit_id || "") : unitId;
+  const unitName = units.find(u => u.id === resolvedUnitId)?.name || "";
 
   const filteredStudents = useMemo(() => {
-    if (!responsibleId) return [];
+    if (!responsibleId || responsibleMode !== "existing") return [];
     return students.filter(s => s.responsible_id === responsibleId);
-  }, [responsibleId, students]);
+  }, [responsibleId, responsibleMode, students]);
 
   const realValue = parseFloat(courseRealValue) || 0;
   const discount = parseFloat(punctualityDiscount) || 0;
   const finalValue = Math.max(0, realValue - discount);
-  const installmentRealValue = realValue > 0 && parseInt(installments) > 0 ? realValue / parseInt(installments) : 0;
-  const installmentFinalValue = finalValue > 0 && parseInt(installments) > 0 ? finalValue / parseInt(installments) : 0;
+  const numInstallments = parseInt(installments) || 0;
+  const installmentRealValue = realValue > 0 && numInstallments > 0 ? realValue / numInstallments : 0;
+  const installmentFinalValue = finalValue > 0 && numInstallments > 0 ? finalValue / numInstallments : 0;
   const installmentDiscount = installmentRealValue - installmentFinalValue;
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
     setLoading(true);
@@ -143,29 +168,81 @@ const AdminContracts = () => {
   };
 
   const resetForm = () => {
-    setResponsibleId(""); setStudentId(""); setResponsibleName(""); setRg("");
-    setCpf(""); setPhone(""); setEmail(""); setAddress(""); setAddressNumber("");
-    setComplement(""); setNeighborhood(""); setCity(""); setState(""); setZipCode("");
-    setDescription(""); setStartDate(""); setFirstDueDate(""); setCourseRealValue("");
-    setPunctualityDiscount("0"); setInstallments("1"); setDueDay(""); setPaymentMethod("");
-    setNotes(""); setStep("form");
+    setResponsibleMode("new"); setResponsibleId(""); setStudentId("");
+    setResponsibleName(""); setBirthDate(""); setRg(""); setCpf("");
+    setPhone(""); setEmail(""); setAddress(""); setAddressNumber("");
+    setComplement(""); setNeighborhood(""); setCity(""); setState("");
+    setZipCode(""); setUnitId(""); setDescription(""); setStartDate("");
+    setFirstDueDate(""); setCourseRealValue(""); setPunctualityDiscount("0");
+    setInstallments("1"); setDueDay(""); setPaymentMethod(""); setNotes("");
+    setPassword(""); setStep("form");
   };
 
-  const canProceedToSummary = () => {
-    return responsibleId && studentId && cpf && description && startDate && firstDueDate
-      && courseRealValue && parseInt(installments) > 0 && paymentMethod && unitId;
+  const validateForm = (): string | null => {
+    if (!responsibleName.trim()) return "Nome do responsável é obrigatório";
+    if (!birthDate) return "Data de nascimento é obrigatória";
+    if (!cpf.trim()) return "CPF é obrigatório";
+    if (!validarCPF(cpf)) return "CPF inválido";
+    if (!rg.trim()) return "RG é obrigatório";
+    if (!phone.trim()) return "Telefone é obrigatório";
+    if (!email.trim()) return "E-mail é obrigatório";
+    if (!validarEmail(email)) return "E-mail inválido";
+    if (!address.trim()) return "Logradouro é obrigatório";
+    if (!addressNumber.trim()) return "Número é obrigatório";
+    if (!neighborhood.trim()) return "Bairro é obrigatório";
+    if (!city.trim()) return "Cidade é obrigatória";
+    if (!state) return "Estado é obrigatório";
+    if (!zipCode.trim()) return "CEP é obrigatório";
+    if (!resolvedUnitId) return "Unidade é obrigatória";
+    if (responsibleMode === "existing" && !studentId) return "Selecione o aluno";
+    if (responsibleMode === "new" && !password.trim()) return "Senha do responsável é obrigatória";
+    if (!description.trim()) return "Curso/descrição é obrigatório";
+    if (!startDate) return "Data de início é obrigatória";
+    if (!firstDueDate) return "Data do 1º vencimento é obrigatória";
+    if (!paymentMethod) return "Método de pagamento é obrigatório";
+    if (!courseRealValue || realValue <= 0) return "Valor real do curso é obrigatório";
+    if (numInstallments <= 0) return "Nº de parcelas deve ser maior que zero";
+    return null;
+  };
+
+  const handleProceedToSummary = () => {
+    const err = validateForm();
+    if (err) {
+      toast({ title: "Dados incompletos", description: err, variant: "destructive" });
+      return;
+    }
+    setStep("summary");
   };
 
   const handleSave = async () => {
-    if (!unitId || !responsibleId || !studentId) return;
     setSaving(true);
     try {
-      const numInstallments = parseInt(installments);
-      // Insert contract
+      let finalResponsibleId = responsibleId;
+
+      // If new responsible, create via edge function
+      if (responsibleMode === "new") {
+        const { data: fnData, error: fnErr } = await supabase.functions.invoke("create-user", {
+          body: {
+            cpf: cpf.replace(/\D/g, ""),
+            full_name: responsibleName,
+            phone,
+            password,
+            role: "RESPONSAVEL",
+            unit_id: unitId,
+          },
+        });
+        if (fnErr) throw new Error(fnErr.message || "Erro ao criar responsável");
+        if (fnData?.error) throw new Error(fnData.error);
+        finalResponsibleId = fnData.user_id;
+      }
+
+      if (!finalResponsibleId) throw new Error("ID do responsável não encontrado");
+
+      // Insert contract (snapshot of all responsible data)
       const { data: contract, error: contractErr } = await supabase.from("contracts").insert({
-        unit_id: unitId,
-        responsible_id: responsibleId,
-        student_id: studentId,
+        unit_id: resolvedUnitId,
+        responsible_id: finalResponsibleId,
+        student_id: responsibleMode === "existing" ? studentId : finalResponsibleId, // placeholder if new
         description,
         total_value: realValue,
         installments: numInstallments,
@@ -177,8 +254,9 @@ const AdminContracts = () => {
         due_day: parseInt(dueDay) || parseInt(firstDueDate.split("-")[2]) || 1,
         payment_method: paymentMethod,
         responsible_name: responsibleName,
+        birth_date: birthDate,
         rg,
-        cpf,
+        cpf: cpf.replace(/\D/g, ""),
         phone,
         email,
         address,
@@ -202,8 +280,8 @@ const AdminContracts = () => {
         dueDate.setMonth(dueDate.getMonth() + i);
         payments.push({
           contract_id: contract.id,
-          unit_id: unitId,
-          responsible_id: responsibleId,
+          unit_id: resolvedUnitId,
+          responsible_id: finalResponsibleId,
           installment_number: i + 1,
           due_date: dueDate.toISOString().split("T")[0],
           value: installmentFinalValue,
@@ -231,6 +309,237 @@ const AdminContracts = () => {
 
   const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+  const renderResponsibleSection = () => (
+    <div>
+      <h3 className="text-sm font-semibold text-primary mb-3">A. Dados do Responsável</h3>
+      <Tabs value={responsibleMode} onValueChange={(v) => { setResponsibleMode(v as any); setResponsibleId(""); setStudentId(""); }} className="mb-4">
+        <TabsList className="w-full grid grid-cols-2">
+          <TabsTrigger value="new" className="text-xs gap-1">
+            <UserPlus size={14} /> Novo Responsável
+          </TabsTrigger>
+          <TabsTrigger value="existing" className="text-xs gap-1">
+            <UserCheck size={14} /> Responsável Existente
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {responsibleMode === "existing" && (
+        <div className="space-y-3 mb-3">
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Responsável *</Label>
+            <Select value={responsibleId} onValueChange={handleResponsibleChange}>
+              <SelectTrigger className="bg-input border-border text-foreground"><SelectValue placeholder="Selecione o responsável" /></SelectTrigger>
+              <SelectContent className="bg-card border-border">
+                {responsibles.map(r => (
+                  <SelectItem key={r.id} value={r.id}>{r.full_name} - {r.cpf}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {responsibleId && (
+            <div className="space-y-1">
+              <Label className="text-foreground text-xs">Aluno *</Label>
+              <Select value={studentId} onValueChange={setStudentId}>
+                <SelectTrigger className="bg-input border-border text-foreground"><SelectValue placeholder="Selecione o aluno" /></SelectTrigger>
+                <SelectContent className="bg-card border-border">
+                  {filteredStudents.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {filteredStudents.length === 0 && (
+                <p className="text-xs text-destructive">Nenhum aluno vinculado a este responsável.</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {responsibleMode === "new" && (
+        <div className="space-y-3 mb-3">
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Unidade *</Label>
+            <Select value={unitId} onValueChange={setUnitId}>
+              <SelectTrigger className="bg-input border-border text-foreground"><SelectValue placeholder="Selecione a unidade" /></SelectTrigger>
+              <SelectContent className="bg-card border-border">
+                {units.map(u => (
+                  <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Senha de acesso do responsável *</Label>
+            <Input className="bg-input border-border text-foreground" type="password" placeholder="Mínimo 6 caracteres" value={password} onChange={e => setPassword(e.target.value)} />
+          </div>
+        </div>
+      )}
+
+      {/* Personal data fields - shown in both modes (editable snapshot) */}
+      <p className="text-xs font-medium text-muted-foreground mb-2">Dados Pessoais</p>
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Nome Completo *</Label>
+            <Input className="bg-input border-border text-foreground" value={responsibleName} onChange={e => setResponsibleName(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Data de Nascimento *</Label>
+            <Input className="bg-input border-border text-foreground" type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">CPF *</Label>
+            <Input className="bg-input border-border text-foreground" placeholder="000.000.000-00" value={cpf} onChange={e => setCpf(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">RG / Identidade *</Label>
+            <Input className="bg-input border-border text-foreground" value={rg} onChange={e => setRg(e.target.value)} />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Telefone *</Label>
+            <Input className="bg-input border-border text-foreground" placeholder="(31) 99999-9999" value={phone} onChange={e => setPhone(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">E-mail *</Label>
+            <Input className="bg-input border-border text-foreground" type="email" placeholder="email@exemplo.com" value={email} onChange={e => setEmail(e.target.value)} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderAddressSection = () => (
+    <div>
+      <h3 className="text-sm font-semibold text-primary mb-3">B. Endereço</h3>
+      <div className="space-y-3">
+        <div className="grid grid-cols-3 gap-3">
+          <div className="col-span-2 space-y-1">
+            <Label className="text-foreground text-xs">Logradouro *</Label>
+            <Input className="bg-input border-border text-foreground" value={address} onChange={e => setAddress(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Número *</Label>
+            <Input className="bg-input border-border text-foreground" value={addressNumber} onChange={e => setAddressNumber(e.target.value)} />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Complemento</Label>
+            <Input className="bg-input border-border text-foreground" value={complement} onChange={e => setComplement(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Bairro *</Label>
+            <Input className="bg-input border-border text-foreground" value={neighborhood} onChange={e => setNeighborhood(e.target.value)} />
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Cidade *</Label>
+            <Input className="bg-input border-border text-foreground" value={city} onChange={e => setCity(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Estado *</Label>
+            <Select value={state} onValueChange={setState}>
+              <SelectTrigger className="bg-input border-border text-foreground"><SelectValue placeholder="UF" /></SelectTrigger>
+              <SelectContent className="bg-card border-border">
+                {ESTADOS_BR.map(uf => (
+                  <SelectItem key={uf} value={uf}>{uf}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">CEP *</Label>
+            <Input className="bg-input border-border text-foreground" placeholder="00000-000" value={zipCode} onChange={e => setZipCode(e.target.value)} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderFinancialSection = () => (
+    <div>
+      <h3 className="text-sm font-semibold text-primary mb-3">C. Dados Financeiros</h3>
+      <div className="space-y-3">
+        <div className="space-y-1">
+          <Label className="text-foreground text-xs">Curso / Descrição *</Label>
+          <Input className="bg-input border-border text-foreground" placeholder="Ex: Informática Básica" value={description} onChange={e => setDescription(e.target.value)} />
+        </div>
+        {resolvedUnitId && (
+          <div className="p-2 rounded-md bg-muted">
+            <p className="text-xs text-muted-foreground">Unidade: <span className="font-semibold text-foreground">{unitName}</span></p>
+          </div>
+        )}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Data de Início *</Label>
+            <Input className="bg-input border-border text-foreground" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Data do 1º Vencimento *</Label>
+            <Input className="bg-input border-border text-foreground" type="date" value={firstDueDate} onChange={e => setFirstDueDate(e.target.value)} />
+          </div>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-foreground text-xs">Método de Pagamento *</Label>
+          <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+            <SelectTrigger className="bg-input border-border text-foreground"><SelectValue placeholder="Selecione" /></SelectTrigger>
+            <SelectContent className="bg-card border-border">
+              <SelectItem value="PIX">PIX</SelectItem>
+              <SelectItem value="BOLETO">Boleto</SelectItem>
+              <SelectItem value="CARD">Cartão</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderInstallmentSection = () => (
+    <div>
+      <h3 className="text-sm font-semibold text-primary mb-3">D. Parcelamento</h3>
+      <div className="space-y-3">
+        <div className="grid grid-cols-3 gap-3">
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Valor Real do Curso *</Label>
+            <Input className="bg-input border-border text-foreground" type="number" step="0.01" min="0" placeholder="0,00" value={courseRealValue} onChange={e => setCourseRealValue(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Desc. Pontualidade</Label>
+            <Input className="bg-input border-border text-foreground" type="number" step="0.01" min="0" placeholder="0,00" value={punctualityDiscount} onChange={e => setPunctualityDiscount(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Valor Final</Label>
+            <Input className="bg-input border-border text-foreground" readOnly value={fmt(finalValue)} />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Nº de Parcelas *</Label>
+            <Input className="bg-input border-border text-foreground" type="number" min="1" value={installments} onChange={e => setInstallments(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Dia de Vencimento</Label>
+            <Input className="bg-input border-border text-foreground" type="number" min="1" max="28" placeholder="Herda do 1º vencimento" value={dueDay} onChange={e => setDueDay(e.target.value)} />
+          </div>
+        </div>
+        {realValue > 0 && numInstallments > 0 && (
+          <div className="p-3 rounded-md bg-muted space-y-1">
+            <p className="text-xs text-muted-foreground">Parcela sem desconto: <span className="font-semibold text-foreground">{fmt(installmentRealValue)}</span></p>
+            {discount > 0 && (
+              <p className="text-xs text-muted-foreground">Desc. pontualidade/parcela: <span className="font-semibold text-destructive">-{fmt(installmentDiscount)}</span></p>
+            )}
+            <p className="text-xs text-muted-foreground">Parcela com desconto: <span className="font-semibold text-primary">{fmt(installmentFinalValue)}</span></p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -251,222 +560,60 @@ const AdminContracts = () => {
 
             {step === "form" ? (
               <div className="space-y-6">
-                {/* Section A: Dados do Responsável */}
-                <div>
-                  <h3 className="text-sm font-semibold text-primary mb-3">A. Dados do Responsável</h3>
-                  <div className="space-y-3">
-                    <div className="space-y-1">
-                      <Label className="text-foreground text-xs">Responsável *</Label>
-                      <Select value={responsibleId} onValueChange={handleResponsibleChange}>
-                        <SelectTrigger className="bg-input border-border text-foreground"><SelectValue placeholder="Selecione o responsável" /></SelectTrigger>
-                        <SelectContent className="bg-card border-border">
-                          {responsibles.map(r => (
-                            <SelectItem key={r.id} value={r.id}>{r.full_name} - {r.cpf}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {responsibleId && (
-                      <>
-                        <div className="space-y-1">
-                          <Label className="text-foreground text-xs">Aluno *</Label>
-                          <Select value={studentId} onValueChange={setStudentId}>
-                            <SelectTrigger className="bg-input border-border text-foreground"><SelectValue placeholder="Selecione o aluno" /></SelectTrigger>
-                            <SelectContent className="bg-card border-border">
-                              {filteredStudents.map(s => (
-                                <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {filteredStudents.length === 0 && (
-                            <p className="text-xs text-destructive">Nenhum aluno vinculado a este responsável.</p>
-                          )}
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <Label className="text-foreground text-xs">Nome Completo</Label>
-                            <Input className="bg-input border-border text-foreground" value={responsibleName} onChange={e => setResponsibleName(e.target.value)} />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-foreground text-xs">CPF *</Label>
-                            <Input className="bg-input border-border text-foreground" value={cpf} onChange={e => setCpf(e.target.value)} />
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <Label className="text-foreground text-xs">RG / Identidade</Label>
-                            <Input className="bg-input border-border text-foreground" value={rg} onChange={e => setRg(e.target.value)} />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-foreground text-xs">Telefone</Label>
-                            <Input className="bg-input border-border text-foreground" value={phone} onChange={e => setPhone(e.target.value)} />
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-foreground text-xs">E-mail</Label>
-                          <Input className="bg-input border-border text-foreground" type="email" value={email} onChange={e => setEmail(e.target.value)} />
-                        </div>
-                        <Separator className="my-2" />
-                        <p className="text-xs text-muted-foreground font-medium">Endereço</p>
-                        <div className="grid grid-cols-3 gap-3">
-                          <div className="col-span-2 space-y-1">
-                            <Label className="text-foreground text-xs">Logradouro</Label>
-                            <Input className="bg-input border-border text-foreground" value={address} onChange={e => setAddress(e.target.value)} />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-foreground text-xs">Número</Label>
-                            <Input className="bg-input border-border text-foreground" value={addressNumber} onChange={e => setAddressNumber(e.target.value)} />
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <Label className="text-foreground text-xs">Complemento</Label>
-                            <Input className="bg-input border-border text-foreground" value={complement} onChange={e => setComplement(e.target.value)} />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-foreground text-xs">Bairro</Label>
-                            <Input className="bg-input border-border text-foreground" value={neighborhood} onChange={e => setNeighborhood(e.target.value)} />
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-3 gap-3">
-                          <div className="space-y-1">
-                            <Label className="text-foreground text-xs">Cidade</Label>
-                            <Input className="bg-input border-border text-foreground" value={city} onChange={e => setCity(e.target.value)} />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-foreground text-xs">Estado</Label>
-                            <Select value={state} onValueChange={setState}>
-                              <SelectTrigger className="bg-input border-border text-foreground"><SelectValue placeholder="UF" /></SelectTrigger>
-                              <SelectContent className="bg-card border-border">
-                                {ESTADOS_BR.map(uf => (
-                                  <SelectItem key={uf} value={uf}>{uf}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-foreground text-xs">CEP</Label>
-                            <Input className="bg-input border-border text-foreground" value={zipCode} onChange={e => setZipCode(e.target.value)} />
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-
+                {renderResponsibleSection()}
                 <Separator />
-
-                {/* Section B: Dados Financeiros */}
-                <div>
-                  <h3 className="text-sm font-semibold text-primary mb-3">B. Dados Financeiros do Contrato</h3>
-                  <div className="space-y-3">
-                    <div className="space-y-1">
-                      <Label className="text-foreground text-xs">Curso / Descrição *</Label>
-                      <Input className="bg-input border-border text-foreground" placeholder="Ex: Informática Básica" value={description} onChange={e => setDescription(e.target.value)} />
-                    </div>
-                    {unitId && (
-                      <div className="p-2 rounded-md bg-muted">
-                        <p className="text-xs text-muted-foreground">Unidade: <span className="font-semibold text-foreground">{unitName}</span></p>
-                      </div>
-                    )}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-foreground text-xs">Data de Início *</Label>
-                        <Input className="bg-input border-border text-foreground" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-foreground text-xs">Data do 1º Vencimento *</Label>
-                        <Input className="bg-input border-border text-foreground" type="date" value={firstDueDate} onChange={e => setFirstDueDate(e.target.value)} />
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-foreground text-xs">Método de Pagamento *</Label>
-                      <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                        <SelectTrigger className="bg-input border-border text-foreground"><SelectValue placeholder="Selecione" /></SelectTrigger>
-                        <SelectContent className="bg-card border-border">
-                          <SelectItem value="PIX">PIX</SelectItem>
-                          <SelectItem value="BOLETO">Boleto</SelectItem>
-                          <SelectItem value="CARD">Cartão</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-
+                {renderAddressSection()}
                 <Separator />
-
-                {/* Section C: Parcelamento */}
-                <div>
-                  <h3 className="text-sm font-semibold text-primary mb-3">C. Parcelamento</h3>
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-foreground text-xs">Valor Real do Curso *</Label>
-                        <Input className="bg-input border-border text-foreground" type="number" step="0.01" min="0" placeholder="0,00" value={courseRealValue} onChange={e => setCourseRealValue(e.target.value)} />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-foreground text-xs">Desc. Pontualidade</Label>
-                        <Input className="bg-input border-border text-foreground" type="number" step="0.01" min="0" placeholder="0,00" value={punctualityDiscount} onChange={e => setPunctualityDiscount(e.target.value)} />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-foreground text-xs">Valor Final</Label>
-                        <Input className="bg-input border-border text-foreground" readOnly value={fmt(finalValue)} />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-foreground text-xs">Nº de Parcelas *</Label>
-                        <Input className="bg-input border-border text-foreground" type="number" min="1" value={installments} onChange={e => setInstallments(e.target.value)} />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-foreground text-xs">Dia de Vencimento</Label>
-                        <Input className="bg-input border-border text-foreground" type="number" min="1" max="28" placeholder="Herda do 1º vencimento" value={dueDay} onChange={e => setDueDay(e.target.value)} />
-                      </div>
-                    </div>
-                    {realValue > 0 && parseInt(installments) > 0 && (
-                      <div className="p-3 rounded-md bg-muted space-y-1">
-                        <p className="text-xs text-muted-foreground">Parcela sem desconto: <span className="font-semibold text-foreground">{fmt(installmentRealValue)}</span></p>
-                        {discount > 0 && (
-                          <p className="text-xs text-muted-foreground">Desc. pontualidade/parcela: <span className="font-semibold text-destructive">-{fmt(installmentDiscount)}</span></p>
-                        )}
-                        <p className="text-xs text-muted-foreground">Parcela com desconto: <span className="font-semibold text-primary">{fmt(installmentFinalValue)}</span></p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
+                {renderFinancialSection()}
                 <Separator />
-
-                {/* Section D: Observações */}
+                {renderInstallmentSection()}
+                <Separator />
                 <div>
-                  <h3 className="text-sm font-semibold text-primary mb-3">D. Observações</h3>
+                  <h3 className="text-sm font-semibold text-primary mb-3">E. Observações</h3>
                   <Textarea className="bg-input border-border text-foreground" placeholder="Observações do contrato..." value={notes} onChange={e => setNotes(e.target.value)} rows={3} />
                 </div>
-
                 <Button
                   className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-                  disabled={!canProceedToSummary()}
-                  onClick={() => setStep("summary")}
+                  onClick={handleProceedToSummary}
                 >
                   Revisar Contrato
                 </Button>
               </div>
             ) : (
-              /* Summary Step */
               <div className="space-y-4">
                 <div className="p-4 rounded-lg bg-muted space-y-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Responsável</p>
                   <div className="grid grid-cols-2 gap-y-2 text-sm">
-                    <span className="text-muted-foreground">Responsável:</span>
+                    <span className="text-muted-foreground">Nome:</span>
                     <span className="text-foreground font-medium">{responsibleName}</span>
                     <span className="text-muted-foreground">CPF:</span>
                     <span className="text-foreground">{cpf}</span>
-                    <span className="text-muted-foreground">Aluno:</span>
-                    <span className="text-foreground font-medium">{selectedStudent?.full_name}</span>
-                    <span className="text-muted-foreground">Unidade:</span>
-                    <span className="text-foreground font-medium">{unitName}</span>
+                    <span className="text-muted-foreground">RG:</span>
+                    <span className="text-foreground">{rg}</span>
+                    <span className="text-muted-foreground">Nascimento:</span>
+                    <span className="text-foreground">{birthDate ? new Date(birthDate + "T12:00:00").toLocaleDateString("pt-BR") : ""}</span>
+                    <span className="text-muted-foreground">Telefone:</span>
+                    <span className="text-foreground">{phone}</span>
+                    <span className="text-muted-foreground">E-mail:</span>
+                    <span className="text-foreground">{email}</span>
                   </div>
                   <Separator />
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Endereço</p>
+                  <p className="text-sm text-foreground">
+                    {address}, {addressNumber}{complement ? ` - ${complement}` : ""}<br />
+                    {neighborhood} - {city}/{state} - CEP: {zipCode}
+                  </p>
+                  <Separator />
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Contrato</p>
                   <div className="grid grid-cols-2 gap-y-2 text-sm">
+                    {responsibleMode === "existing" && selectedStudent && (
+                      <>
+                        <span className="text-muted-foreground">Aluno:</span>
+                        <span className="text-foreground font-medium">{selectedStudent.full_name}</span>
+                      </>
+                    )}
+                    <span className="text-muted-foreground">Unidade:</span>
+                    <span className="text-foreground font-medium">{unitName}</span>
                     <span className="text-muted-foreground">Curso:</span>
                     <span className="text-foreground font-medium">{description}</span>
                     <span className="text-muted-foreground">Valor Real:</span>
