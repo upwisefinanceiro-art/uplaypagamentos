@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Loader2, UserPlus, UserCheck } from "lucide-react";
+import { Plus, Loader2, UserPlus, UserCheck, Save } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
