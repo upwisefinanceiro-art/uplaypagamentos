@@ -69,21 +69,21 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 2) Get user's unit_id
-    const { data: userProfile, error: profileErr } = await supabaseAdmin
-      .from("profiles")
-      .select("unit_id")
-      .eq("id", userId)
-      .single();
+    // 2) Verify caller is admin
+    const { data: callerRoles } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId);
 
-    if (profileErr || !userProfile?.unit_id) {
+    const isAdminMaster = callerRoles?.some((r: any) => r.role === "ADMIN_MASTER");
+    const isAdminUnidade = callerRoles?.some((r: any) => r.role === "ADMIN_UNIDADE");
+
+    if (!isAdminMaster && !isAdminUnidade) {
       return new Response(
-        JSON.stringify({ error: "Usuário sem unidade vinculada" }),
+        JSON.stringify({ error: "Sem permissão para gerar cobranças" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    const unitId = userProfile.unit_id;
 
     // 3) Get unit's Asaas credentials
     const { data: unit, error: unitErr } = await supabaseAdmin
@@ -101,10 +101,10 @@ Deno.serve(async (req) => {
 
     const baseUrl = unit.asaas_base_url || "https://sandbox.asaas.com/api/v3";
 
-    // 4) Get responsible profile
+    // 4) Get responsible profile and resolve unit from responsible
     const { data: responsible, error: respErr } = await supabaseAdmin
       .from("profiles")
-      .select("full_name, cpf, phone, asaas_customer_id")
+      .select("full_name, cpf, phone, asaas_customer_id, unit_id")
       .eq("id", responsible_id)
       .single();
 
@@ -113,6 +113,31 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: "Responsável não encontrado" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    if (!responsible.unit_id) {
+      return new Response(
+        JSON.stringify({ error: "Responsável sem unidade vinculada. Atualize o cadastro do cliente." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const unitId = responsible.unit_id;
+
+    // ADMIN_UNIDADE can only charge clients from their own unit
+    if (isAdminUnidade && !isAdminMaster) {
+      const { data: adminProfile } = await supabaseAdmin
+        .from("profiles")
+        .select("unit_id")
+        .eq("id", userId)
+        .single();
+
+      if (adminProfile?.unit_id !== unitId) {
+        return new Response(
+          JSON.stringify({ error: "Sem permissão para cobrar clientes de outra unidade" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // 5) Ensure Asaas customer exists (validate against production API)
