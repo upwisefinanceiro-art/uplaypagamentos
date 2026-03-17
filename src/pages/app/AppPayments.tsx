@@ -402,6 +402,22 @@ const AppPayments = () => {
           Nenhum pagamento encontrado.
         </div>
       )}
+
+      {/* WhatsApp Dialog */}
+      {waPayment && waResponsible && (
+        <WhatsAppDialog
+          open={waDialogOpen}
+          onOpenChange={setWaDialogOpen}
+          phone={waResponsible.phone}
+          responsibleName={waResponsible.full_name}
+          studentName={waStudent}
+          description={waDescription}
+          value={waPayment.final_value ?? waPayment.value}
+          dueDate={waPayment.due_date}
+          invoiceUrl={waPayment.invoice_url}
+          pixCopyPaste={waPayment.pix_copy_paste}
+        />
+      )}
     </div>
   );
 };
