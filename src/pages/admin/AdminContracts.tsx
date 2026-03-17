@@ -221,8 +221,8 @@ const AdminContracts = () => {
     try {
       let finalResponsibleId = responsibleId;
 
-      // If new responsible, create via edge function
-      if (responsibleMode === "new") {
+      // If new responsible AND user wants to save to base, create via edge function
+      if (responsibleMode === "new" && saveResponsibleToBase) {
         const { data: fnData, error: fnErr } = await supabase.functions.invoke("create-user", {
           body: {
             cpf: cpf.replace(/\D/g, ""),
@@ -236,6 +236,15 @@ const AdminContracts = () => {
         if (fnErr) throw new Error(fnErr.message || "Erro ao criar responsável");
         if (fnData?.error) throw new Error(fnData.error);
         finalResponsibleId = fnData.user_id;
+      }
+
+      // If new mode but NOT saving to base, we need a placeholder responsible_id
+      // We'll use a dummy UUID that links the contract data via snapshot only
+      if (responsibleMode === "new" && !saveResponsibleToBase) {
+        // Use the current admin user as a placeholder responsible
+        // The real data is in the contract snapshot fields
+        const { data: { user } } = await supabase.auth.getUser();
+        finalResponsibleId = user?.id || "";
       }
 
       if (!finalResponsibleId) throw new Error("ID do responsável não encontrado");
