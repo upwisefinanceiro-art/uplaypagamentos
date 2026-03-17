@@ -108,9 +108,25 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 5) Ensure Asaas customer exists
+    // 5) Ensure Asaas customer exists (validate against production API)
     let asaasCustomerId = responsible.asaas_customer_id;
 
+    // If we have a stored customer ID, validate it exists in this unit's Asaas account
+    if (asaasCustomerId) {
+      try {
+        const checkRes = await fetch(`${baseUrl}/customers/${asaasCustomerId}`, {
+          headers: { access_token: unit.asaas_api_key },
+        });
+        if (!checkRes.ok) {
+          // Customer doesn't exist in production — clear it
+          asaasCustomerId = null;
+        }
+      } catch {
+        asaasCustomerId = null;
+      }
+    }
+
+    // Create customer if needed
     if (!asaasCustomerId) {
       const cpfClean = responsible.cpf.replace(/\D/g, "");
       const customerPayload = {
