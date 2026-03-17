@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Loader2, UserPlus, UserCheck } from "lucide-react";
+import { Plus, Loader2, UserPlus, UserCheck, Save } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -120,6 +121,7 @@ const AdminContracts = () => {
   const [paymentMethod, setPaymentMethod] = useState("");
   const [notes, setNotes] = useState("");
   const [password, setPassword] = useState("");
+  const [saveResponsibleToBase, setSaveResponsibleToBase] = useState(false);
 
   const selectedResponsible = responsibles.find(r => r.id === responsibleId);
   const selectedStudent = students.find(s => s.id === studentId);
@@ -175,7 +177,7 @@ const AdminContracts = () => {
     setZipCode(""); setUnitId(""); setDescription(""); setStartDate("");
     setFirstDueDate(""); setCourseRealValue(""); setPunctualityDiscount("0");
     setInstallments("1"); setDueDay(""); setPaymentMethod(""); setNotes("");
-    setPassword(""); setStep("form");
+    setPassword(""); setStep("form"); setSaveResponsibleToBase(false);
   };
 
   const validateForm = (): string | null => {
@@ -195,7 +197,7 @@ const AdminContracts = () => {
     if (!zipCode.trim()) return "CEP é obrigatório";
     if (!resolvedUnitId) return "Unidade é obrigatória";
     if (responsibleMode === "existing" && !studentId) return "Selecione o aluno";
-    if (responsibleMode === "new" && !password.trim()) return "Senha do responsável é obrigatória";
+    if (responsibleMode === "new" && saveResponsibleToBase && !password.trim()) return "Senha do responsável é obrigatória para salvar na base";
     if (!description.trim()) return "Curso/descrição é obrigatório";
     if (!startDate) return "Data de início é obrigatória";
     if (!firstDueDate) return "Data do 1º vencimento é obrigatória";
@@ -219,8 +221,8 @@ const AdminContracts = () => {
     try {
       let finalResponsibleId = responsibleId;
 
-      // If new responsible, create via edge function
-      if (responsibleMode === "new") {
+      // If new responsible AND user wants to save to base, create via edge function
+      if (responsibleMode === "new" && saveResponsibleToBase) {
         const { data: fnData, error: fnErr } = await supabase.functions.invoke("create-user", {
           body: {
             cpf: cpf.replace(/\D/g, ""),
@@ -234,6 +236,15 @@ const AdminContracts = () => {
         if (fnErr) throw new Error(fnErr.message || "Erro ao criar responsável");
         if (fnData?.error) throw new Error(fnData.error);
         finalResponsibleId = fnData.user_id;
+      }
+
+      // If new mode but NOT saving to base, we need a placeholder responsible_id
+      // We'll use a dummy UUID that links the contract data via snapshot only
+      if (responsibleMode === "new" && !saveResponsibleToBase) {
+        // Use the current admin user as a placeholder responsible
+        // The real data is in the contract snapshot fields
+        const { data: { user } } = await supabase.auth.getUser();
+        finalResponsibleId = user?.id || "";
       }
 
       if (!finalResponsibleId) throw new Error("ID do responsável não encontrado");
@@ -368,10 +379,23 @@ const AdminContracts = () => {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
-            <Label className="text-foreground text-xs">Senha de acesso do responsável *</Label>
-            <Input className="bg-input border-border text-foreground" type="password" placeholder="Mínimo 6 caracteres" value={password} onChange={e => setPassword(e.target.value)} />
+          <div className="flex items-center gap-2 p-3 rounded-md border border-border bg-muted/30">
+            <Checkbox
+              id="save-responsible"
+              checked={saveResponsibleToBase}
+              onCheckedChange={(checked) => setSaveResponsibleToBase(checked === true)}
+            />
+            <label htmlFor="save-responsible" className="text-xs text-foreground cursor-pointer flex items-center gap-1.5">
+              <Save size={13} className="text-primary" />
+              Salvar responsável na base (para reaproveitar depois)
+            </label>
           </div>
+          {saveResponsibleToBase && (
+            <div className="space-y-1">
+              <Label className="text-foreground text-xs">Senha de acesso do responsável *</Label>
+              <Input className="bg-input border-border text-foreground" type="password" placeholder="Mínimo 6 caracteres" value={password} onChange={e => setPassword(e.target.value)} />
+            </div>
+          )}
         </div>
       )}
 
