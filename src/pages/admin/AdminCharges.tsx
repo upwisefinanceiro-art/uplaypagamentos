@@ -149,6 +149,17 @@ const AdminCharges = () => {
       return;
     }
 
+    if (parseFloat(chargeValue) < 10) {
+      toast({ title: "O valor mínimo da cobrança é R$ 10,00", variant: "destructive" });
+      return;
+    }
+
+    const resp = responsibles.find((r) => r.id === selectedResponsible);
+    if (!resp?.unit_id) {
+      toast({ title: "Responsável sem unidade vinculada", description: "Atualize o cadastro do cliente antes de gerar a cobrança.", variant: "destructive" });
+      return;
+    }
+
     setCreating(true);
     setChargeResult(null);
 
