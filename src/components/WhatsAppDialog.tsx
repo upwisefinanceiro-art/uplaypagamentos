@@ -16,7 +16,6 @@ interface WhatsAppDialogProps {
   value: number;
   dueDate: string;
   invoiceUrl?: string | null;
-  pixCopyPaste?: string | null;
 }
 
 const formatPhone = (phone: string): string => {
