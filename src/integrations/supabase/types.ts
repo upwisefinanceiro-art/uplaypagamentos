@@ -16,49 +16,109 @@ export type Database = {
     Tables: {
       contracts: {
         Row: {
+          address: string | null
+          address_number: string | null
           asaas_customer_id: string | null
+          city: string | null
+          complement: string | null
+          course_real_value: number | null
+          cpf: string | null
           created_at: string
           description: string
+          due_day: number | null
+          email: string | null
           end_date: string | null
+          final_value_with_discount: number | null
+          first_due_date: string | null
           id: string
           installments: number
+          neighborhood: string | null
+          notes: string | null
+          payment_method: string | null
+          phone: string | null
+          proof_of_address_url: string | null
+          punctuality_discount: number | null
           responsible_id: string
+          responsible_name: string | null
+          rg: string | null
           start_date: string
+          state: string | null
           status: string
           student_id: string
           total_value: number
           unit_id: string
           updated_at: string
+          zip_code: string | null
         }
         Insert: {
+          address?: string | null
+          address_number?: string | null
           asaas_customer_id?: string | null
+          city?: string | null
+          complement?: string | null
+          course_real_value?: number | null
+          cpf?: string | null
           created_at?: string
           description: string
+          due_day?: number | null
+          email?: string | null
           end_date?: string | null
+          final_value_with_discount?: number | null
+          first_due_date?: string | null
           id?: string
           installments?: number
+          neighborhood?: string | null
+          notes?: string | null
+          payment_method?: string | null
+          phone?: string | null
+          proof_of_address_url?: string | null
+          punctuality_discount?: number | null
           responsible_id: string
+          responsible_name?: string | null
+          rg?: string | null
           start_date: string
+          state?: string | null
           status?: string
           student_id: string
           total_value: number
           unit_id: string
           updated_at?: string
+          zip_code?: string | null
         }
         Update: {
+          address?: string | null
+          address_number?: string | null
           asaas_customer_id?: string | null
+          city?: string | null
+          complement?: string | null
+          course_real_value?: number | null
+          cpf?: string | null
           created_at?: string
           description?: string
+          due_day?: number | null
+          email?: string | null
           end_date?: string | null
+          final_value_with_discount?: number | null
+          first_due_date?: string | null
           id?: string
           installments?: number
+          neighborhood?: string | null
+          notes?: string | null
+          payment_method?: string | null
+          phone?: string | null
+          proof_of_address_url?: string | null
+          punctuality_discount?: number | null
           responsible_id?: string
+          responsible_name?: string | null
+          rg?: string | null
           start_date?: string
+          state?: string | null
           status?: string
           student_id?: string
           total_value?: number
           unit_id?: string
           updated_at?: string
+          zip_code?: string | null
         }
         Relationships: [
           {
@@ -93,13 +153,16 @@ export type Database = {
           contract_id: string | null
           created_at: string
           due_date: string
+          final_value: number | null
           id: string
           installment_number: number
           invoice_url: string | null
+          original_value: number | null
           paid_at: string | null
           payment_method: string | null
           pix_copy_paste: string | null
           pix_qr_code: string | null
+          punctuality_discount: number | null
           raw_response: Json | null
           responsible_id: string
           status: string
@@ -115,13 +178,16 @@ export type Database = {
           contract_id?: string | null
           created_at?: string
           due_date: string
+          final_value?: number | null
           id?: string
           installment_number?: number
           invoice_url?: string | null
+          original_value?: number | null
           paid_at?: string | null
           payment_method?: string | null
           pix_copy_paste?: string | null
           pix_qr_code?: string | null
+          punctuality_discount?: number | null
           raw_response?: Json | null
           responsible_id: string
           status?: string
@@ -137,13 +203,16 @@ export type Database = {
           contract_id?: string | null
           created_at?: string
           due_date?: string
+          final_value?: number | null
           id?: string
           installment_number?: number
           invoice_url?: string | null
+          original_value?: number | null
           paid_at?: string | null
           payment_method?: string | null
           pix_copy_paste?: string | null
           pix_qr_code?: string | null
+          punctuality_discount?: number | null
           raw_response?: Json | null
           responsible_id?: string
           status?: string
