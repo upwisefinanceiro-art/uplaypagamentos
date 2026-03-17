@@ -87,7 +87,7 @@ const AppPayments = () => {
     setLoading(true);
     const { data } = await supabase
       .from("payments")
-      .select("id, value, due_date, status, payment_method, installment_number, pix_copy_paste, invoice_url, boleto_url, checkout_url, contract_id")
+      .select("id, value, due_date, status, payment_method, installment_number, pix_copy_paste, invoice_url, boleto_url, checkout_url, contract_id, responsible_id, final_value")
       .order("due_date", { ascending: false });
     if (data) setPayments(data);
     setLoading(false);
