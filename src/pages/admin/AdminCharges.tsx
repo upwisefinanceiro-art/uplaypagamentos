@@ -96,7 +96,7 @@ const AdminCharges = () => {
       supabase.from("payments").select("id, value, due_date, status, payment_method, pix_copy_paste, invoice_url, checkout_url, boleto_url, pix_qr_code, asaas_payment_id, responsible_id, unit_id, installment_number, contract_id").order("due_date", { ascending: false }),
       supabase.from("students").select("id, full_name, responsible_id"),
       supabase.from("units").select("id, name"),
-      supabase.from("profiles").select("id, full_name"),
+      supabase.from("profiles").select("id, full_name, unit_id"),
     ]);
 
     if (paymentsRes.data) setPayments(paymentsRes.data as PaymentRow[]);
