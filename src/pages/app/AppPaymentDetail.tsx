@@ -369,7 +369,7 @@ const AppPaymentDetail = () => {
               variant="outline"
               size="sm"
               className="gap-2 text-xs border-success/30 text-success hover:bg-success/10 hover:text-success"
-              onClick={handleWhatsApp}
+              onClick={() => setWaDialogOpen(true)}
             >
               <MessageCircle size={14} /> WhatsApp
             </Button>
