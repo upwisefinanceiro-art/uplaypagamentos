@@ -19,6 +19,7 @@ interface ContractRow {
   course_real_value: number | null;
   punctuality_discount: number | null;
   final_value_with_discount: number | null;
+  total_value: number;
   installments: number;
   first_due_date: string | null;
   start_date: string;
