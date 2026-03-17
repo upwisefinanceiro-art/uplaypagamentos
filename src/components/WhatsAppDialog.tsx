@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { MessageCircle, AlertTriangle, ExternalLink } from "lucide-react";
+import { MessageCircle, AlertTriangle, ExternalLink, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
