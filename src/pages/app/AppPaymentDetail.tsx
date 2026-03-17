@@ -52,16 +52,30 @@ const AppPaymentDetail = () => {
         .single();
       if (data) {
         setPayment(data);
-        const promises: Promise<any>[] = [
+        const [respRes, unitRes] = await Promise.all([
           supabase.from("profiles").select("full_name, phone, cpf").eq("id", data.responsible_id).single(),
           supabase.from("units").select("name").eq("id", data.unit_id).single(),
-        ];
+        ]);
+        if (respRes.data) setResponsible(respRes.data);
+        if (unitRes.data) setUnit(unitRes.data);
         if (data.contract_id) {
-          promises.push(
-            supabase.from("contracts").select("description, student_id, responsible_name").eq("id", data.contract_id).single()
-          );
+          const { data: contractData } = await supabase
+            .from("contracts")
+            .select("description, student_id, responsible_name")
+            .eq("id", data.contract_id)
+            .single();
+          if (contractData) {
+            setContract(contractData);
+            if (contractData.student_id) {
+              const { data: studentData } = await supabase
+                .from("students")
+                .select("full_name")
+                .eq("id", contractData.student_id)
+                .single();
+              if (studentData) setStudent(studentData);
+            }
+          }
         }
-        const results = await Promise.all(promises);
         if (results[0].data) setResponsible(results[0].data);
         if (results[1].data) setUnit(results[1].data);
         if (results[2]?.data) {
