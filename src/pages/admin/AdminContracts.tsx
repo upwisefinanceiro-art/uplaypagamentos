@@ -602,6 +602,69 @@ const AdminContracts = () => {
     </div>
   );
 
+  const renderApostilasSection = () => (
+    <div>
+      <h3 className="text-sm font-semibold text-primary mb-3">E. Apostilas</h3>
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="include-apostilas"
+            checked={includeApostilas}
+            onCheckedChange={(checked) => setIncludeApostilas(checked === true)}
+          />
+          <label htmlFor="include-apostilas" className="text-xs text-foreground cursor-pointer">
+            Incluir parcelas de apostilas no contrato
+          </label>
+        </div>
+
+        {includeApostilas && (
+          <div className="space-y-3 p-3 rounded-md border border-border bg-muted/30">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-foreground text-xs">Valor Total das Apostilas *</Label>
+                <Input className="bg-input border-border text-foreground" type="number" step="0.01" min="0" placeholder="0,00" value={apostilasTotal} onChange={e => setApostilasTotal(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-foreground text-xs">Quantidade de Parcelas *</Label>
+                <Input className="bg-input border-border text-foreground" type="number" min="1" value={apostilasQty} onChange={e => setApostilasQty(e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-foreground text-xs">Data do 1º Vencimento *</Label>
+                <Input className="bg-input border-border text-foreground" type="date" value={apostilasStartDate} onChange={e => setApostilasStartDate(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-foreground text-xs">Intervalo entre parcelas (meses)</Label>
+                <Input className="bg-input border-border text-foreground" type="number" min="1" max="12" value={apostilasInterval} onChange={e => setApostilasInterval(e.target.value)} />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Parcelas das apostilas geradas a cada {apostilasIntervalMonths} {apostilasIntervalMonths === 1 ? "mês" : "meses"}
+            </p>
+            {apostilasTotalValue > 0 && apostilasCount > 0 && apostilasStartDate && (
+              <div className="p-3 rounded-md bg-muted space-y-1">
+                <p className="text-xs text-muted-foreground">
+                  Valor por parcela: <span className="font-semibold text-primary">{fmt(apostilasInstallmentValue)}</span>
+                </p>
+                <p className="text-xs font-medium text-muted-foreground mt-2">Vencimentos:</p>
+                {Array.from({ length: apostilasCount }).map((_, i) => {
+                  const d = new Date(apostilasStartDate + "T12:00:00");
+                  d.setMonth(d.getMonth() + (i * apostilasIntervalMonths));
+                  return (
+                    <p key={i} className="text-xs text-foreground">
+                      {i + 1}ª — {d.toLocaleDateString("pt-BR")}
+                    </p>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
