@@ -109,6 +109,38 @@ const AppPayments = () => {
 
   const filtered = filter === "ALL" ? payments : payments.filter((p) => p.status === filter);
 
+  const handleOpenWhatsApp = async (payment: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setWaPayment(payment);
+    // Fetch responsible info
+    const { data: resp } = await supabase
+      .from("profiles")
+      .select("full_name, phone")
+      .eq("id", payment.responsible_id)
+      .single();
+    setWaResponsible(resp);
+
+    let desc = `Parcela ${payment.installment_number}`;
+    let studentName: string | undefined;
+    if (payment.contract_id) {
+      const { data: contractData } = await supabase
+        .from("contracts")
+        .select("description, student_id")
+        .eq("id", payment.contract_id)
+        .single();
+      if (contractData) {
+        desc = contractData.description || desc;
+        if (contractData.student_id) {
+          const { data: stData } = await supabase.from("students").select("full_name").eq("id", contractData.student_id).single();
+          studentName = stData?.full_name;
+        }
+      }
+    }
+    setWaDescription(desc);
+    setWaStudent(studentName);
+    setWaDialogOpen(true);
+  };
+
   const filteredStudents = selectedResponsible
     ? students.filter((s) => s.responsible_id === selectedResponsible)
     : [];
