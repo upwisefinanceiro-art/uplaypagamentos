@@ -760,6 +760,22 @@ const AdminContracts = () => {
                     <span className="text-muted-foreground">Pagamento:</span>
                     <span className="text-foreground">{paymentMethod}</span>
                   </div>
+                  {includeApostilas && apostilasCount > 0 && apostilasTotalValue > 0 && (
+                    <>
+                      <Separator />
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Apostilas</p>
+                      <div className="grid grid-cols-2 gap-y-2 text-sm">
+                        <span className="text-muted-foreground">Valor Total:</span>
+                        <span className="text-foreground">{fmt(apostilasTotalValue)}</span>
+                        <span className="text-muted-foreground">Parcelas:</span>
+                        <span className="text-foreground">{apostilasCount}x de {fmt(apostilasInstallmentValue)}</span>
+                        <span className="text-muted-foreground">Intervalo:</span>
+                        <span className="text-foreground">A cada {apostilasIntervalMonths} {apostilasIntervalMonths === 1 ? "mês" : "meses"}</span>
+                        <span className="text-muted-foreground">1º Vencimento:</span>
+                        <span className="text-foreground">{apostilasStartDate ? new Date(apostilasStartDate + "T12:00:00").toLocaleDateString("pt-BR") : ""}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <div className="flex gap-3">
