@@ -430,6 +430,22 @@ const AppPaymentDetail = () => {
           })}
         </div>
       </div>
+
+      {/* WhatsApp Dialog */}
+      {payment && (
+        <WhatsAppDialog
+          open={waDialogOpen}
+          onOpenChange={setWaDialogOpen}
+          phone={responsible?.phone}
+          responsibleName={responsible?.full_name || contract?.responsible_name || "Responsável"}
+          studentName={student?.full_name}
+          description={description}
+          value={finalValue}
+          dueDate={payment.due_date}
+          invoiceUrl={payment.invoice_url}
+          pixCopyPaste={payment.pix_copy_paste}
+        />
+      )}
     </div>
   );
 };
