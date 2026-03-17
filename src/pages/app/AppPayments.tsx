@@ -352,29 +352,47 @@ const AppPayments = () => {
       ) : (
         <div className="space-y-2">
           {filtered.map((payment) => (
-            <button
+            <div
               key={payment.id}
-              onClick={() => navigate(`/app/pagamentos/${payment.id}`)}
               className="w-full glass-card p-3 flex items-center gap-3 text-left hover:bg-secondary/50 transition-colors"
             >
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">
-                  Parcela {payment.installment_number} {payment.payment_method ? `• ${payment.payment_method}` : ""}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {new Date(payment.due_date + "T12:00:00").toLocaleDateString("pt-BR")}
-                </p>
-              </div>
-              <div className="flex flex-col items-end gap-1">
-                <span className="text-sm font-semibold text-foreground">
-                  R$ {Number(payment.value).toFixed(2).replace(".", ",")}
-                </span>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${statusClasses[payment.status as PaymentStatus] || ""}`}>
-                  {statusLabels[payment.status as PaymentStatus] || payment.status}
-                </span>
-              </div>
-              <ChevronRight size={16} className="text-muted-foreground flex-shrink-0" />
-            </button>
+              <button
+                onClick={() => navigate(`/app/pagamentos/${payment.id}`)}
+                className="flex-1 flex items-center gap-3 min-w-0"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    Parcela {payment.installment_number} {payment.payment_method ? `• ${payment.payment_method}` : ""}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(payment.due_date + "T12:00:00").toLocaleDateString("pt-BR")}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <span className="text-sm font-semibold text-foreground">
+                    R$ {Number(payment.value).toFixed(2).replace(".", ",")}
+                  </span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${statusClasses[payment.status as PaymentStatus] || ""}`}>
+                    {statusLabels[payment.status as PaymentStatus] || payment.status}
+                  </span>
+                </div>
+              </button>
+              {payment.status === "PENDING" && (
+                <button
+                  onClick={(e) => handleOpenWhatsApp(payment, e)}
+                  className="p-2 rounded-md text-success hover:bg-success/10 transition-colors flex-shrink-0"
+                  title="Enviar no WhatsApp"
+                >
+                  <MessageCircle size={16} />
+                </button>
+              )}
+              <button
+                onClick={() => navigate(`/app/pagamentos/${payment.id}`)}
+                className="flex-shrink-0"
+              >
+                <ChevronRight size={16} className="text-muted-foreground" />
+              </button>
+            </div>
           ))}
         </div>
       )}
