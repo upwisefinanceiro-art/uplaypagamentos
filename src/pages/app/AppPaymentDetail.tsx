@@ -76,19 +76,6 @@ const AppPaymentDetail = () => {
             }
           }
         }
-        if (results[0].data) setResponsible(results[0].data);
-        if (results[1].data) setUnit(results[1].data);
-        if (results[2]?.data) {
-          setContract(results[2].data);
-          if (results[2].data.student_id) {
-            const { data: studentData } = await supabase
-              .from("students")
-              .select("full_name")
-              .eq("id", results[2].data.student_id)
-              .single();
-            if (studentData) setStudent(studentData);
-          }
-        }
       }
       setLoading(false);
     };
