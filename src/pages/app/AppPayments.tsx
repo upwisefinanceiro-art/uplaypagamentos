@@ -74,6 +74,13 @@ const AppPayments = () => {
   const [billingType, setBillingType] = useState<BillingType>("PIX");
   const [chargeDescription, setChargeDescription] = useState("");
 
+  // WhatsApp dialog state
+  const [waDialogOpen, setWaDialogOpen] = useState(false);
+  const [waPayment, setWaPayment] = useState<any>(null);
+  const [waResponsible, setWaResponsible] = useState<{ full_name: string; phone: string | null } | null>(null);
+  const [waStudent, setWaStudent] = useState<string | undefined>(undefined);
+  const [waDescription, setWaDescription] = useState("");
+
   const canCreateCharge = hasRole("ADMIN_MASTER") || hasRole("ADMIN_UNIDADE");
 
   const fetchPayments = async () => {
