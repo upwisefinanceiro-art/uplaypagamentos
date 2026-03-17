@@ -62,6 +62,13 @@ Deno.serve(async (req) => {
       );
     }
 
+    if (value < 10) {
+      return new Response(
+        JSON.stringify({ error: "O valor mínimo da cobrança é R$ 10,00" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // 2) Get user's unit_id
     const { data: userProfile, error: profileErr } = await supabaseAdmin
       .from("profiles")
