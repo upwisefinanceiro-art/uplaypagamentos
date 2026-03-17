@@ -319,10 +319,33 @@ const AdminContracts = () => {
         });
       }
 
+      // Generate apostilas installments (trimestral by default)
+      if (includeApostilas && apostilasCount > 0 && apostilasTotalValue > 0 && apostilasStartDate) {
+        const apostilasBase = new Date(apostilasStartDate + "T12:00:00");
+        for (let i = 0; i < apostilasCount; i++) {
+          const dueDate = new Date(apostilasBase);
+          dueDate.setMonth(dueDate.getMonth() + (i * apostilasIntervalMonths));
+          payments.push({
+            contract_id: contract.id,
+            unit_id: resolvedUnitId,
+            responsible_id: finalResponsibleId,
+            installment_number: numInstallments + i + 1,
+            due_date: dueDate.toISOString().split("T")[0],
+            value: apostilasInstallmentValue,
+            original_value: apostilasInstallmentValue,
+            punctuality_discount: 0,
+            final_value: apostilasInstallmentValue,
+            payment_method: paymentMethod,
+            status: "PENDING",
+          });
+        }
+      }
+
       const { error: paymentsErr } = await supabase.from("payments").insert(payments);
       if (paymentsErr) throw paymentsErr;
 
-      toast({ title: "Contrato criado!", description: `${numInstallments} parcelas geradas com sucesso.` });
+      const totalParcelas = payments.length;
+      toast({ title: "Contrato criado!", description: `${totalParcelas} parcelas geradas com sucesso.` });
       setDialogOpen(false);
       resetForm();
       fetchData();
