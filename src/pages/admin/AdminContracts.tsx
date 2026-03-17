@@ -693,8 +693,10 @@ const AdminContracts = () => {
                 <Separator />
                 {renderInstallmentSection()}
                 <Separator />
+                {renderApostilasSection()}
+                <Separator />
                 <div>
-                  <h3 className="text-sm font-semibold text-primary mb-3">E. Observações</h3>
+                  <h3 className="text-sm font-semibold text-primary mb-3">F. Observações</h3>
                   <Textarea className="bg-input border-border text-foreground" placeholder="Observações do contrato..." value={notes} onChange={e => setNotes(e.target.value)} rows={3} />
                 </div>
                 <Button
