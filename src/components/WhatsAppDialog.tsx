@@ -39,20 +39,20 @@ const buildDefaultMessage = ({
   value,
   dueDate,
   invoiceUrl,
-  pixCopyPaste,
 }: Omit<WhatsAppDialogProps, "open" | "onOpenChange" | "phone">): string => {
   const formatCurrency = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
   const formatDate = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("pt-BR");
 
-  let msg = `Olá, ${responsibleName}.\n`;
-  msg += `Sua cobrança da EnsinUP foi gerada com sucesso.\n\n`;
+  let msg = `Olá, ${responsibleName}.\n\n`;
+  msg += `Sua cobrança da EnsinUP foi gerada.\n\n`;
   if (studentName) msg += `Aluno: ${studentName}\n`;
   msg += `Referência: ${description}\n`;
   msg += `Valor: *${formatCurrency(value)}*\n`;
   msg += `Vencimento: *${formatDate(dueDate)}*\n\n`;
-  if (invoiceUrl) msg += `Pague por este link:\n${invoiceUrl}\n\n`;
-  if (pixCopyPaste) msg += `Se preferir, utilize o PIX copia e cola disponível no sistema.\n\n`;
-  msg += `Qualquer dúvida, estamos à disposição! 😊`;
+  if (invoiceUrl) {
+    msg += `Você pode pagar pelo link abaixo:\n${invoiceUrl}\n\n`;
+  }
+  msg += `Se tiver qualquer dúvida, estamos à disposição.`;
 
   return msg;
 };
