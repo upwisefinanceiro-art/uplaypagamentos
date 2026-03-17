@@ -104,7 +104,7 @@ const AdminCharges = () => {
     // Build responsibles list from profiles that have students
     if (profilesRes.data && studentsRes.data) {
       const respIds = new Set(studentsRes.data.map((s: any) => s.responsible_id));
-      setResponsibles(profilesRes.data.filter((p: any) => respIds.has(p.id)).map((p: any) => ({ id: p.id, full_name: p.full_name })));
+      setResponsibles(profilesRes.data.filter((p: any) => respIds.has(p.id)).map((p: any) => ({ id: p.id, full_name: p.full_name, unit_id: p.unit_id })));
     }
     if (unitsRes.data) {
       setUnits(unitsRes.data);
