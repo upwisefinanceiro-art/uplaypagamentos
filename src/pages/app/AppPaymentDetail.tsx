@@ -89,27 +89,6 @@ const AppPaymentDetail = () => {
     toast({ title: `${label} copiado!` });
   };
 
-  const handleWhatsApp = () => {
-    if (!payment) return;
-    const nome = responsible?.full_name || contract?.responsible_name || "Responsável";
-    const valor = formatCurrency(payment.final_value ?? payment.value);
-    const vencimento = formatDate(payment.due_date);
-    const link = payment.invoice_url || "";
-    const pix = payment.pix_copy_paste || "";
-
-    let msg = `Olá, ${nome}! 👋\n\n`;
-    msg += `Segue sua cobrança do EnsinUP:\n`;
-    msg += `💰 Valor: *${valor}*\n`;
-    msg += `📅 Vencimento: *${vencimento}*\n\n`;
-    if (link) msg += `🔗 Pague pelo link:\n${link}\n\n`;
-    if (pix) msg += `Ou copie o código PIX abaixo:\n\`\`\`${pix}\`\`\`\n\n`;
-    msg += `Qualquer dúvida, estamos à disposição! 😊`;
-
-    const phone = responsible?.phone?.replace(/\D/g, "") || "";
-    const waUrl = phone ? `https://wa.me/55${phone}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`;
-    window.open(waUrl, "_blank");
-  };
-
   const formatCurrency = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
   const formatDate = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("pt-BR");
 
