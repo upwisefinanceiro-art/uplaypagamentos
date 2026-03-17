@@ -81,6 +81,15 @@ const WhatsAppDialog = ({
     }
   }, [open, responsibleName, studentName, description, value, dueDate, invoiceUrl]);
 
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(message);
+    setCopied(true);
+    toast({ title: "Mensagem copiada!", description: "Cole onde preferir." });
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const handleSend = () => {
     if (!phoneValid) {
       toast({ title: "Telefone inválido", description: "O responsável não possui um telefone válido cadastrado.", variant: "destructive" });
