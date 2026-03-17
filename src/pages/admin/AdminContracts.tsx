@@ -177,7 +177,7 @@ const AdminContracts = () => {
     setZipCode(""); setUnitId(""); setDescription(""); setStartDate("");
     setFirstDueDate(""); setCourseRealValue(""); setPunctualityDiscount("0");
     setInstallments("1"); setDueDay(""); setPaymentMethod(""); setNotes("");
-    setPassword(""); setStep("form");
+    setPassword(""); setStep("form"); setSaveResponsibleToBase(false);
   };
 
   const validateForm = (): string | null => {
