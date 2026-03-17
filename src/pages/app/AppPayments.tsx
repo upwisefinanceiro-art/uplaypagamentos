@@ -302,7 +302,7 @@ const AppPayments = () => {
                   {/* WhatsApp */}
                   <Button
                     variant="outline"
-                    className="w-full gap-1.5 border-green-500/30 text-green-600 hover:bg-green-50 hover:text-green-700"
+                    className="w-full gap-1.5 border-success/30 text-success hover:bg-success/10 hover:text-success"
                     onClick={() => {
                       const resp = responsibles.find(r => r.id === selectedResponsible);
                       const nome = resp?.full_name || "Responsável";
