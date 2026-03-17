@@ -370,10 +370,23 @@ const AdminContracts = () => {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
-            <Label className="text-foreground text-xs">Senha de acesso do responsável *</Label>
-            <Input className="bg-input border-border text-foreground" type="password" placeholder="Mínimo 6 caracteres" value={password} onChange={e => setPassword(e.target.value)} />
+          <div className="flex items-center gap-2 p-3 rounded-md border border-border bg-muted/30">
+            <Checkbox
+              id="save-responsible"
+              checked={saveResponsibleToBase}
+              onCheckedChange={(checked) => setSaveResponsibleToBase(checked === true)}
+            />
+            <label htmlFor="save-responsible" className="text-xs text-foreground cursor-pointer flex items-center gap-1.5">
+              <Save size={13} className="text-primary" />
+              Salvar responsável na base (para reaproveitar depois)
+            </label>
           </div>
+          {saveResponsibleToBase && (
+            <div className="space-y-1">
+              <Label className="text-foreground text-xs">Senha de acesso do responsável *</Label>
+              <Input className="bg-input border-border text-foreground" type="password" placeholder="Mínimo 6 caracteres" value={password} onChange={e => setPassword(e.target.value)} />
+            </div>
+          )}
         </div>
       )}
 
