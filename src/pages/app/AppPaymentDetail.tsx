@@ -387,7 +387,7 @@ const AppPaymentDetail = () => {
             <Button
               variant="outline"
               size="sm"
-              className="gap-2 text-xs border-green-500/30 text-green-500 hover:bg-green-500/10 hover:text-green-400"
+              className="gap-2 text-xs border-success/30 text-success hover:bg-success/10 hover:text-success"
               onClick={handleWhatsApp}
             >
               <MessageCircle size={14} /> WhatsApp
