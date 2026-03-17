@@ -124,6 +124,11 @@ const AdminCharges = () => {
     fetchData();
   }, []);
 
+  const getResponsibleUnit = (respId: string) => {
+    const resp = responsibles.find((r) => r.id === respId);
+    return resp?.unit_id ? (unitNames[resp.unit_id] || "—") : "Sem unidade";
+  };
+
   const filtered = payments.filter((p) => {
     if (statusFilter !== "ALL" && p.status !== statusFilter) return false;
     if (unitFilter !== "ALL" && p.unit_id !== unitFilter) return false;
