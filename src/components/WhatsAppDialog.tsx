@@ -149,6 +149,14 @@ const WhatsAppDialog = ({
             Cancelar
           </Button>
           <Button
+            variant="outline"
+            className="gap-2"
+            onClick={handleCopy}
+          >
+            {copied ? <Check size={14} /> : <Copy size={14} />}
+            {copied ? "Copiada!" : "Copiar mensagem"}
+          </Button>
+          <Button
             className="gap-2 bg-success hover:bg-success/90 text-success-foreground"
             onClick={handleSend}
             disabled={!phoneValid}
