@@ -219,6 +219,11 @@ const AdminContracts = () => {
     if (!paymentMethod) return "Método de pagamento é obrigatório";
     if (!courseRealValue || realValue <= 0) return "Valor real do curso é obrigatório";
     if (numInstallments <= 0) return "Nº de parcelas deve ser maior que zero";
+    if (includeApostilas) {
+      if (!apostilasTotal || apostilasTotalValue <= 0) return "Valor total das apostilas é obrigatório";
+      if (apostilasCount <= 0) return "Quantidade de parcelas de apostilas é obrigatória";
+      if (!apostilasStartDate) return "Data do 1º vencimento das apostilas é obrigatória";
+    }
     return null;
   };
 
