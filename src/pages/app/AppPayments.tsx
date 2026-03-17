@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight, Plus, Copy, QrCode, ExternalLink, Loader2 } from "lucide-react";
+import { ChevronRight, Plus, Copy, QrCode, ExternalLink, Loader2, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import WhatsAppDialog from "@/components/WhatsAppDialog";
 
 type PaymentStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELLED";
 
@@ -73,13 +74,20 @@ const AppPayments = () => {
   const [billingType, setBillingType] = useState<BillingType>("PIX");
   const [chargeDescription, setChargeDescription] = useState("");
 
+  // WhatsApp dialog state
+  const [waDialogOpen, setWaDialogOpen] = useState(false);
+  const [waPayment, setWaPayment] = useState<any>(null);
+  const [waResponsible, setWaResponsible] = useState<{ full_name: string; phone: string | null } | null>(null);
+  const [waStudent, setWaStudent] = useState<string | undefined>(undefined);
+  const [waDescription, setWaDescription] = useState("");
+
   const canCreateCharge = hasRole("ADMIN_MASTER") || hasRole("ADMIN_UNIDADE");
 
   const fetchPayments = async () => {
     setLoading(true);
     const { data } = await supabase
       .from("payments")
-      .select("id, value, due_date, status, payment_method, installment_number, pix_copy_paste, invoice_url, boleto_url, checkout_url, contract_id")
+      .select("id, value, due_date, status, payment_method, installment_number, pix_copy_paste, invoice_url, boleto_url, checkout_url, contract_id, responsible_id, final_value")
       .order("due_date", { ascending: false });
     if (data) setPayments(data);
     setLoading(false);
@@ -100,6 +108,38 @@ const AppPayments = () => {
   }, []);
 
   const filtered = filter === "ALL" ? payments : payments.filter((p) => p.status === filter);
+
+  const handleOpenWhatsApp = async (payment: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setWaPayment(payment);
+    // Fetch responsible info
+    const { data: resp } = await supabase
+      .from("profiles")
+      .select("full_name, phone")
+      .eq("id", payment.responsible_id)
+      .single();
+    setWaResponsible(resp);
+
+    let desc = `Parcela ${payment.installment_number}`;
+    let studentName: string | undefined;
+    if (payment.contract_id) {
+      const { data: contractData } = await supabase
+        .from("contracts")
+        .select("description, student_id")
+        .eq("id", payment.contract_id)
+        .single();
+      if (contractData) {
+        desc = contractData.description || desc;
+        if (contractData.student_id) {
+          const { data: stData } = await supabase.from("students").select("full_name").eq("id", contractData.student_id).single();
+          studentName = stData?.full_name;
+        }
+      }
+    }
+    setWaDescription(desc);
+    setWaStudent(studentName);
+    setWaDialogOpen(true);
+  };
 
   const filteredStudents = selectedResponsible
     ? students.filter((s) => s.responsible_id === selectedResponsible)
@@ -262,7 +302,7 @@ const AppPayments = () => {
                   {/* WhatsApp */}
                   <Button
                     variant="outline"
-                    className="w-full gap-1.5 border-green-500/30 text-green-600 hover:bg-green-50 hover:text-green-700"
+                    className="w-full gap-1.5 border-success/30 text-success hover:bg-success/10 hover:text-success"
                     onClick={() => {
                       const resp = responsibles.find(r => r.id === selectedResponsible);
                       const nome = resp?.full_name || "Responsável";
@@ -312,29 +352,47 @@ const AppPayments = () => {
       ) : (
         <div className="space-y-2">
           {filtered.map((payment) => (
-            <button
+            <div
               key={payment.id}
-              onClick={() => navigate(`/app/pagamentos/${payment.id}`)}
               className="w-full glass-card p-3 flex items-center gap-3 text-left hover:bg-secondary/50 transition-colors"
             >
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">
-                  Parcela {payment.installment_number} {payment.payment_method ? `• ${payment.payment_method}` : ""}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {new Date(payment.due_date + "T12:00:00").toLocaleDateString("pt-BR")}
-                </p>
-              </div>
-              <div className="flex flex-col items-end gap-1">
-                <span className="text-sm font-semibold text-foreground">
-                  R$ {Number(payment.value).toFixed(2).replace(".", ",")}
-                </span>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${statusClasses[payment.status as PaymentStatus] || ""}`}>
-                  {statusLabels[payment.status as PaymentStatus] || payment.status}
-                </span>
-              </div>
-              <ChevronRight size={16} className="text-muted-foreground flex-shrink-0" />
-            </button>
+              <button
+                onClick={() => navigate(`/app/pagamentos/${payment.id}`)}
+                className="flex-1 flex items-center gap-3 min-w-0"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    Parcela {payment.installment_number} {payment.payment_method ? `• ${payment.payment_method}` : ""}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(payment.due_date + "T12:00:00").toLocaleDateString("pt-BR")}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <span className="text-sm font-semibold text-foreground">
+                    R$ {Number(payment.value).toFixed(2).replace(".", ",")}
+                  </span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${statusClasses[payment.status as PaymentStatus] || ""}`}>
+                    {statusLabels[payment.status as PaymentStatus] || payment.status}
+                  </span>
+                </div>
+              </button>
+              {payment.status === "PENDING" && (
+                <button
+                  onClick={(e) => handleOpenWhatsApp(payment, e)}
+                  className="p-2 rounded-md text-success hover:bg-success/10 transition-colors flex-shrink-0"
+                  title="Enviar no WhatsApp"
+                >
+                  <MessageCircle size={16} />
+                </button>
+              )}
+              <button
+                onClick={() => navigate(`/app/pagamentos/${payment.id}`)}
+                className="flex-shrink-0"
+              >
+                <ChevronRight size={16} className="text-muted-foreground" />
+              </button>
+            </div>
           ))}
         </div>
       )}
@@ -343,6 +401,22 @@ const AppPayments = () => {
         <div className="text-center py-12 text-muted-foreground text-sm">
           Nenhum pagamento encontrado.
         </div>
+      )}
+
+      {/* WhatsApp Dialog */}
+      {waPayment && waResponsible && (
+        <WhatsAppDialog
+          open={waDialogOpen}
+          onOpenChange={setWaDialogOpen}
+          phone={waResponsible.phone}
+          responsibleName={waResponsible.full_name}
+          studentName={waStudent}
+          description={waDescription}
+          value={waPayment.final_value ?? waPayment.value}
+          dueDate={waPayment.due_date}
+          invoiceUrl={waPayment.invoice_url}
+          pixCopyPaste={waPayment.pix_copy_paste}
+        />
       )}
     </div>
   );

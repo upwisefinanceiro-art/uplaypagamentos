@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import WhatsAppDialog from "@/components/WhatsAppDialog";
 
 type PaymentStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELLED";
 
@@ -39,6 +40,7 @@ const AppPaymentDetail = () => {
   const [contract, setContract] = useState<any>(null);
   const [student, setStudent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [waDialogOpen, setWaDialogOpen] = useState(false);
 
   const isAdmin = hasRole("ADMIN_MASTER");
 
@@ -85,27 +87,6 @@ const AppPaymentDetail = () => {
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast({ title: `${label} copiado!` });
-  };
-
-  const handleWhatsApp = () => {
-    if (!payment) return;
-    const nome = responsible?.full_name || contract?.responsible_name || "Responsável";
-    const valor = formatCurrency(payment.final_value ?? payment.value);
-    const vencimento = formatDate(payment.due_date);
-    const link = payment.invoice_url || "";
-    const pix = payment.pix_copy_paste || "";
-
-    let msg = `Olá, ${nome}! 👋\n\n`;
-    msg += `Segue sua cobrança do EnsinUP:\n`;
-    msg += `💰 Valor: *${valor}*\n`;
-    msg += `📅 Vencimento: *${vencimento}*\n\n`;
-    if (link) msg += `🔗 Pague pelo link:\n${link}\n\n`;
-    if (pix) msg += `Ou copie o código PIX abaixo:\n\`\`\`${pix}\`\`\`\n\n`;
-    msg += `Qualquer dúvida, estamos à disposição! 😊`;
-
-    const phone = responsible?.phone?.replace(/\D/g, "") || "";
-    const waUrl = phone ? `https://wa.me/55${phone}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`;
-    window.open(waUrl, "_blank");
   };
 
   const formatCurrency = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
@@ -388,7 +369,7 @@ const AppPaymentDetail = () => {
               variant="outline"
               size="sm"
               className="gap-2 text-xs border-success/30 text-success hover:bg-success/10 hover:text-success"
-              onClick={handleWhatsApp}
+              onClick={() => setWaDialogOpen(true)}
             >
               <MessageCircle size={14} /> WhatsApp
             </Button>
@@ -449,6 +430,22 @@ const AppPaymentDetail = () => {
           })}
         </div>
       </div>
+
+      {/* WhatsApp Dialog */}
+      {payment && (
+        <WhatsAppDialog
+          open={waDialogOpen}
+          onOpenChange={setWaDialogOpen}
+          phone={responsible?.phone}
+          responsibleName={responsible?.full_name || contract?.responsible_name || "Responsável"}
+          studentName={student?.full_name}
+          description={description}
+          value={finalValue}
+          dueDate={payment.due_date}
+          invoiceUrl={payment.invoice_url}
+          pixCopyPaste={payment.pix_copy_paste}
+        />
+      )}
     </div>
   );
 };
