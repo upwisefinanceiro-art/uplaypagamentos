@@ -69,21 +69,21 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 2) Get user's unit_id
-    const { data: userProfile, error: profileErr } = await supabaseAdmin
-      .from("profiles")
-      .select("unit_id")
-      .eq("id", userId)
-      .single();
+    // 2) Verify caller is admin
+    const { data: callerRoles } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId);
 
-    if (profileErr || !userProfile?.unit_id) {
+    const isAdminMaster = callerRoles?.some((r: any) => r.role === "ADMIN_MASTER");
+    const isAdminUnidade = callerRoles?.some((r: any) => r.role === "ADMIN_UNIDADE");
+
+    if (!isAdminMaster && !isAdminUnidade) {
       return new Response(
-        JSON.stringify({ error: "Usuário sem unidade vinculada" }),
+        JSON.stringify({ error: "Sem permissão para gerar cobranças" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    const unitId = userProfile.unit_id;
 
     // 3) Get unit's Asaas credentials
     const { data: unit, error: unitErr } = await supabaseAdmin
