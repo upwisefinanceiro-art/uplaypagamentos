@@ -191,6 +191,8 @@ const AdminContracts = () => {
     setFirstDueDate(""); setCourseRealValue(""); setPunctualityDiscount("0");
     setInstallments("1"); setDueDay(""); setPaymentMethod(""); setNotes("");
     setPassword(""); setStep("form"); setSaveResponsibleToBase(false);
+    setIncludeApostilas(false); setApostilasTotal(""); setApostilasQty("1");
+    setApostilasStartDate(""); setApostilasInterval("3");
   };
 
   const validateForm = (): string | null => {
