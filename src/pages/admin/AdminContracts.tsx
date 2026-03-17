@@ -148,6 +148,12 @@ const AdminContracts = () => {
   const installmentFinalValue = finalValue > 0 && numInstallments > 0 ? finalValue / numInstallments : 0;
   const installmentDiscount = installmentRealValue - installmentFinalValue;
 
+  // Apostilas computed
+  const apostilasTotalValue = parseFloat(apostilasTotal) || 0;
+  const apostilasCount = parseInt(apostilasQty) || 0;
+  const apostilasIntervalMonths = parseInt(apostilasInterval) || 3;
+  const apostilasInstallmentValue = apostilasTotalValue > 0 && apostilasCount > 0 ? apostilasTotalValue / apostilasCount : 0;
+
   useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
