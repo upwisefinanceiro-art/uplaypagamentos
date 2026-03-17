@@ -66,7 +66,6 @@ const WhatsAppDialog = ({
   value,
   dueDate,
   invoiceUrl,
-  pixCopyPaste,
 }: WhatsAppDialogProps) => {
   const { toast } = useToast();
   const [message, setMessage] = useState("");
