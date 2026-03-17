@@ -230,13 +230,26 @@ const AdminCharges = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label>Valor (R$) *</Label>
-                    <Input type="number" step="0.01" min="1" value={chargeValue} onChange={(e) => setChargeValue(e.target.value)} placeholder="350,00" />
+                    <Input type="number" step="0.01" min="10" value={chargeValue} onChange={(e) => setChargeValue(e.target.value)} placeholder="10,00" />
+                    {chargeValue && parseFloat(chargeValue) < 10 && (
+                      <p className="text-xs text-destructive">Valor mínimo: R$ 10,00</p>
+                    )}
                   </div>
                   <div className="space-y-1.5">
                     <Label>Vencimento *</Label>
                     <Input type="date" value={chargeDueDate} onChange={(e) => setChargeDueDate(e.target.value)} />
                   </div>
                 </div>
+
+                {/* Show responsible's unit */}
+                {selectedResponsible && (
+                  <div className="rounded-md border border-border bg-muted/50 p-2.5">
+                    <p className="text-xs text-muted-foreground">
+                      Unidade: <span className="font-medium text-foreground">{getResponsibleUnit(selectedResponsible)}</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">A cobrança será gerada na conta Asaas desta unidade.</p>
+                  </div>
+                )}
 
                 <div className="space-y-1.5">
                   <Label>Forma de Pagamento *</Label>
