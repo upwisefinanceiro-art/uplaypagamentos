@@ -47,6 +47,7 @@ interface PaymentRow {
 interface ResponsibleRow {
   id: string;
   full_name: string;
+  unit_id: string | null;
 }
 
 interface StudentRow {
