@@ -121,6 +121,7 @@ const AdminContracts = () => {
   const [paymentMethod, setPaymentMethod] = useState("");
   const [notes, setNotes] = useState("");
   const [password, setPassword] = useState("");
+  const [saveResponsibleToBase, setSaveResponsibleToBase] = useState(false);
 
   const selectedResponsible = responsibles.find(r => r.id === responsibleId);
   const selectedStudent = students.find(s => s.id === studentId);
