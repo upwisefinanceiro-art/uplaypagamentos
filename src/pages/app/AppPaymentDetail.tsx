@@ -443,7 +443,6 @@ const AppPaymentDetail = () => {
           value={finalValue}
           dueDate={payment.due_date}
           invoiceUrl={payment.invoice_url}
-          pixCopyPaste={payment.pix_copy_paste}
         />
       )}
     </div>
