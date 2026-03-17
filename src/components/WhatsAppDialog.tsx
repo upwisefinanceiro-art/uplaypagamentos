@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { MessageCircle, AlertTriangle, ExternalLink } from "lucide-react";
+import { MessageCircle, AlertTriangle, ExternalLink, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -81,6 +81,15 @@ const WhatsAppDialog = ({
     }
   }, [open, responsibleName, studentName, description, value, dueDate, invoiceUrl]);
 
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(message);
+    setCopied(true);
+    toast({ title: "Mensagem copiada!", description: "Cole onde preferir." });
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const handleSend = () => {
     if (!phoneValid) {
       toast({ title: "Telefone inválido", description: "O responsável não possui um telefone válido cadastrado.", variant: "destructive" });
@@ -138,6 +147,14 @@ const WhatsAppDialog = ({
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={handleCopy}
+          >
+            {copied ? <Check size={14} /> : <Copy size={14} />}
+            {copied ? "Copiada!" : "Copiar mensagem"}
           </Button>
           <Button
             className="gap-2 bg-success hover:bg-success/90 text-success-foreground"
