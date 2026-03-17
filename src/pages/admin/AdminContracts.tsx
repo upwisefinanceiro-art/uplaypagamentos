@@ -123,6 +123,13 @@ const AdminContracts = () => {
   const [password, setPassword] = useState("");
   const [saveResponsibleToBase, setSaveResponsibleToBase] = useState(false);
 
+  // Apostilas state
+  const [includeApostilas, setIncludeApostilas] = useState(false);
+  const [apostilasTotal, setApostilasTotal] = useState("");
+  const [apostilasQty, setApostilasQty] = useState("1");
+  const [apostilasStartDate, setApostilasStartDate] = useState("");
+  const [apostilasInterval, setApostilasInterval] = useState("3");
+
   const selectedResponsible = responsibles.find(r => r.id === responsibleId);
   const selectedStudent = students.find(s => s.id === studentId);
   const resolvedUnitId = responsibleMode === "existing" ? (selectedResponsible?.unit_id || "") : unitId;
