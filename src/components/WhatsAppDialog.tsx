@@ -76,10 +76,10 @@ const WhatsAppDialog = ({
   useEffect(() => {
     if (open) {
       setMessage(
-        buildDefaultMessage({ responsibleName, studentName, description, value, dueDate, invoiceUrl, pixCopyPaste })
+        buildDefaultMessage({ responsibleName, studentName, description, value, dueDate, invoiceUrl })
       );
     }
-  }, [open, responsibleName, studentName, description, value, dueDate, invoiceUrl, pixCopyPaste]);
+  }, [open, responsibleName, studentName, description, value, dueDate, invoiceUrl]);
 
   const handleSend = () => {
     if (!phoneValid) {
