@@ -123,6 +123,13 @@ const AdminContracts = () => {
   const [password, setPassword] = useState("");
   const [saveResponsibleToBase, setSaveResponsibleToBase] = useState(false);
 
+  // Apostilas state
+  const [includeApostilas, setIncludeApostilas] = useState(false);
+  const [apostilasTotal, setApostilasTotal] = useState("");
+  const [apostilasQty, setApostilasQty] = useState("1");
+  const [apostilasStartDate, setApostilasStartDate] = useState("");
+  const [apostilasInterval, setApostilasInterval] = useState("3");
+
   const selectedResponsible = responsibles.find(r => r.id === responsibleId);
   const selectedStudent = students.find(s => s.id === studentId);
   const resolvedUnitId = responsibleMode === "existing" ? (selectedResponsible?.unit_id || "") : unitId;
@@ -140,6 +147,12 @@ const AdminContracts = () => {
   const installmentRealValue = realValue > 0 && numInstallments > 0 ? realValue / numInstallments : 0;
   const installmentFinalValue = finalValue > 0 && numInstallments > 0 ? finalValue / numInstallments : 0;
   const installmentDiscount = installmentRealValue - installmentFinalValue;
+
+  // Apostilas computed
+  const apostilasTotalValue = parseFloat(apostilasTotal) || 0;
+  const apostilasCount = parseInt(apostilasQty) || 0;
+  const apostilasIntervalMonths = parseInt(apostilasInterval) || 3;
+  const apostilasInstallmentValue = apostilasTotalValue > 0 && apostilasCount > 0 ? apostilasTotalValue / apostilasCount : 0;
 
   useEffect(() => { fetchData(); }, []);
 
@@ -178,6 +191,8 @@ const AdminContracts = () => {
     setFirstDueDate(""); setCourseRealValue(""); setPunctualityDiscount("0");
     setInstallments("1"); setDueDay(""); setPaymentMethod(""); setNotes("");
     setPassword(""); setStep("form"); setSaveResponsibleToBase(false);
+    setIncludeApostilas(false); setApostilasTotal(""); setApostilasQty("1");
+    setApostilasStartDate(""); setApostilasInterval("3");
   };
 
   const validateForm = (): string | null => {
@@ -204,6 +219,11 @@ const AdminContracts = () => {
     if (!paymentMethod) return "Método de pagamento é obrigatório";
     if (!courseRealValue || realValue <= 0) return "Valor real do curso é obrigatório";
     if (numInstallments <= 0) return "Nº de parcelas deve ser maior que zero";
+    if (includeApostilas) {
+      if (!apostilasTotal || apostilasTotalValue <= 0) return "Valor total das apostilas é obrigatório";
+      if (apostilasCount <= 0) return "Quantidade de parcelas de apostilas é obrigatória";
+      if (!apostilasStartDate) return "Data do 1º vencimento das apostilas é obrigatória";
+    }
     return null;
   };
 
@@ -304,10 +324,33 @@ const AdminContracts = () => {
         });
       }
 
+      // Generate apostilas installments (trimestral by default)
+      if (includeApostilas && apostilasCount > 0 && apostilasTotalValue > 0 && apostilasStartDate) {
+        const apostilasBase = new Date(apostilasStartDate + "T12:00:00");
+        for (let i = 0; i < apostilasCount; i++) {
+          const dueDate = new Date(apostilasBase);
+          dueDate.setMonth(dueDate.getMonth() + (i * apostilasIntervalMonths));
+          payments.push({
+            contract_id: contract.id,
+            unit_id: resolvedUnitId,
+            responsible_id: finalResponsibleId,
+            installment_number: numInstallments + i + 1,
+            due_date: dueDate.toISOString().split("T")[0],
+            value: apostilasInstallmentValue,
+            original_value: apostilasInstallmentValue,
+            punctuality_discount: 0,
+            final_value: apostilasInstallmentValue,
+            payment_method: paymentMethod,
+            status: "PENDING",
+          });
+        }
+      }
+
       const { error: paymentsErr } = await supabase.from("payments").insert(payments);
       if (paymentsErr) throw paymentsErr;
 
-      toast({ title: "Contrato criado!", description: `${numInstallments} parcelas geradas com sucesso.` });
+      const totalParcelas = payments.length;
+      toast({ title: "Contrato criado!", description: `${totalParcelas} parcelas geradas com sucesso.` });
       setDialogOpen(false);
       resetForm();
       fetchData();
@@ -564,6 +607,69 @@ const AdminContracts = () => {
     </div>
   );
 
+  const renderApostilasSection = () => (
+    <div>
+      <h3 className="text-sm font-semibold text-primary mb-3">E. Apostilas</h3>
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="include-apostilas"
+            checked={includeApostilas}
+            onCheckedChange={(checked) => setIncludeApostilas(checked === true)}
+          />
+          <label htmlFor="include-apostilas" className="text-xs text-foreground cursor-pointer">
+            Incluir parcelas de apostilas no contrato
+          </label>
+        </div>
+
+        {includeApostilas && (
+          <div className="space-y-3 p-3 rounded-md border border-border bg-muted/30">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-foreground text-xs">Valor Total das Apostilas *</Label>
+                <Input className="bg-input border-border text-foreground" type="number" step="0.01" min="0" placeholder="0,00" value={apostilasTotal} onChange={e => setApostilasTotal(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-foreground text-xs">Quantidade de Parcelas *</Label>
+                <Input className="bg-input border-border text-foreground" type="number" min="1" value={apostilasQty} onChange={e => setApostilasQty(e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-foreground text-xs">Data do 1º Vencimento *</Label>
+                <Input className="bg-input border-border text-foreground" type="date" value={apostilasStartDate} onChange={e => setApostilasStartDate(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-foreground text-xs">Intervalo entre parcelas (meses)</Label>
+                <Input className="bg-input border-border text-foreground" type="number" min="1" max="12" value={apostilasInterval} onChange={e => setApostilasInterval(e.target.value)} />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Parcelas das apostilas geradas a cada {apostilasIntervalMonths} {apostilasIntervalMonths === 1 ? "mês" : "meses"}
+            </p>
+            {apostilasTotalValue > 0 && apostilasCount > 0 && apostilasStartDate && (
+              <div className="p-3 rounded-md bg-muted space-y-1">
+                <p className="text-xs text-muted-foreground">
+                  Valor por parcela: <span className="font-semibold text-primary">{fmt(apostilasInstallmentValue)}</span>
+                </p>
+                <p className="text-xs font-medium text-muted-foreground mt-2">Vencimentos:</p>
+                {Array.from({ length: apostilasCount }).map((_, i) => {
+                  const d = new Date(apostilasStartDate + "T12:00:00");
+                  d.setMonth(d.getMonth() + (i * apostilasIntervalMonths));
+                  return (
+                    <p key={i} className="text-xs text-foreground">
+                      {i + 1}ª — {d.toLocaleDateString("pt-BR")}
+                    </p>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -592,8 +698,10 @@ const AdminContracts = () => {
                 <Separator />
                 {renderInstallmentSection()}
                 <Separator />
+                {renderApostilasSection()}
+                <Separator />
                 <div>
-                  <h3 className="text-sm font-semibold text-primary mb-3">E. Observações</h3>
+                  <h3 className="text-sm font-semibold text-primary mb-3">F. Observações</h3>
                   <Textarea className="bg-input border-border text-foreground" placeholder="Observações do contrato..." value={notes} onChange={e => setNotes(e.target.value)} rows={3} />
                 </div>
                 <Button
@@ -657,6 +765,22 @@ const AdminContracts = () => {
                     <span className="text-muted-foreground">Pagamento:</span>
                     <span className="text-foreground">{paymentMethod}</span>
                   </div>
+                  {includeApostilas && apostilasCount > 0 && apostilasTotalValue > 0 && (
+                    <>
+                      <Separator />
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Apostilas</p>
+                      <div className="grid grid-cols-2 gap-y-2 text-sm">
+                        <span className="text-muted-foreground">Valor Total:</span>
+                        <span className="text-foreground">{fmt(apostilasTotalValue)}</span>
+                        <span className="text-muted-foreground">Parcelas:</span>
+                        <span className="text-foreground">{apostilasCount}x de {fmt(apostilasInstallmentValue)}</span>
+                        <span className="text-muted-foreground">Intervalo:</span>
+                        <span className="text-foreground">A cada {apostilasIntervalMonths} {apostilasIntervalMonths === 1 ? "mês" : "meses"}</span>
+                        <span className="text-muted-foreground">1º Vencimento:</span>
+                        <span className="text-foreground">{apostilasStartDate ? new Date(apostilasStartDate + "T12:00:00").toLocaleDateString("pt-BR") : ""}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <div className="flex gap-3">
