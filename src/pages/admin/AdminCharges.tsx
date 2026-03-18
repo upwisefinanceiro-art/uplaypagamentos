@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { RefreshCw, Copy, Plus, QrCode, ExternalLink, Loader2 } from "lucide-react";
+import { RefreshCw, Copy, Plus, QrCode, ExternalLink, Loader2, MessageCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import WhatsAppDialog from "@/components/WhatsAppDialog";
 
 type PaymentStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELLED";
 type BillingType = "PIX" | "BOLETO" | "CARD";
@@ -89,6 +90,34 @@ const AdminCharges = () => {
   const [chargeDueDate, setChargeDueDate] = useState("");
   const [billingType, setBillingType] = useState<BillingType>("PIX");
   const [chargeDescription, setChargeDescription] = useState("");
+
+  // WhatsApp dialog
+  const [waDialogOpen, setWaDialogOpen] = useState(false);
+  const [waPayment, setWaPayment] = useState<PaymentRow | null>(null);
+  const [waResponsible, setWaResponsible] = useState<{ full_name: string; phone: string | null } | null>(null);
+  const [waStudent, setWaStudent] = useState<string | undefined>(undefined);
+  const [waDescription, setWaDescription] = useState("");
+
+  const handleOpenWhatsApp = async (p: PaymentRow) => {
+    setWaPayment(p);
+    const { data: resp } = await supabase.from("profiles").select("full_name, phone").eq("id", p.responsible_id).single();
+    setWaResponsible(resp);
+    let desc = `Parcela ${p.installment_number}`;
+    let studentName: string | undefined;
+    if (p.contract_id) {
+      const { data: c } = await supabase.from("contracts").select("description, student_id").eq("id", p.contract_id).single();
+      if (c) {
+        desc = c.description || desc;
+        if (c.student_id) {
+          const { data: s } = await supabase.from("students").select("full_name").eq("id", c.student_id).single();
+          studentName = s?.full_name;
+        }
+      }
+    }
+    setWaDescription(desc);
+    setWaStudent(studentName);
+    setWaDialogOpen(true);
+  };
 
   const fetchData = async () => {
     setLoadingData(true);
@@ -416,6 +445,15 @@ const AdminCharges = () => {
                       <Copy size={14} />
                     </button>
                   )}
+                  {(p.status === "PENDING" || p.status === "OVERDUE") && (
+                    <button
+                      className="p-1.5 text-success hover:bg-success/10 rounded transition-colors"
+                      title="Enviar no WhatsApp"
+                      onClick={() => handleOpenWhatsApp(p)}
+                    >
+                      <MessageCircle size={14} />
+                    </button>
+                  )}
                   {(p.invoice_url || p.boleto_url || p.checkout_url) && (
                     <a
                       href={p.invoice_url || p.boleto_url || p.checkout_url || "#"}
@@ -436,6 +474,23 @@ const AdminCharges = () => {
 
       {!loadingData && filtered.length === 0 && (
         <div className="text-center py-12 text-muted-foreground text-sm">Nenhuma cobrança encontrada.</div>
+      )}
+
+      {/* WhatsApp Dialog */}
+      {waPayment && waResponsible && (
+        <WhatsAppDialog
+          open={waDialogOpen}
+          onOpenChange={setWaDialogOpen}
+          phone={waResponsible.phone}
+          responsibleName={waResponsible.full_name}
+          studentName={waStudent}
+          description={waDescription}
+          value={Number(waPayment.value)}
+          dueDate={waPayment.due_date}
+          invoiceUrl={waPayment.invoice_url}
+          paymentId={waPayment.id}
+          responsibleId={waPayment.responsible_id}
+        />
       )}
     </div>
   );

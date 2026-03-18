@@ -409,6 +409,50 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_message_logs: {
+        Row: {
+          channel: string
+          id: string
+          message_text: string
+          payment_id: string | null
+          phone: string | null
+          responsible_id: string
+          sent_at: string
+          sent_by: string
+          status: string
+        }
+        Insert: {
+          channel?: string
+          id?: string
+          message_text: string
+          payment_id?: string | null
+          phone?: string | null
+          responsible_id: string
+          sent_at?: string
+          sent_by: string
+          status?: string
+        }
+        Update: {
+          channel?: string
+          id?: string
+          message_text?: string
+          payment_id?: string | null
+          phone?: string | null
+          responsible_id?: string
+          sent_at?: string
+          sent_by?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_message_logs_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       units_public: {

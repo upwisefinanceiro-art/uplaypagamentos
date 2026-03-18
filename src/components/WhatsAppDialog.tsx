@@ -5,6 +5,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface WhatsAppDialogProps {
   open: boolean;
@@ -16,6 +18,8 @@ interface WhatsAppDialogProps {
   value: number;
   dueDate: string;
   invoiceUrl?: string | null;
+  paymentId?: string;
+  responsibleId?: string;
 }
 
 const formatPhone = (phone: string): string => {
@@ -43,7 +47,7 @@ const buildDefaultMessage = ({
   const formatDate = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("pt-BR");
 
   let msg = `Olá, ${responsibleName}.\n\n`;
-  msg += `Sua cobrança da EnsinUP foi gerada.\n\n`;
+  msg += `Aqui é do financeiro da EnsinUP.\n\n`;
   if (studentName) msg += `Aluno: ${studentName}\n`;
   msg += `Referência: ${description}\n`;
   msg += `Valor: *${formatCurrency(value)}*\n`;
@@ -66,8 +70,11 @@ const WhatsAppDialog = ({
   value,
   dueDate,
   invoiceUrl,
+  paymentId,
+  responsibleId,
 }: WhatsAppDialogProps) => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [message, setMessage] = useState("");
 
   const phoneValid = phone ? isValidPhone(phone) : false;
@@ -86,15 +93,33 @@ const WhatsAppDialog = ({
   const handleCopy = async () => {
     await navigator.clipboard.writeText(message);
     setCopied(true);
+    await logMessage("COPY_MANUAL");
     toast({ title: "Mensagem copiada!", description: "Cole onde preferir." });
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleSend = () => {
+  const logMessage = async (channel: string) => {
+    if (!user) return;
+    try {
+      await supabase.from("whatsapp_message_logs" as any).insert({
+        payment_id: paymentId || null,
+        responsible_id: responsibleId || user.id,
+        phone: phoneValid ? `55${formattedPhone}` : null,
+        message_text: message,
+        channel,
+        sent_by: user.id,
+      });
+    } catch (e) {
+      // non-blocking log
+    }
+  };
+
+  const handleSend = async () => {
     if (!phoneValid) {
       toast({ title: "Telefone inválido", description: "O responsável não possui um telefone válido cadastrado.", variant: "destructive" });
       return;
     }
+    await logMessage("WHATSAPP_MANUAL");
     const waUrl = `https://wa.me/55${formattedPhone}?text=${encodeURIComponent(message)}`;
     window.open(waUrl, "_blank");
     onOpenChange(false);
