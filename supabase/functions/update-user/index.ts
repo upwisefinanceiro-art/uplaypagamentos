@@ -5,6 +5,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const jsonResponse = (body: Record<string, unknown>, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -12,11 +18,8 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Não autorizado" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (!authHeader?.startsWith("Bearer ")) {
+      return jsonResponse({ error: "Não autorizado" });
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -24,10 +27,7 @@ Deno.serve(async (req) => {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
 
     if (!supabaseUrl || !serviceRoleKey || !anonKey) {
-      return new Response(JSON.stringify({ error: "Missing environment variables" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Missing environment variables" });
     }
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
@@ -35,52 +35,40 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const {
-      data: { user: caller },
-    } = await callerClient.auth.getUser();
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await callerClient.auth.getClaims(token);
+    const callerId = claimsData?.claims?.sub;
 
-    if (!caller) {
-      return new Response(JSON.stringify({ error: "Não autorizado" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (claimsError || !callerId) {
+      return jsonResponse({ error: "Não autorizado" });
     }
 
     const { data: callerRoles } = await supabaseAdmin
       .from("user_roles")
       .select("role")
-      .eq("user_id", caller.id);
+      .eq("user_id", callerId);
 
-    const isAdminMaster = callerRoles?.some((r: { role: string }) => r.role === "ADMIN_MASTER");
-    const isAdminUnidade = callerRoles?.some((r: { role: string }) => r.role === "ADMIN_UNIDADE");
+    const isAdminMaster = callerRoles?.some((row: { role: string }) => row.role === "ADMIN_MASTER");
+    const isAdminUnidade = callerRoles?.some((row: { role: string }) => row.role === "ADMIN_UNIDADE");
 
     if (!isAdminMaster && !isAdminUnidade) {
-      return new Response(JSON.stringify({ error: "Sem permissão" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Sem permissão" });
     }
 
     const { user_id, full_name, cpf, phone, unit_id, email, address } = await req.json();
 
     if (!user_id || !full_name?.trim() || !cpf?.trim()) {
-      return new Response(JSON.stringify({ error: "user_id, nome e CPF são obrigatórios" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "user_id, nome e CPF são obrigatórios" });
     }
 
     const { data: targetProfile, error: targetError } = await supabaseAdmin
       .from("profiles")
-      .select("id, unit_id, full_name, cpf, phone, email, address")
+      .select("id, unit_id, full_name, cpf, phone, email, address, active")
       .eq("id", user_id)
       .single();
 
     if (targetError || !targetProfile) {
-      return new Response(JSON.stringify({ error: "Registro não encontrado" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Registro não encontrado" });
     }
 
     const cleanCpf = String(cpf).replace(/\D/g, "");
@@ -89,27 +77,26 @@ Deno.serve(async (req) => {
     const normalizedAddress = typeof address === "string" && address.trim() ? address.trim() : null;
     const normalizedEmail = typeof email === "string" && email.trim()
       ? email.trim().toLowerCase()
-      : `${cleanCpf}@ensinup.app`;
+      : targetProfile.email || `${cleanCpf}@ensinup.app`;
 
     let nextUnitId = targetProfile.unit_id;
 
     if (isAdminMaster) {
-      nextUnitId = typeof unit_id === "string" && unit_id.trim() ? unit_id : null;
+      nextUnitId = unit_id === null
+        ? null
+        : typeof unit_id === "string" && unit_id.trim()
+          ? unit_id.trim()
+          : targetProfile.unit_id;
     } else {
       const { data: callerProfile } = await supabaseAdmin
         .from("profiles")
         .select("unit_id")
-        .eq("id", caller.id)
+        .eq("id", callerId)
         .single();
 
       if (!callerProfile?.unit_id || callerProfile.unit_id !== targetProfile.unit_id) {
-        return new Response(JSON.stringify({ error: "Sem permissão para editar este registro" }), {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return jsonResponse({ error: "Sem permissão para editar este registro" });
       }
-
-      nextUnitId = targetProfile.unit_id;
     }
 
     const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(user_id, {
@@ -121,10 +108,7 @@ Deno.serve(async (req) => {
     });
 
     if (authError) {
-      return new Response(JSON.stringify({ error: authError.message }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: authError.message });
     }
 
     const updateData = {
@@ -142,31 +126,22 @@ Deno.serve(async (req) => {
       .eq("id", user_id);
 
     if (updateError) {
-      return new Response(JSON.stringify({ error: updateError.message }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: updateError.message });
     }
 
     await supabaseAdmin.from("audit_logs").insert({
       action: "EDIT",
       target_table: "profiles",
       target_id: user_id,
-      performed_by: caller.id,
+      performed_by: callerId,
       details: {
         before: targetProfile,
         after: updateData,
       },
     });
 
-    return new Response(JSON.stringify({ success: true, profile: updateData }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ success: true, profile: updateData });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Erro interno" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ error: err instanceof Error ? err.message : "Erro interno" });
   }
 });

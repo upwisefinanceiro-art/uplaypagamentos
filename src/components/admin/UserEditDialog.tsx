@@ -21,7 +21,7 @@ interface UserEditDialogProps {
     address?: string | null;
   } | null;
   units: { id: string; name: string }[];
-  onSaved: () => void;
+  onSaved: () => void | Promise<void>;
   showUnitSelector?: boolean;
 }
 
@@ -64,32 +64,40 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
 
     setSaving(true);
 
-    const { data, error } = await supabase.functions.invoke("update-user", {
-      body: {
-        user_id: user.id,
-        full_name: name,
-        cpf,
-        phone: phone || null,
-        email: email || null,
-        address: address || null,
-        unit_id: showUnitSelector ? unitId || null : undefined,
-      },
-    });
+    try {
+      const { data, error } = await supabase.functions.invoke("update-user", {
+        body: {
+          user_id: user.id,
+          full_name: name,
+          cpf,
+          phone: phone || null,
+          email: email || null,
+          address: address || null,
+          unit_id: showUnitSelector ? unitId || null : undefined,
+        },
+      });
 
-    if (error || data?.error) {
+      if (error || data?.error) {
+        toast({
+          title: "Erro ao salvar",
+          description: error?.message || data?.error,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      await Promise.resolve(onSaved());
+      toast({ title: "Dados atualizados com sucesso!" });
+      onOpenChange(false);
+    } catch (err) {
       toast({
         title: "Erro ao salvar",
-        description: error?.message || data?.error,
+        description: err instanceof Error ? err.message : "Erro inesperado",
         variant: "destructive",
       });
+    } finally {
       setSaving(false);
-      return;
     }
-
-    toast({ title: "Dados atualizados com sucesso!" });
-    setSaving(false);
-    onOpenChange(false);
-    onSaved();
   };
 
   return (

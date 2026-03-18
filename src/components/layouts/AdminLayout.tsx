@@ -16,7 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 const menuItems = [
   { path: "/admin", icon: LayoutDashboard, label: "Dashboard", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
   { path: "/admin/unidades", icon: Building2, label: "Unidades", roles: ["ADMIN_MASTER"] },
-  { path: "/admin/usuarios", icon: Users, label: "Usuários Admin", roles: ["ADMIN_MASTER"] },
+  { path: "/admin/usuarios", icon: Users, label: "Colaboradores", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
   { path: "/admin/clientes", icon: UserCheck, label: "Clientes", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
   { path: "/admin/contratos", icon: FileText, label: "Contratos", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
   { path: "/admin/cobrancas", icon: CreditCard, label: "Cobranças", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
@@ -26,7 +26,7 @@ const AdminLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { hasRole, signOut, profile } = useAuth();
+  const { hasRole, signOut } = useAuth();
 
   const userRole = hasRole("ADMIN_MASTER") ? "ADMIN_MASTER" : "ADMIN_UNIDADE";
 
@@ -39,7 +39,6 @@ const AdminLayout = () => {
 
   const Sidebar = () => (
     <div className="flex flex-col h-full bg-sidebar">
-      {/* Logo */}
       <div className="p-4 border-b border-sidebar-border flex items-center gap-3">
         <img src="/logo.png" alt="EnsinUP" className="h-9 w-auto" />
         <div>
@@ -48,7 +47,6 @@ const AdminLayout = () => {
         </div>
       </div>
 
-      {/* Menu */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {filteredMenu.map(({ path, icon: Icon, label }) => (
           <button
@@ -69,10 +67,12 @@ const AdminLayout = () => {
         ))}
       </nav>
 
-      {/* Footer */}
       <div className="p-3 border-t border-sidebar-border">
         <button
-          onClick={async () => { await signOut(); navigate("/login"); }}
+          onClick={async () => {
+            await signOut();
+            navigate("/login");
+          }}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
         >
           <LogOut size={18} />
@@ -84,12 +84,10 @@ const AdminLayout = () => {
 
   return (
     <div className="min-h-screen bg-background flex">
-      {/* Desktop Sidebar */}
       <aside className="hidden lg:block w-60 border-r border-border flex-shrink-0 sticky top-0 h-screen">
         <Sidebar />
       </aside>
 
-      {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div
@@ -108,9 +106,7 @@ const AdminLayout = () => {
         </div>
       )}
 
-      {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Bar */}
         <header className="sticky top-0 z-20 bg-card/95 backdrop-blur-sm border-b border-border px-4 lg:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
@@ -130,7 +126,6 @@ const AdminLayout = () => {
           </div>
         </header>
 
-        {/* Page Content */}
         <main className="flex-1 p-4 lg:p-6">
           <Outlet />
         </main>

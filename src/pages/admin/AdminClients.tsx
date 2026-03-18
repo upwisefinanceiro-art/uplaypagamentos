@@ -73,15 +73,15 @@ const AdminClients = () => {
     setLoading(true);
 
     const [profilesRes, rolesRes, studentsRes, unitsRes] = await Promise.all([
-      supabase.from("profiles").select("id, full_name, cpf, phone, unit_id, active, email, address"),
+      supabase.from("profiles").select("id, full_name, cpf, phone, unit_id, active, email, address").order("full_name"),
       supabase.from("user_roles").select("user_id").eq("role", "RESPONSAVEL"),
-      supabase.from("students").select("id, full_name, responsible_id"),
-      supabase.from("units").select("id, name"),
+      supabase.from("students").select("id, full_name, responsible_id").order("full_name"),
+      supabase.from("units").select("id, name").order("name"),
     ]);
 
     if (profilesRes.data && rolesRes.data) {
       const responsibleIds = new Set(rolesRes.data.map((r: { user_id: string }) => r.user_id));
-      setClients(profilesRes.data.filter((profile) => responsibleIds.has(profile.id)) as ClientRow[]);
+      setClients(profilesRes.data.filter((row) => responsibleIds.has(row.id)) as ClientRow[]);
     }
 
     if (studentsRes.data) setStudents(studentsRes.data as StudentRow[]);
@@ -148,18 +148,26 @@ const AdminClients = () => {
     }
 
     if (formStudentName && data?.user_id) {
-      await supabase.from("students").insert({
+      const { error: studentError } = await supabase.from("students").insert({
         full_name: formStudentName,
         responsible_id: data.user_id,
         unit_id: unitId,
       });
+
+      if (studentError) {
+        toast({
+          title: "Cliente criado, mas aluno não foi salvo",
+          description: studentError.message,
+          variant: "destructive",
+        });
+      }
     }
 
     toast({ title: "Cliente criado com sucesso!" });
     setCreating(false);
     setDialogOpen(false);
     resetForm();
-    fetchData();
+    await fetchData();
   };
 
   const handleAction = async () => {
@@ -173,15 +181,12 @@ const AdminClients = () => {
     else if (action === "permanent_delete") body.action = "permanent_delete";
 
     const { data, error } = await supabase.functions.invoke("delete-user", { body });
-    console.log("[DELETE-USER] body sent:", JSON.stringify(body));
-    console.log("[DELETE-USER] response data:", JSON.stringify(data));
-    console.log("[DELETE-USER] response error:", JSON.stringify(error));
 
     if (error || data?.error) {
       toast({
         title: "Erro",
         description: data?.has_dependencies
-          ? "Este registro possui histórico financeiro e não pode ser excluído. Use desativar."
+          ? "Este registro possui histórico e não pode ser excluído. Use desativar."
           : error?.message || data?.error,
         variant: "destructive",
       });
@@ -196,7 +201,7 @@ const AdminClients = () => {
 
     setActionLoading(false);
     setActionTarget(null);
-    fetchData();
+    await fetchData();
   };
 
   const unitMap: Record<string, string> = {};

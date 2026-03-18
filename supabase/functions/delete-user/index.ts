@@ -18,38 +18,38 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
+    if (!authHeader?.startsWith("Bearer ")) {
       return jsonResponse({ error: "Não autorizado" });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
 
     if (!supabaseUrl || !serviceRoleKey || !anonKey) {
       return jsonResponse({ error: "Missing environment variables" });
     }
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
-
     const callerClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
-    const {
-      data: { user: caller },
-    } = await callerClient.auth.getUser();
 
-    if (!caller) {
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await callerClient.auth.getClaims(token);
+    const callerId = claimsData?.claims?.sub;
+
+    if (claimsError || !callerId) {
       return jsonResponse({ error: "Não autorizado" });
     }
 
     const { data: callerRoles } = await supabaseAdmin
       .from("user_roles")
       .select("role")
-      .eq("user_id", caller.id);
+      .eq("user_id", callerId);
 
-    const isAdminMaster = callerRoles?.some((r: { role: string }) => r.role === "ADMIN_MASTER");
-    const isAdminUnidade = callerRoles?.some((r: { role: string }) => r.role === "ADMIN_UNIDADE");
+    const isAdminMaster = callerRoles?.some((row: { role: string }) => row.role === "ADMIN_MASTER");
+    const isAdminUnidade = callerRoles?.some((row: { role: string }) => row.role === "ADMIN_UNIDADE");
 
     if (!isAdminMaster && !isAdminUnidade) {
       return jsonResponse({ error: "Sem permissão" });
@@ -61,8 +61,25 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "user_id é obrigatório" });
     }
 
-    if (user_id === caller.id) {
+    if (user_id === callerId) {
       return jsonResponse({ error: "Você não pode executar esta ação em si mesmo" });
+    }
+
+    const [{ data: callerProfile }, { data: targetProfile }, { data: targetRoles }] = await Promise.all([
+      supabaseAdmin.from("profiles").select("unit_id").eq("id", callerId).maybeSingle(),
+      supabaseAdmin.from("profiles").select("id, unit_id, active").eq("id", user_id).maybeSingle(),
+      supabaseAdmin.from("user_roles").select("role").eq("user_id", user_id),
+    ]);
+
+    if (!targetProfile) {
+      return jsonResponse({ error: "Registro não encontrado" });
+    }
+
+    if (!isAdminMaster) {
+      const targetIsMaster = targetRoles?.some((row: { role: string }) => row.role === "ADMIN_MASTER");
+      if (targetIsMaster || !callerProfile?.unit_id || callerProfile.unit_id !== targetProfile.unit_id) {
+        return jsonResponse({ error: "Sem permissão para este usuário" });
+      }
     }
 
     const logAction = async (auditAction: string, details: Record<string, unknown> = {}) => {
@@ -70,28 +87,10 @@ Deno.serve(async (req) => {
         action: auditAction,
         target_table: "profiles",
         target_id: user_id,
-        performed_by: caller.id,
+        performed_by: callerId,
         details,
       });
     };
-
-    if (!isAdminMaster) {
-      const { data: callerProfile } = await supabaseAdmin
-        .from("profiles")
-        .select("unit_id")
-        .eq("id", caller.id)
-        .single();
-
-      const { data: targetProfile } = await supabaseAdmin
-        .from("profiles")
-        .select("unit_id")
-        .eq("id", user_id)
-        .single();
-
-      if (!callerProfile?.unit_id || callerProfile.unit_id !== targetProfile?.unit_id) {
-        return jsonResponse({ error: "Sem permissão para este usuário" });
-      }
-    }
 
     if (action === "permanent_delete") {
       await logAction("DELETE_ATTEMPT", { requested_action: "permanent_delete" });
@@ -120,31 +119,50 @@ Deno.serve(async (req) => {
           has_payments: hasPayments,
         });
         return jsonResponse({
-          error: "Este registro possui histórico financeiro e não pode ser excluído. Use desativar.",
+          error: "Este registro possui histórico e não pode ser excluído. Use desativar.",
           has_dependencies: true,
         });
       }
 
       await supabaseAdmin.from("students").delete().eq("responsible_id", user_id);
       await supabaseAdmin.from("user_roles").delete().eq("user_id", user_id);
-      await logAction("PERMANENT_DELETE", { deleted_user_id: user_id });
       await supabaseAdmin.from("profiles").delete().eq("id", user_id);
-      await supabaseAdmin.auth.admin.deleteUser(user_id);
 
+      const { error: deleteAuthError } = await supabaseAdmin.auth.admin.deleteUser(user_id);
+      if (deleteAuthError) {
+        return jsonResponse({ error: deleteAuthError.message });
+      }
+
+      await logAction("PERMANENT_DELETE", { deleted_user_id: user_id });
       return jsonResponse({ success: true, message: "Usuário excluído permanentemente" });
     }
 
     if (action === "reactivate") {
-      await supabaseAdmin.from("profiles").update({ active: true }).eq("id", user_id);
-      await supabaseAdmin.auth.admin.updateUserById(user_id, { ban_duration: "none" });
-      await logAction("REACTIVATE", { active: true });
+      const { error: profileError } = await supabaseAdmin.from("profiles").update({ active: true }).eq("id", user_id);
+      if (profileError) {
+        return jsonResponse({ error: profileError.message });
+      }
+
+      const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(user_id, { ban_duration: "none" });
+      if (authError) {
+        return jsonResponse({ error: authError.message });
+      }
+
+      await logAction("REACTIVATE", { before_active: targetProfile.active, after_active: true });
       return jsonResponse({ success: true, message: "Usuário reativado" });
     }
 
-    // Default: deactivate
-    await supabaseAdmin.from("profiles").update({ active: false }).eq("id", user_id);
-    await supabaseAdmin.auth.admin.updateUserById(user_id, { ban_duration: "876600h" });
-    await logAction("DEACTIVATE", { active: false });
+    const { error: profileError } = await supabaseAdmin.from("profiles").update({ active: false }).eq("id", user_id);
+    if (profileError) {
+      return jsonResponse({ error: profileError.message });
+    }
+
+    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(user_id, { ban_duration: "876600h" });
+    if (authError) {
+      return jsonResponse({ error: authError.message });
+    }
+
+    await logAction("DEACTIVATE", { before_active: targetProfile.active, after_active: false });
     return jsonResponse({ success: true, message: "Usuário desativado com sucesso" });
   } catch (err) {
     return jsonResponse({ error: err instanceof Error ? err.message : "Erro interno" });
