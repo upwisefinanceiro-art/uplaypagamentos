@@ -91,7 +91,34 @@ const AdminCharges = () => {
   const [billingType, setBillingType] = useState<BillingType>("PIX");
   const [chargeDescription, setChargeDescription] = useState("");
 
-  const fetchData = async () => {
+  // WhatsApp dialog
+  const [waDialogOpen, setWaDialogOpen] = useState(false);
+  const [waPayment, setWaPayment] = useState<PaymentRow | null>(null);
+  const [waResponsible, setWaResponsible] = useState<{ full_name: string; phone: string | null } | null>(null);
+  const [waStudent, setWaStudent] = useState<string | undefined>(undefined);
+  const [waDescription, setWaDescription] = useState("");
+
+  const handleOpenWhatsApp = async (p: PaymentRow) => {
+    setWaPayment(p);
+    const { data: resp } = await supabase.from("profiles").select("full_name, phone").eq("id", p.responsible_id).single();
+    setWaResponsible(resp);
+    let desc = `Parcela ${p.installment_number}`;
+    let studentName: string | undefined;
+    if (p.contract_id) {
+      const { data: c } = await supabase.from("contracts").select("description, student_id").eq("id", p.contract_id).single();
+      if (c) {
+        desc = c.description || desc;
+        if (c.student_id) {
+          const { data: s } = await supabase.from("students").select("full_name").eq("id", c.student_id).single();
+          studentName = s?.full_name;
+        }
+      }
+    }
+    setWaDescription(desc);
+    setWaStudent(studentName);
+    setWaDialogOpen(true);
+  };
+
     setLoadingData(true);
     const [paymentsRes, studentsRes, unitsRes, profilesRes] = await Promise.all([
       supabase.from("payments").select("id, value, due_date, status, payment_method, pix_copy_paste, invoice_url, checkout_url, boleto_url, pix_qr_code, asaas_payment_id, responsible_id, unit_id, installment_number, contract_id").order("due_date", { ascending: false }),
