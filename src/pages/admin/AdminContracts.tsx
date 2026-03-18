@@ -384,7 +384,7 @@ const AdminContracts = () => {
             <Select value={responsibleId} onValueChange={handleResponsibleChange}>
               <SelectTrigger className="bg-input border-border text-foreground"><SelectValue placeholder="Selecione o responsável" /></SelectTrigger>
               <SelectContent className="bg-card border-border">
-                {responsibles.map(r => (
+                {responsibles.map((r) => (
                   <SelectItem key={r.id} value={r.id}>{r.full_name} - {r.cpf}</SelectItem>
                 ))}
               </SelectContent>

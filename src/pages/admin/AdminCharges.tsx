@@ -254,11 +254,11 @@ const AdminCharges = () => {
                   <Label>Responsável *</Label>
                   <Select value={selectedResponsible} onValueChange={(v) => { setSelectedResponsible(v); setSelectedStudent(""); }}>
                     <SelectTrigger><SelectValue placeholder="Selecione o responsável" /></SelectTrigger>
-                    <SelectContent>
-                      {responsibles.map((r) => (
-                        <SelectItem key={r.id} value={r.id}>{r.full_name}</SelectItem>
-                      ))}
-                    </SelectContent>
+                      <SelectContent>
+                        {responsibles.map((r) => (
+                          <SelectItem key={r.id} value={r.id}>{r.full_name}</SelectItem>
+                        ))}
+                      </SelectContent>
                   </Select>
                 </div>
 

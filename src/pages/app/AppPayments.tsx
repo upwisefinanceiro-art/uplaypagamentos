@@ -96,7 +96,7 @@ const AppPayments = () => {
   const fetchChargeData = async () => {
     const [profilesRes, studentsRes] = await Promise.all([
       supabase.from("profiles").select("id, full_name").eq("active", true),
-      supabase.from("students").select("id, full_name, responsible_id"),
+      supabase.from("students").select("id, full_name, responsible_id").eq("active", true),
     ]);
     if (profilesRes.data) setResponsibles(profilesRes.data);
     if (studentsRes.data) setStudents(studentsRes.data);
