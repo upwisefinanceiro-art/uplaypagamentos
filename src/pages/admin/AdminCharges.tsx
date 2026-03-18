@@ -119,6 +119,7 @@ const AdminCharges = () => {
     setWaDialogOpen(true);
   };
 
+  const fetchData = async () => {
     setLoadingData(true);
     const [paymentsRes, studentsRes, unitsRes, profilesRes] = await Promise.all([
       supabase.from("payments").select("id, value, due_date, status, payment_method, pix_copy_paste, invoice_url, checkout_url, boleto_url, pix_qr_code, asaas_payment_id, responsible_id, unit_id, installment_number, contract_id").order("due_date", { ascending: false }),
