@@ -173,6 +173,9 @@ const AdminClients = () => {
     else if (action === "permanent_delete") body.action = "permanent_delete";
 
     const { data, error } = await supabase.functions.invoke("delete-user", { body });
+    console.log("[DELETE-USER] body sent:", JSON.stringify(body));
+    console.log("[DELETE-USER] response data:", JSON.stringify(data));
+    console.log("[DELETE-USER] response error:", JSON.stringify(error));
 
     if (error || data?.error) {
       toast({
