@@ -167,9 +167,9 @@ const AdminDashboard = () => {
       .sort((a, b) => new Date(b.paid_at!).getTime() - new Date(a.paid_at!).getTime())
       .slice(0, 10);
 
-    // Inadimplência: overdue / (overdue + paid in period)
-    const totalDueAndPaid = totalOverdue + totalReceived;
-    const inadimplencia = totalDueAndPaid > 0 ? (totalOverdue / totalDueAndPaid) * 100 : 0;
+    // Inadimplência: overdue / total a receber (pending + overdue)
+    const totalAReceber = totalToReceive + totalOverdue;
+    const inadimplencia = totalAReceber > 0 ? (totalOverdue / totalAReceber) * 100 : 0;
 
     // Per unit breakdown
     const perUnit = units.map((u) => {
