@@ -93,6 +93,7 @@ const WhatsAppDialog = ({
   const handleCopy = async () => {
     await navigator.clipboard.writeText(message);
     setCopied(true);
+    await logMessage("COPY_MANUAL");
     toast({ title: "Mensagem copiada!", description: "Cole onde preferir." });
     setTimeout(() => setCopied(false), 2000);
   };
