@@ -280,9 +280,11 @@ export type Database = {
       profiles: {
         Row: {
           active: boolean
+          address: string | null
           asaas_customer_id: string | null
           cpf: string
           created_at: string
+          email: string | null
           full_name: string
           id: string
           phone: string | null
@@ -291,9 +293,11 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          address?: string | null
           asaas_customer_id?: string | null
           cpf: string
           created_at?: string
+          email?: string | null
           full_name: string
           id: string
           phone?: string | null
@@ -302,9 +306,11 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          address?: string | null
           asaas_customer_id?: string | null
           cpf?: string
           created_at?: string
+          email?: string | null
           full_name?: string
           id?: string
           phone?: string | null
