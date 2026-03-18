@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { Plus, Pencil, Eye, Loader2, Trash2, RotateCcw } from "lucide-react";
+import { Plus, Loader2, Eye, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
@@ -13,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import UserEditDialog from "@/components/admin/UserEditDialog";
+import UserActionButtons from "@/components/admin/UserActionButtons";
 
 interface ClientRow {
   id: string;
@@ -34,6 +37,8 @@ interface UnitRow {
   name: string;
 }
 
+type ActionType = "deactivate" | "reactivate" | "permanent_delete";
+
 const AdminClients = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [clients, setClients] = useState<ClientRow[]>([]);
@@ -42,8 +47,10 @@ const AdminClients = () => {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState("");
-  const [deleteTarget, setDeleteTarget] = useState<ClientRow | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
+  const [actionTarget, setActionTarget] = useState<{ client: ClientRow; action: ActionType } | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [editTarget, setEditTarget] = useState<ClientRow | null>(null);
   const { toast } = useToast();
   const { profile, hasRole } = useAuth();
 
@@ -109,22 +116,33 @@ const AdminClients = () => {
     setCreating(false); setDialogOpen(false); resetForm(); fetchData();
   };
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    setDeleting(true);
+  const handleAction = async () => {
+    if (!actionTarget) return;
+    setActionLoading(true);
 
-    const action = deleteTarget.active ? "deactivate" : "reactivate";
-    const { data, error } = await supabase.functions.invoke("delete-user", {
-      body: { user_id: deleteTarget.id, action: deleteTarget.active ? undefined : "reactivate" },
-    });
+    const { client, action } = actionTarget;
+    const body: Record<string, any> = { user_id: client.id };
+
+    if (action === "reactivate") body.action = "reactivate";
+    else if (action === "permanent_delete") body.action = "permanent_delete";
+
+    const { data, error } = await supabase.functions.invoke("delete-user", { body });
 
     if (error || data?.error) {
-      toast({ title: "Erro", description: error?.message || data?.error, variant: "destructive" });
+      const msg = data?.has_dependencies
+        ? "Este cliente possui contratos ou cobranças. Não é possível excluir. Sugerimos desativar."
+        : (error?.message || data?.error);
+      toast({ title: "Erro", description: msg, variant: "destructive" });
     } else {
-      toast({ title: deleteTarget.active ? "Cliente desativado com sucesso" : "Cliente reativado com sucesso" });
+      const messages: Record<ActionType, string> = {
+        deactivate: "Cliente desativado com sucesso",
+        reactivate: "Cliente reativado com sucesso",
+        permanent_delete: "Cliente excluído permanentemente",
+      };
+      toast({ title: messages[action] });
     }
 
-    setDeleting(false); setDeleteTarget(null); fetchData();
+    setActionLoading(false); setActionTarget(null); fetchData();
   };
 
   const unitMap: Record<string, string> = {};
@@ -134,11 +152,35 @@ const AdminClients = () => {
     students.filter((s) => s.responsible_id === responsibleId).map((s) => s.full_name).join(", ");
 
   const filtered = clients.filter((c) => {
+    if (!showInactive && !c.active) return false;
     if (!search) return true;
     const q = search.toLowerCase();
     const studentNames = getStudents(c.id).toLowerCase();
     return c.full_name.toLowerCase().includes(q) || c.cpf.includes(q) || studentNames.includes(q);
   });
+
+  const getAlertContent = () => {
+    if (!actionTarget) return { title: "", description: "" };
+    const { client, action } = actionTarget;
+    if (action === "permanent_delete") {
+      return {
+        title: "Excluir cliente permanentemente",
+        description: `⚠️ Essa ação é irreversível! O cliente "${client.full_name}" e todos os dados associados serão removidos definitivamente. Deseja continuar?`,
+      };
+    }
+    if (action === "deactivate") {
+      return {
+        title: "Desativar cliente",
+        description: `Tem certeza que deseja desativar "${client.full_name}"? O cliente não conseguirá mais acessar o sistema, mas o histórico será mantido.`,
+      };
+    }
+    return {
+      title: "Reativar cliente",
+      description: `Deseja reativar "${client.full_name}"? O cliente voltará a ter acesso ao sistema.`,
+    };
+  };
+
+  const alertContent = getAlertContent();
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -146,9 +188,7 @@ const AdminClients = () => {
         <h1 className="text-xl font-bold text-foreground">Clientes (Responsáveis)</h1>
         <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
           <DialogTrigger asChild>
-            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
-              <Plus size={16} className="mr-2" /> Novo Cliente
-            </Button>
+            <Button><Plus size={16} className="mr-2" /> Novo Cliente</Button>
           </DialogTrigger>
           <DialogContent className="bg-card border-border max-h-[90vh] overflow-y-auto">
             <DialogHeader>
@@ -188,7 +228,7 @@ const AdminClients = () => {
                   <Input className="bg-input border-border text-foreground" type="password" placeholder="Senha inicial" value={formPassword} onChange={(e) => setFormPassword(e.target.value)} />
                 </div>
               </div>
-              <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" disabled={creating}>
+              <Button type="submit" className="w-full" disabled={creating}>
                 {creating ? <><Loader2 size={16} className="animate-spin mr-2" /> Salvando...</> : "Salvar"}
               </Button>
             </form>
@@ -196,7 +236,16 @@ const AdminClients = () => {
         </Dialog>
       </div>
 
-      <Input className="bg-input border-border text-foreground" placeholder="Buscar por nome, CPF ou aluno..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      <div className="flex items-center gap-4">
+        <div className="relative flex-1">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input className="bg-input border-border text-foreground pl-9" placeholder="Buscar por nome, CPF ou aluno..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch checked={showInactive} onCheckedChange={setShowInactive} />
+          <Label className="text-xs text-muted-foreground whitespace-nowrap">Mostrar inativos</Label>
+        </div>
+      </div>
 
       {loading ? (
         <div className="flex justify-center py-12"><Loader2 className="animate-spin text-muted-foreground" /></div>
@@ -214,19 +263,13 @@ const AdminClients = () => {
                   <p className="text-xs text-muted-foreground">Aluno(s): {getStudents(client.id)}</p>
                 )}
               </div>
-              <div className="flex gap-1">
-                <button className="p-1.5 text-muted-foreground hover:text-foreground transition-colors" title="Ver"><Eye size={14} /></button>
-                <button className="p-1.5 text-muted-foreground hover:text-foreground transition-colors" title="Editar"><Pencil size={14} /></button>
-                {client.active ? (
-                  <button className="p-1.5 text-muted-foreground hover:text-destructive transition-colors" title="Desativar" onClick={() => setDeleteTarget(client)}>
-                    <Trash2 size={14} />
-                  </button>
-                ) : (
-                  <button className="p-1.5 text-muted-foreground hover:text-primary transition-colors" title="Reativar" onClick={() => setDeleteTarget(client)}>
-                    <RotateCcw size={14} />
-                  </button>
-                )}
-              </div>
+              <UserActionButtons
+                active={client.active}
+                onEdit={() => setEditTarget(client)}
+                onDeactivate={() => setActionTarget({ client, action: "deactivate" })}
+                onReactivate={() => setActionTarget({ client, action: "reactivate" })}
+                onPermanentDelete={() => setActionTarget({ client, action: "permanent_delete" })}
+              />
             </div>
           ))}
           {filtered.length === 0 && (
@@ -235,28 +278,34 @@ const AdminClients = () => {
         </div>
       )}
 
-      {/* Delete/Reactivate Confirmation */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+      {/* Edit Dialog */}
+      <UserEditDialog
+        open={!!editTarget}
+        onOpenChange={(o) => !o && setEditTarget(null)}
+        user={editTarget}
+        units={units}
+        onSaved={fetchData}
+        showUnitSelector={hasRole("ADMIN_MASTER")}
+      />
+
+      {/* Action Confirmation */}
+      <AlertDialog open={!!actionTarget} onOpenChange={(o) => !o && setActionTarget(null)}>
         <AlertDialogContent className="bg-card border-border">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-foreground">
-              {deleteTarget?.active ? "Desativar cliente" : "Reativar cliente"}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteTarget?.active
-                ? `Tem certeza que deseja desativar "${deleteTarget?.full_name}"? O cliente não conseguirá mais acessar o sistema.`
-                : `Deseja reativar "${deleteTarget?.full_name}"? O cliente voltará a ter acesso ao sistema.`}
-            </AlertDialogDescription>
+            <AlertDialogTitle className="text-foreground">{alertContent.title}</AlertDialogTitle>
+            <AlertDialogDescription>{alertContent.description}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="border-border" disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel className="border-border" disabled={actionLoading}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDelete}
-              disabled={deleting}
-              className={deleteTarget?.active ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground" : "bg-primary hover:bg-primary/90 text-primary-foreground"}
+              onClick={handleAction}
+              disabled={actionLoading}
+              className={actionTarget?.action === "reactivate"
+                ? "bg-primary hover:bg-primary/90 text-primary-foreground"
+                : "bg-destructive hover:bg-destructive/90 text-destructive-foreground"}
             >
-              {deleting ? <Loader2 size={14} className="animate-spin mr-2" /> : null}
-              {deleteTarget?.active ? "Desativar" : "Reativar"}
+              {actionLoading ? <Loader2 size={14} className="animate-spin mr-2" /> : null}
+              {actionTarget?.action === "permanent_delete" ? "Excluir Permanentemente" : actionTarget?.action === "deactivate" ? "Desativar" : "Reativar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

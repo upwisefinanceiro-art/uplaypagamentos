@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
-    // Verify caller has admin role
+    // Verify caller
     const callerClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -68,15 +68,14 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Prevent self-deletion
     if (user_id === caller.id) {
-      return new Response(JSON.stringify({ error: "Você não pode excluir a si mesmo" }), {
+      return new Response(JSON.stringify({ error: "Você não pode executar esta ação em si mesmo" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // ADMIN_UNIDADE can only deactivate users from their own unit
+    // ADMIN_UNIDADE: only own unit
     if (!isAdminMaster) {
       const { data: callerProfile } = await supabaseAdmin
         .from("profiles")
@@ -98,13 +97,66 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (action === "reactivate") {
-      // Reactivate user
-      await supabaseAdmin.from("profiles").update({ active: true }).eq("id", user_id);
+    // === PERMANENT DELETE ===
+    if (action === "permanent_delete") {
+      if (!isAdminMaster) {
+        return new Response(JSON.stringify({ error: "Apenas ADMIN_MASTER pode excluir permanentemente" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
-      // Re-enable auth user
-      await supabaseAdmin.auth.admin.updateUserById(user_id, {
-        ban_duration: "none",
+      // Check dependencies: contracts or payments
+      const [contractsRes, paymentsRes] = await Promise.all([
+        supabaseAdmin.from("contracts").select("id").eq("responsible_id", user_id).limit(1),
+        supabaseAdmin.from("payments").select("id").eq("responsible_id", user_id).limit(1),
+      ]);
+
+      const hasContracts = (contractsRes.data?.length ?? 0) > 0;
+      const hasPayments = (paymentsRes.data?.length ?? 0) > 0;
+
+      if (hasContracts || hasPayments) {
+        return new Response(JSON.stringify({
+          error: "Este usuário possui contratos ou cobranças vinculados. Não é possível excluir permanentemente. Sugerimos desativar o usuário.",
+          has_dependencies: true,
+        }), {
+          status: 409,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Delete related data: students, user_roles, audit_logs refs, profile, then auth user
+      await supabaseAdmin.from("students").delete().eq("responsible_id", user_id);
+      await supabaseAdmin.from("user_roles").delete().eq("user_id", user_id);
+
+      // Log before deleting profile
+      await supabaseAdmin.from("audit_logs").insert({
+        action: "PERMANENT_DELETE",
+        target_table: "profiles",
+        target_id: user_id,
+        performed_by: caller.id,
+        details: { deleted_user_id: user_id },
+      });
+
+      await supabaseAdmin.from("profiles").delete().eq("id", user_id);
+      await supabaseAdmin.auth.admin.deleteUser(user_id);
+
+      return new Response(
+        JSON.stringify({ success: true, message: "Usuário excluído permanentemente" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // === REACTIVATE ===
+    if (action === "reactivate") {
+      await supabaseAdmin.from("profiles").update({ active: true }).eq("id", user_id);
+      await supabaseAdmin.auth.admin.updateUserById(user_id, { ban_duration: "none" });
+
+      await supabaseAdmin.from("audit_logs").insert({
+        action: "REACTIVATE",
+        target_table: "profiles",
+        target_id: user_id,
+        performed_by: caller.id,
       });
 
       return new Response(
@@ -113,13 +165,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Default: deactivate (soft delete)
-    // Set profile as inactive
+    // === DEACTIVATE (default) ===
     await supabaseAdmin.from("profiles").update({ active: false }).eq("id", user_id);
+    await supabaseAdmin.auth.admin.updateUserById(user_id, { ban_duration: "876600h" });
 
-    // Ban the auth user (soft disable)
-    await supabaseAdmin.auth.admin.updateUserById(user_id, {
-      ban_duration: "876600h", // ~100 years
+    await supabaseAdmin.from("audit_logs").insert({
+      action: "DEACTIVATE",
+      target_table: "profiles",
+      target_id: user_id,
+      performed_by: caller.id,
     });
 
     return new Response(
