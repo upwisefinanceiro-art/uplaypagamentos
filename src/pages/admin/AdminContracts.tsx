@@ -161,7 +161,7 @@ const AdminContracts = () => {
     const [contractsRes, studentsRes, responsiblesRes, unitsRes] = await Promise.all([
       supabase.from("contracts").select("*, units(name), students(full_name)").order("created_at", { ascending: false }),
       supabase.from("students").select("id, full_name, responsible_id, unit_id").eq("active", true),
-      supabase.from("profiles").select("id, full_name, cpf, phone, unit_id, asaas_customer_id"),
+      supabase.from("profiles").select("id, full_name, cpf, phone, unit_id, asaas_customer_id").eq("active", true),
       supabase.from("units").select("id, name").eq("active", true),
     ]);
     if (contractsRes.data) setContracts(contractsRes.data as any);

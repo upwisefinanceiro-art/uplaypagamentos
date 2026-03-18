@@ -123,17 +123,20 @@ const AdminCharges = () => {
     setLoadingData(true);
     const [paymentsRes, studentsRes, unitsRes, profilesRes] = await Promise.all([
       supabase.from("payments").select("id, value, due_date, status, payment_method, pix_copy_paste, invoice_url, checkout_url, boleto_url, pix_qr_code, asaas_payment_id, responsible_id, unit_id, installment_number, contract_id").order("due_date", { ascending: false }),
-      supabase.from("students").select("id, full_name, responsible_id"),
+      supabase.from("students").select("id, full_name, responsible_id").eq("active", true),
       supabase.from("units").select("id, name"),
-      supabase.from("profiles").select("id, full_name, unit_id"),
+      supabase.from("profiles").select("id, full_name, unit_id").eq("active", true),
     ]);
 
     if (paymentsRes.data) setPayments(paymentsRes.data as PaymentRow[]);
     if (studentsRes.data) setStudents(studentsRes.data as StudentRow[]);
-    // Build responsibles list from profiles that have students
     if (profilesRes.data && studentsRes.data) {
-      const respIds = new Set(studentsRes.data.map((s: any) => s.responsible_id));
-      setResponsibles(profilesRes.data.filter((p: any) => respIds.has(p.id)).map((p: any) => ({ id: p.id, full_name: p.full_name, unit_id: p.unit_id })));
+      const respIds = new Set(studentsRes.data.map((s: { responsible_id: string }) => s.responsible_id));
+      setResponsibles(
+        profilesRes.data
+          .filter((profile) => respIds.has(profile.id))
+          .map((profile) => ({ id: profile.id, full_name: profile.full_name, unit_id: profile.unit_id }))
+      );
     }
     if (unitsRes.data) {
       setUnits(unitsRes.data);
