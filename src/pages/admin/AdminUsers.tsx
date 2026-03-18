@@ -55,6 +55,7 @@ const AdminUsers = () => {
   const [editTarget, setEditTarget] = useState<AdminUser | null>(null);
   const { toast } = useToast();
   const { hasRole } = useAuth();
+  const isMaster = hasRole("ADMIN_MASTER");
 
   const [formName, setFormName] = useState("");
   const [formCpf, setFormCpf] = useState("");
@@ -66,9 +67,9 @@ const AdminUsers = () => {
     setLoading(true);
 
     const [profilesRes, rolesRes, unitsRes] = await Promise.all([
-      supabase.from("profiles").select("id, full_name, cpf, phone, unit_id, active, email, address"),
+      supabase.from("profiles").select("id, full_name, cpf, phone, unit_id, active, email, address").order("full_name"),
       supabase.from("user_roles").select("user_id, role").in("role", ["ADMIN_MASTER", "ADMIN_UNIDADE"]),
-      supabase.from("units").select("id, name"),
+      supabase.from("units").select("id, name").order("name"),
     ]);
 
     if (profilesRes.data && rolesRes.data) {
@@ -140,7 +141,7 @@ const AdminUsers = () => {
     setCreating(false);
     setDialogOpen(false);
     resetForm();
-    fetchData();
+    await fetchData();
   };
 
   const handleAction = async () => {
@@ -159,7 +160,7 @@ const AdminUsers = () => {
       toast({
         title: "Erro",
         description: data?.has_dependencies
-          ? "Este registro possui histórico financeiro e não pode ser excluído. Use desativar."
+          ? "Este registro possui histórico e não pode ser excluído. Use desativar."
           : error?.message || data?.error,
         variant: "destructive",
       });
@@ -174,7 +175,7 @@ const AdminUsers = () => {
 
     setActionLoading(false);
     setActionTarget(null);
-    fetchData();
+    await fetchData();
   };
 
   const unitMap: Record<string, string> = {};
@@ -223,68 +224,75 @@ const AdminUsers = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-foreground">Colaboradores</h1>
-        <Dialog
-          open={dialogOpen}
-          onOpenChange={(open) => {
-            setDialogOpen(open);
-            if (!open) resetForm();
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button>
-              <Plus size={16} className="mr-2" /> Novo Colaborador
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="bg-card border-border">
-            <DialogHeader>
-              <DialogTitle className="text-foreground">Novo Colaborador</DialogTitle>
-            </DialogHeader>
-            <form className="space-y-4" onSubmit={handleCreate}>
-              <div className="space-y-2">
-                <Label className="text-foreground">Nome *</Label>
-                <Input className="bg-input border-border text-foreground" placeholder="Nome completo" value={formName} onChange={(e) => setFormName(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-foreground">CPF *</Label>
-                <Input className="bg-input border-border text-foreground" placeholder="000.000.000-00" value={formCpf} onChange={(e) => setFormCpf(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-foreground">Telefone</Label>
-                <Input className="bg-input border-border text-foreground" placeholder="(00) 00000-0000" value={formPhone} onChange={(e) => setFormPhone(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-foreground">Unidade *</Label>
-                <Select value={formUnitId} onValueChange={setFormUnitId}>
-                  <SelectTrigger className="bg-input border-border text-foreground">
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-card border-border">
-                    {units.map((unit) => (
-                      <SelectItem key={unit.id} value={unit.id}>
-                        {unit.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-foreground">Senha Provisória *</Label>
-                <Input className="bg-input border-border text-foreground" type="password" placeholder="Senha inicial" value={formPassword} onChange={(e) => setFormPassword(e.target.value)} />
-              </div>
-              <Button type="submit" className="w-full" disabled={creating}>
-                {creating ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin mr-2" /> Salvando...
-                  </>
-                ) : (
-                  "Salvar"
-                )}
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold text-foreground">Colaboradores</h1>
+          {!isMaster && (
+            <p className="text-sm text-muted-foreground">Você pode editar e desativar colaboradores da sua unidade.</p>
+          )}
+        </div>
+        {isMaster && (
+          <Dialog
+            open={dialogOpen}
+            onOpenChange={(open) => {
+              setDialogOpen(open);
+              if (!open) resetForm();
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button>
+                <Plus size={16} className="mr-2" /> Novo Colaborador
               </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent className="bg-card border-border">
+              <DialogHeader>
+                <DialogTitle className="text-foreground">Novo Colaborador</DialogTitle>
+              </DialogHeader>
+              <form className="space-y-4" onSubmit={handleCreate}>
+                <div className="space-y-2">
+                  <Label className="text-foreground">Nome *</Label>
+                  <Input className="bg-input border-border text-foreground" placeholder="Nome completo" value={formName} onChange={(e) => setFormName(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-foreground">CPF *</Label>
+                  <Input className="bg-input border-border text-foreground" placeholder="000.000.000-00" value={formCpf} onChange={(e) => setFormCpf(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-foreground">Telefone</Label>
+                  <Input className="bg-input border-border text-foreground" placeholder="(00) 00000-0000" value={formPhone} onChange={(e) => setFormPhone(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-foreground">Unidade *</Label>
+                  <Select value={formUnitId} onValueChange={setFormUnitId}>
+                    <SelectTrigger className="bg-input border-border text-foreground">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                      {units.map((unit) => (
+                        <SelectItem key={unit.id} value={unit.id}>
+                          {unit.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-foreground">Senha Provisória *</Label>
+                  <Input className="bg-input border-border text-foreground" type="password" placeholder="Senha inicial" value={formPassword} onChange={(e) => setFormPassword(e.target.value)} />
+                </div>
+                <Button type="submit" className="w-full" disabled={creating}>
+                  {creating ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin mr-2" /> Salvando...
+                    </>
+                  ) : (
+                    "Salvar"
+                  )}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <div className="flex items-center gap-4">
@@ -349,7 +357,7 @@ const AdminUsers = () => {
         user={editTarget}
         units={units}
         onSaved={fetchData}
-        showUnitSelector={hasRole("ADMIN_MASTER")}
+        showUnitSelector={isMaster}
       />
 
       <AlertDialog open={!!actionTarget} onOpenChange={(open) => !open && setActionTarget(null)}>
