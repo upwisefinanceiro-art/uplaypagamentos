@@ -70,8 +70,11 @@ const WhatsAppDialog = ({
   value,
   dueDate,
   invoiceUrl,
+  paymentId,
+  responsibleId,
 }: WhatsAppDialogProps) => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [message, setMessage] = useState("");
 
   const phoneValid = phone ? isValidPhone(phone) : false;
