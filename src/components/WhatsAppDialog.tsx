@@ -47,7 +47,7 @@ const buildDefaultMessage = ({
   const formatDate = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("pt-BR");
 
   let msg = `Olá, ${responsibleName}.\n\n`;
-  msg += `Sua cobrança da EnsinUP foi gerada.\n\n`;
+  msg += `Aqui é do financeiro da EnsinUP.\n\n`;
   if (studentName) msg += `Aluno: ${studentName}\n`;
   msg += `Referência: ${description}\n`;
   msg += `Valor: *${formatCurrency(value)}*\n`;
