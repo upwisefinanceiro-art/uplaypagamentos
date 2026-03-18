@@ -8,3 +8,12 @@ verify_jwt = false
 
 [functions.create-asaas-charge]
 verify_jwt = false
+
+[functions.update-user]
+verify_jwt = false
+
+[functions.delete-user]
+verify_jwt = false
+
+[functions.seed-test-data]
+verify_jwt = false
