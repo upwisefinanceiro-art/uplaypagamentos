@@ -444,6 +444,15 @@ const AdminCharges = () => {
                       <Copy size={14} />
                     </button>
                   )}
+                  {(p.status === "PENDING" || p.status === "OVERDUE") && (
+                    <button
+                      className="p-1.5 text-success hover:bg-success/10 rounded transition-colors"
+                      title="Enviar no WhatsApp"
+                      onClick={() => handleOpenWhatsApp(p)}
+                    >
+                      <MessageCircle size={14} />
+                    </button>
+                  )}
                   {(p.invoice_url || p.boleto_url || p.checkout_url) && (
                     <a
                       href={p.invoice_url || p.boleto_url || p.checkout_url || "#"}
@@ -464,6 +473,23 @@ const AdminCharges = () => {
 
       {!loadingData && filtered.length === 0 && (
         <div className="text-center py-12 text-muted-foreground text-sm">Nenhuma cobrança encontrada.</div>
+      )}
+
+      {/* WhatsApp Dialog */}
+      {waPayment && waResponsible && (
+        <WhatsAppDialog
+          open={waDialogOpen}
+          onOpenChange={setWaDialogOpen}
+          phone={waResponsible.phone}
+          responsibleName={waResponsible.full_name}
+          studentName={waStudent}
+          description={waDescription}
+          value={Number(waPayment.value)}
+          dueDate={waPayment.due_date}
+          invoiceUrl={waPayment.invoice_url}
+          paymentId={waPayment.id}
+          responsibleId={waPayment.responsible_id}
+        />
       )}
     </div>
   );
