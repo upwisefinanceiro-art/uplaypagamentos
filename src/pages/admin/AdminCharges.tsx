@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { RefreshCw, Copy, Plus, QrCode, ExternalLink, Loader2 } from "lucide-react";
+import { RefreshCw, Copy, Plus, QrCode, ExternalLink, Loader2, MessageCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
