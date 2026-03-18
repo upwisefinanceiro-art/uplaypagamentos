@@ -161,7 +161,7 @@ const AdminContracts = () => {
     const [contractsRes, studentsRes, responsiblesRes, unitsRes] = await Promise.all([
       supabase.from("contracts").select("*, units(name), students(full_name)").order("created_at", { ascending: false }),
       supabase.from("students").select("id, full_name, responsible_id, unit_id").eq("active", true),
-      supabase.from("profiles").select("id, full_name, cpf, phone, unit_id, asaas_customer_id"),
+      supabase.from("profiles").select("id, full_name, cpf, phone, unit_id, asaas_customer_id").eq("active", true),
       supabase.from("units").select("id, name").eq("active", true),
     ]);
     if (contractsRes.data) setContracts(contractsRes.data as any);
@@ -384,7 +384,7 @@ const AdminContracts = () => {
             <Select value={responsibleId} onValueChange={handleResponsibleChange}>
               <SelectTrigger className="bg-input border-border text-foreground"><SelectValue placeholder="Selecione o responsável" /></SelectTrigger>
               <SelectContent className="bg-card border-border">
-                {responsibles.map(r => (
+                {responsibles.map((r) => (
                   <SelectItem key={r.id} value={r.id}>{r.full_name} - {r.cpf}</SelectItem>
                 ))}
               </SelectContent>

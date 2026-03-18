@@ -32,11 +32,13 @@ Deno.serve(async (req) => {
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
-    // Verify caller
     const callerClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: { user: caller } } = await callerClient.auth.getUser();
+    const {
+      data: { user: caller },
+    } = await callerClient.auth.getUser();
+
     if (!caller) {
       return new Response(JSON.stringify({ error: "Não autorizado" }), {
         status: 401,
@@ -49,8 +51,8 @@ Deno.serve(async (req) => {
       .select("role")
       .eq("user_id", caller.id);
 
-    const isAdminMaster = callerRoles?.some((r: any) => r.role === "ADMIN_MASTER");
-    const isAdminUnidade = callerRoles?.some((r: any) => r.role === "ADMIN_UNIDADE");
+    const isAdminMaster = callerRoles?.some((r: { role: string }) => r.role === "ADMIN_MASTER");
+    const isAdminUnidade = callerRoles?.some((r: { role: string }) => r.role === "ADMIN_UNIDADE");
 
     if (!isAdminMaster && !isAdminUnidade) {
       return new Response(JSON.stringify({ error: "Sem permissão" }), {
@@ -75,7 +77,16 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ADMIN_UNIDADE: only own unit
+    const logAction = async (auditAction: string, details: Record<string, unknown> = {}) => {
+      await supabaseAdmin.from("audit_logs").insert({
+        action: auditAction,
+        target_table: "profiles",
+        target_id: user_id,
+        performed_by: caller.id,
+        details,
+      });
+    };
+
     if (!isAdminMaster) {
       const { data: callerProfile } = await supabaseAdmin
         .from("profiles")
@@ -97,16 +108,21 @@ Deno.serve(async (req) => {
       }
     }
 
-    // === PERMANENT DELETE ===
     if (action === "permanent_delete") {
+      await logAction("DELETE_ATTEMPT", { requested_action: "permanent_delete" });
+
       if (!isAdminMaster) {
+        await logAction("DELETE_ATTEMPT", {
+          requested_action: "permanent_delete",
+          blocked_reason: "not_admin_master",
+        });
+
         return new Response(JSON.stringify({ error: "Apenas ADMIN_MASTER pode excluir permanentemente" }), {
           status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // Check dependencies: contracts or payments
       const [contractsRes, paymentsRes] = await Promise.all([
         supabaseAdmin.from("contracts").select("id").eq("responsible_id", user_id).limit(1),
         supabaseAdmin.from("payments").select("id").eq("responsible_id", user_id).limit(1),
@@ -116,8 +132,15 @@ Deno.serve(async (req) => {
       const hasPayments = (paymentsRes.data?.length ?? 0) > 0;
 
       if (hasContracts || hasPayments) {
+        await logAction("DELETE_ATTEMPT", {
+          requested_action: "permanent_delete",
+          blocked_reason: "financial_history",
+          has_contracts: hasContracts,
+          has_payments: hasPayments,
+        });
+
         return new Response(JSON.stringify({
-          error: "Este usuário possui contratos ou cobranças vinculados. Não é possível excluir permanentemente. Sugerimos desativar o usuário.",
+          error: "Este registro possui histórico financeiro e não pode ser excluído. Use desativar.",
           has_dependencies: true,
         }), {
           status: 409,
@@ -125,63 +148,41 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Delete related data: students, user_roles, audit_logs refs, profile, then auth user
       await supabaseAdmin.from("students").delete().eq("responsible_id", user_id);
       await supabaseAdmin.from("user_roles").delete().eq("user_id", user_id);
 
-      // Log before deleting profile
-      await supabaseAdmin.from("audit_logs").insert({
-        action: "PERMANENT_DELETE",
-        target_table: "profiles",
-        target_id: user_id,
-        performed_by: caller.id,
-        details: { deleted_user_id: user_id },
-      });
+      await logAction("PERMANENT_DELETE", { deleted_user_id: user_id });
 
       await supabaseAdmin.from("profiles").delete().eq("id", user_id);
       await supabaseAdmin.auth.admin.deleteUser(user_id);
 
-      return new Response(
-        JSON.stringify({ success: true, message: "Usuário excluído permanentemente" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ success: true, message: "Usuário excluído permanentemente" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    // === REACTIVATE ===
     if (action === "reactivate") {
       await supabaseAdmin.from("profiles").update({ active: true }).eq("id", user_id);
       await supabaseAdmin.auth.admin.updateUserById(user_id, { ban_duration: "none" });
+      await logAction("REACTIVATE", { active: true });
 
-      await supabaseAdmin.from("audit_logs").insert({
-        action: "REACTIVATE",
-        target_table: "profiles",
-        target_id: user_id,
-        performed_by: caller.id,
+      return new Response(JSON.stringify({ success: true, message: "Usuário reativado" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-
-      return new Response(
-        JSON.stringify({ success: true, message: "Usuário reativado" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
     }
 
-    // === DEACTIVATE (default) ===
     await supabaseAdmin.from("profiles").update({ active: false }).eq("id", user_id);
     await supabaseAdmin.auth.admin.updateUserById(user_id, { ban_duration: "876600h" });
+    await logAction("DEACTIVATE", { active: false });
 
-    await supabaseAdmin.from("audit_logs").insert({
-      action: "DEACTIVATE",
-      target_table: "profiles",
-      target_id: user_id,
-      performed_by: caller.id,
+    return new Response(JSON.stringify({ success: true, message: "Usuário desativado com sucesso" }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-
-    return new Response(
-      JSON.stringify({ success: true, message: "Usuário desativado com sucesso" }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Erro interno" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
