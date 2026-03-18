@@ -5,6 +5,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface WhatsAppDialogProps {
   open: boolean;
@@ -16,6 +18,8 @@ interface WhatsAppDialogProps {
   value: number;
   dueDate: string;
   invoiceUrl?: string | null;
+  paymentId?: string;
+  responsibleId?: string;
 }
 
 const formatPhone = (phone: string): string => {
