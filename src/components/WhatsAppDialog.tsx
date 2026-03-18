@@ -97,11 +97,28 @@ const WhatsAppDialog = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleSend = () => {
+  const logMessage = async (channel: string) => {
+    if (!user) return;
+    try {
+      await supabase.from("whatsapp_message_logs" as any).insert({
+        payment_id: paymentId || null,
+        responsible_id: responsibleId || user.id,
+        phone: phoneValid ? `55${formattedPhone}` : null,
+        message_text: message,
+        channel,
+        sent_by: user.id,
+      });
+    } catch (e) {
+      // non-blocking log
+    }
+  };
+
+  const handleSend = async () => {
     if (!phoneValid) {
       toast({ title: "Telefone inválido", description: "O responsável não possui um telefone válido cadastrado.", variant: "destructive" });
       return;
     }
+    await logMessage("WHATSAPP_MANUAL");
     const waUrl = `https://wa.me/55${formattedPhone}?text=${encodeURIComponent(message)}`;
     window.open(waUrl, "_blank");
     onOpenChange(false);
