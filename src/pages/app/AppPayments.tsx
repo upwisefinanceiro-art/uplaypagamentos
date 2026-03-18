@@ -415,6 +415,8 @@ const AppPayments = () => {
           value={waPayment.final_value ?? waPayment.value}
           dueDate={waPayment.due_date}
           invoiceUrl={waPayment.invoice_url}
+          paymentId={waPayment.id}
+          responsibleId={waPayment.responsible_id}
         />
       )}
     </div>

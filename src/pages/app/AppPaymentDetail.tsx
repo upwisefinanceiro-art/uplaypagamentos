@@ -443,6 +443,8 @@ const AppPaymentDetail = () => {
           value={finalValue}
           dueDate={payment.due_date}
           invoiceUrl={payment.invoice_url}
+          paymentId={payment.id}
+          responsibleId={payment.responsible_id}
         />
       )}
     </div>
