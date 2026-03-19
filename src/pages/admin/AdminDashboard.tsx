@@ -91,6 +91,12 @@ const AdminDashboard = () => {
   const [unitFilter, setUnitFilter] = useState("all");
   const [periodFilter, setPeriodFilter] = useState("month");
 
+  // Cleanup state
+  const [cleanupPreview, setCleanupPreview] = useState<any>(null);
+  const [cleanupLoading, setCleanupLoading] = useState(false);
+  const [cleanupResult, setCleanupResult] = useState<any>(null);
+  const [cleanupDialogOpen, setCleanupDialogOpen] = useState(false);
+
   // WhatsApp dialog state
   const [waDialog, setWaDialog] = useState<{
     open: boolean;
