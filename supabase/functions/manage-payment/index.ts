@@ -142,6 +142,70 @@ Deno.serve(async (req) => {
       return { error: null, payment };
     };
 
+    // ── DELETE CONTRACT ──
+    if (payload.action === "delete_contract") {
+      const contractId = payload.contract_id;
+      if (!contractId) {
+        return jsonResponse({ error: "contract_id é obrigatório" });
+      }
+
+      const { data: contract, error: contractError } = await supabaseAdmin
+        .from("contracts")
+        .select("id, responsible_id, unit_id, description, status")
+        .eq("id", contractId)
+        .single();
+
+      if (contractError || !contract) {
+        return jsonResponse({ error: "Contrato não encontrado" });
+      }
+
+      const unitAccessError = ensureUnitAccess(contract.unit_id);
+      if (unitAccessError) return unitAccessError;
+
+      // Check for paid payments
+      const { data: paidPayments, count: paidCount } = await supabaseAdmin
+        .from("payments")
+        .select("id", { count: "exact", head: true })
+        .eq("contract_id", contractId)
+        .in("status", ["PAID", "RECEIVED", "CONFIRMED"]);
+
+      if ((paidCount ?? 0) > 0) {
+        return jsonResponse({
+          error: `Este contrato possui ${paidCount} parcela(s) paga(s) e não pode ser excluído. Desative-o ou ajuste manualmente.`,
+          has_paid: true,
+          paid_count: paidCount,
+        });
+      }
+
+      // Delete all unpaid payments for this contract
+      const { data: deletedPayments } = await supabaseAdmin
+        .from("payments")
+        .delete()
+        .eq("contract_id", contractId)
+        .select("id");
+
+      // Delete the contract
+      const { error: deleteError } = await supabaseAdmin
+        .from("contracts")
+        .delete()
+        .eq("id", contractId);
+
+      if (deleteError) {
+        return jsonResponse({ error: deleteError.message });
+      }
+
+      await logAudit("DELETE_CONTRACT", contractId, {
+        description: contract.description,
+        deleted_payments: deletedPayments?.length || 0,
+      });
+
+      return jsonResponse({
+        success: true,
+        message: `Contrato excluído com ${deletedPayments?.length || 0} parcela(s) removida(s)`,
+        deleted_payments: deletedPayments?.length || 0,
+      });
+    }
+
     if (payload.action === "create_manual") {
       if (!payload.responsible_id || !payload.value || !payload.due_date || !payload.description?.trim() || !payload.payment_type) {
         return jsonResponse({ error: "responsible_id, value, due_date, description e payment_type são obrigatórios" });
