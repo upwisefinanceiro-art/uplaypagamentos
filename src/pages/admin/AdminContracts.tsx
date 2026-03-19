@@ -375,6 +375,34 @@ const AdminContracts = () => {
     }
   };
 
+  const handleDeleteContract = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+
+    const { data, error } = await supabase.functions.invoke("manage-payment", {
+      body: { action: "delete_contract", contract_id: deleteTarget.id },
+    });
+
+    setDeleting(false);
+
+    if (error || data?.error) {
+      toast({
+        title: "Erro ao excluir contrato",
+        description: error?.message || data?.error,
+        variant: "destructive",
+      });
+      setDeleteTarget(null);
+      return;
+    }
+
+    toast({
+      title: "Contrato excluído",
+      description: data?.message || "Contrato e parcelas removidos com sucesso.",
+    });
+    setDeleteTarget(null);
+    fetchData();
+  };
+
   const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   const renderResponsibleSection = () => (
