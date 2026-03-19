@@ -13,6 +13,7 @@ interface ChargeInput {
   due_date: string;
   billing_type: "PIX" | "BOLETO" | "CARD";
   description?: string;
+  payment_type?: "MENSALIDADE" | "APOSTILA" | "AVULSA";
 }
 
 Deno.serve(async (req) => {
@@ -50,7 +51,7 @@ Deno.serve(async (req) => {
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
     const body: ChargeInput = await req.json();
-    const { responsible_id, student_id, contract_id, value, due_date, billing_type, description } = body;
+    const { responsible_id, student_id, contract_id, value, due_date, billing_type, description, payment_type } = body;
 
     if (!responsible_id || !value || !due_date || !billing_type) {
       return new Response(JSON.stringify({ error: "Campos obrigatórios: responsible_id, value, due_date, billing_type" }), {
@@ -244,9 +245,13 @@ Deno.serve(async (req) => {
         unit_id: unitId,
         contract_id: contract_id || null,
         responsible_id,
+        student_id: student_id || null,
         installment_number: 1,
         due_date,
         value,
+        final_value: value,
+        description: description || "Mensalidade EnsinUP",
+        payment_type: payment_type || (contract_id ? "MENSALIDADE" : "AVULSA"),
         status: "PENDING",
         asaas_payment_id: chargeData.id,
         pix_qr_code: pixQrCode,

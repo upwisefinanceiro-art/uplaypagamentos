@@ -1,35 +1,66 @@
-import { useState, useEffect } from "react";
-import { RefreshCw, Copy, Plus, QrCode, ExternalLink, Loader2, MessageCircle } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import {
+  Ban,
+  Copy,
+  ExternalLink,
+  Loader2,
+  MessageCircle,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
 import WhatsAppDialog from "@/components/WhatsAppDialog";
 
 type PaymentStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELLED";
 type BillingType = "PIX" | "BOLETO" | "CARD";
+type PaymentType = "MENSALIDADE" | "APOSTILA" | "AVULSA";
 
-const statusLabels: Record<PaymentStatus, string> = { PENDING: "Pendente", PAID: "Pago", OVERDUE: "Vencido", CANCELLED: "Cancelado" };
-const statusClasses: Record<PaymentStatus, string> = { PENDING: "status-pending", PAID: "status-paid", OVERDUE: "status-overdue", CANCELLED: "status-cancelled" };
+type ManagedPaymentAction = "delete" | "cancel";
 
-interface ChargeResult {
-  payment_id: string;
-  asaas_charge_id: string;
-  status: string;
-  invoice_url: string | null;
-  pix_qr_code: string | null;
-  pix_copy_paste: string | null;
-  boleto_url: string | null;
-  checkout_url: string | null;
-}
+const statusLabels: Record<PaymentStatus, string> = {
+  PENDING: "Pendente",
+  PAID: "Pago",
+  OVERDUE: "Vencido",
+  CANCELLED: "Cancelado",
+};
+
+const statusClasses: Record<PaymentStatus, string> = {
+  PENDING: "status-pending",
+  PAID: "status-paid",
+  OVERDUE: "status-overdue",
+  CANCELLED: "status-cancelled",
+};
+
+const typeLabels: Record<PaymentType, string> = {
+  MENSALIDADE: "Mensalidade",
+  APOSTILA: "Apostila",
+  AVULSA: "Avulsa",
+};
 
 interface PaymentRow {
   id: string;
   value: number;
+  final_value: number | null;
   due_date: string;
   status: string;
   payment_method: string | null;
@@ -42,13 +73,27 @@ interface PaymentRow {
   responsible_id: string;
   unit_id: string;
   installment_number: number;
-  contract_id: string;
+  contract_id: string | null;
+  student_id: string | null;
+  description: string;
+  payment_type: string;
+}
+
+interface ContractRow {
+  id: string;
+  description: string;
+  responsible_id: string;
+  student_id: string;
+  unit_id: string;
+  status: string;
 }
 
 interface ResponsibleRow {
   id: string;
   full_name: string;
   unit_id: string | null;
+  active: boolean;
+  phone: string | null;
 }
 
 interface StudentRow {
@@ -62,93 +107,147 @@ interface UnitRow {
   name: string;
 }
 
+interface ChargeResult {
+  payment_id: string;
+  asaas_charge_id: string;
+  invoice_url: string | null;
+}
+
+interface ManualFormState {
+  responsibleId: string;
+  studentId: string;
+  contractId: string;
+  paymentType: PaymentType;
+  description: string;
+  value: string;
+  dueDate: string;
+}
+
+interface EditFormState {
+  paymentId: string;
+  value: string;
+  dueDate: string;
+  description: string;
+  status: PaymentStatus;
+}
+
+const emptyManualForm: ManualFormState = {
+  responsibleId: "",
+  studentId: "NONE",
+  contractId: "NONE",
+  paymentType: "AVULSA",
+  description: "",
+  value: "",
+  dueDate: "",
+};
+
+const emptyEditForm: EditFormState = {
+  paymentId: "",
+  value: "",
+  dueDate: "",
+  description: "",
+  status: "PENDING",
+};
+
 const AdminCharges = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { toast } = useToast();
+
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [unitFilter, setUnitFilter] = useState<string>("ALL");
+  const [typeFilter, setTypeFilter] = useState<string>("ALL");
   const [search, setSearch] = useState("");
-  const { toast } = useToast();
-  const { session } = useAuth();
-
-  // Real data
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [units, setUnits] = useState<UnitRow[]>([]);
-  const [profiles, setProfiles] = useState<Record<string, string>>({});
+  const [contracts, setContracts] = useState<ContractRow[]>([]);
   const [responsibles, setResponsibles] = useState<ResponsibleRow[]>([]);
-  const [unitNames, setUnitNames] = useState<Record<string, string>>({});
+  const [profiles, setProfiles] = useState<Record<string, ResponsibleRow>>({});
   const [loadingData, setLoadingData] = useState(true);
 
-  // New charge dialog
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
+  const [chargeDialogOpen, setChargeDialogOpen] = useState(false);
+  const [manualDialogOpen, setManualDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [creatingCharge, setCreatingCharge] = useState(false);
+  const [creatingManual, setCreatingManual] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [chargeResult, setChargeResult] = useState<ChargeResult | null>(null);
+  const [manualForm, setManualForm] = useState<ManualFormState>(emptyManualForm);
+  const [editForm, setEditForm] = useState<EditFormState>(emptyEditForm);
+  const [actionTarget, setActionTarget] = useState<{ payment: PaymentRow; action: ManagedPaymentAction } | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
-  // Form fields
   const [selectedResponsible, setSelectedResponsible] = useState("");
-  const [selectedStudent, setSelectedStudent] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState("NONE");
+  const [selectedContract, setSelectedContract] = useState("NONE");
   const [chargeValue, setChargeValue] = useState("");
   const [chargeDueDate, setChargeDueDate] = useState("");
   const [billingType, setBillingType] = useState<BillingType>("PIX");
   const [chargeDescription, setChargeDescription] = useState("");
+  const [chargePaymentType, setChargePaymentType] = useState<PaymentType>("AVULSA");
 
-  // WhatsApp dialog
   const [waDialogOpen, setWaDialogOpen] = useState(false);
   const [waPayment, setWaPayment] = useState<PaymentRow | null>(null);
   const [waResponsible, setWaResponsible] = useState<{ full_name: string; phone: string | null } | null>(null);
   const [waStudent, setWaStudent] = useState<string | undefined>(undefined);
   const [waDescription, setWaDescription] = useState("");
 
-  const handleOpenWhatsApp = async (p: PaymentRow) => {
-    setWaPayment(p);
-    const { data: resp } = await supabase.from("profiles").select("full_name, phone").eq("id", p.responsible_id).single();
-    setWaResponsible(resp);
-    let desc = `Parcela ${p.installment_number}`;
-    let studentName: string | undefined;
-    if (p.contract_id) {
-      const { data: c } = await supabase.from("contracts").select("description, student_id").eq("id", p.contract_id).single();
-      if (c) {
-        desc = c.description || desc;
-        if (c.student_id) {
-          const { data: s } = await supabase.from("students").select("full_name").eq("id", c.student_id).single();
-          studentName = s?.full_name;
-        }
-      }
-    }
-    setWaDescription(desc);
-    setWaStudent(studentName);
-    setWaDialogOpen(true);
-  };
+  const scopedResponsibleId = new URLSearchParams(location.search).get("responsible");
+  const scopedContractId = new URLSearchParams(location.search).get("contract");
+  const shouldOpenManual = new URLSearchParams(location.search).get("create") === "manual";
 
   const fetchData = async () => {
     setLoadingData(true);
-    const [paymentsRes, studentsRes, unitsRes, profilesRes] = await Promise.all([
-      supabase.from("payments").select("id, value, due_date, status, payment_method, pix_copy_paste, invoice_url, checkout_url, boleto_url, pix_qr_code, asaas_payment_id, responsible_id, unit_id, installment_number, contract_id").order("due_date", { ascending: false }),
-      supabase.from("students").select("id, full_name, responsible_id").eq("active", true),
-      supabase.from("units").select("id, name"),
-      supabase.from("profiles").select("id, full_name, unit_id").eq("active", true),
+
+    const [paymentsRes, studentsRes, unitsRes, profilesRes, rolesRes, contractsRes] = await Promise.all([
+      supabase
+        .from("payments")
+        .select("id, value, final_value, due_date, status, payment_method, pix_copy_paste, invoice_url, checkout_url, boleto_url, pix_qr_code, asaas_payment_id, responsible_id, unit_id, installment_number, contract_id, student_id, description, payment_type")
+        .order("due_date", { ascending: false }),
+      supabase.from("students").select("id, full_name, responsible_id").order("full_name"),
+      supabase.from("units").select("id, name").order("name"),
+      supabase.from("profiles").select("id, full_name, unit_id, active, phone").order("full_name"),
+      supabase.from("user_roles").select("user_id").eq("role", "RESPONSAVEL"),
+      supabase.from("contracts").select("id, description, responsible_id, student_id, unit_id, status").order("created_at", { ascending: false }),
     ]);
 
     if (paymentsRes.data) setPayments(paymentsRes.data as PaymentRow[]);
     if (studentsRes.data) setStudents(studentsRes.data as StudentRow[]);
-    if (profilesRes.data && studentsRes.data) {
-      const respIds = new Set(studentsRes.data.map((s: { responsible_id: string }) => s.responsible_id));
-      setResponsibles(
-        profilesRes.data
-          .filter((profile) => respIds.has(profile.id))
-          .map((profile) => ({ id: profile.id, full_name: profile.full_name, unit_id: profile.unit_id }))
-      );
-    }
-    if (unitsRes.data) {
-      setUnits(unitsRes.data);
-      const map: Record<string, string> = {};
-      unitsRes.data.forEach((u) => (map[u.id] = u.name));
-      setUnitNames(map);
-    }
+    if (unitsRes.data) setUnits(unitsRes.data as UnitRow[]);
+    if (contractsRes.data) setContracts(contractsRes.data as ContractRow[]);
+
     if (profilesRes.data) {
-      const map: Record<string, string> = {};
-      profilesRes.data.forEach((p) => (map[p.id] = p.full_name));
-      setProfiles(map);
+      const profileMap = Object.fromEntries(
+        profilesRes.data.map((profile) => [
+          profile.id,
+          {
+            id: profile.id,
+            full_name: profile.full_name,
+            unit_id: profile.unit_id,
+            active: profile.active,
+            phone: profile.phone,
+          },
+        ]),
+      );
+      setProfiles(profileMap);
+
+      if (rolesRes.data) {
+        const responsibleIds = new Set(rolesRes.data.map((role: { user_id: string }) => role.user_id));
+        setResponsibles(
+          profilesRes.data
+            .filter((profile) => responsibleIds.has(profile.id) && profile.active)
+            .map((profile) => ({
+              id: profile.id,
+              full_name: profile.full_name,
+              unit_id: profile.unit_id,
+              active: profile.active,
+              phone: profile.phone,
+            })),
+        );
+      }
     }
+
     setLoadingData(false);
   };
 
@@ -156,330 +255,744 @@ const AdminCharges = () => {
     fetchData();
   }, []);
 
-  const getResponsibleUnit = (respId: string) => {
-    const resp = responsibles.find((r) => r.id === respId);
-    return resp?.unit_id ? (unitNames[resp.unit_id] || "—") : "Sem unidade";
-  };
+  useEffect(() => {
+    if (loadingData) return;
+    if (!shouldOpenManual) return;
 
-  const filtered = payments.filter((p) => {
-    if (statusFilter !== "ALL" && p.status !== statusFilter) return false;
-    if (unitFilter !== "ALL" && p.unit_id !== unitFilter) return false;
+    const contract = scopedContractId ? contracts.find((item) => item.id === scopedContractId) : null;
+    const nextResponsibleId = contract?.responsible_id || scopedResponsibleId || "";
+
+    setManualForm({
+      responsibleId: nextResponsibleId,
+      studentId: contract?.student_id || "NONE",
+      contractId: contract?.id || "NONE",
+      paymentType: contract?.description?.toLowerCase().includes("apostila") ? "APOSTILA" : contract ? "MENSALIDADE" : "AVULSA",
+      description: contract?.description || "",
+      value: "",
+      dueDate: "",
+    });
+    setManualDialogOpen(true);
+  }, [contracts, loadingData, scopedContractId, scopedResponsibleId, shouldOpenManual]);
+
+  const unitMap = useMemo(() => Object.fromEntries(units.map((unit) => [unit.id, unit.name])), [units]);
+  const studentMap = useMemo(() => Object.fromEntries(students.map((student) => [student.id, student.full_name])), [students]);
+  const contractMap = useMemo(() => Object.fromEntries(contracts.map((contract) => [contract.id, contract])), [contracts]);
+
+  const chargeContracts = selectedResponsible
+    ? contracts.filter((contract) => contract.responsible_id === selectedResponsible)
+    : [];
+
+  const chargeStudents = selectedResponsible
+    ? students.filter((student) => student.responsible_id === selectedResponsible)
+    : [];
+
+  const manualContracts = manualForm.responsibleId
+    ? contracts.filter((contract) => contract.responsible_id === manualForm.responsibleId)
+    : [];
+
+  const manualStudents = manualForm.responsibleId
+    ? students.filter((student) => student.responsible_id === manualForm.responsibleId)
+    : [];
+
+  const currentChargeUnit = selectedResponsible ? unitMap[profiles[selectedResponsible]?.unit_id || ""] || "—" : "—";
+  const currentManualUnit = manualForm.responsibleId ? unitMap[profiles[manualForm.responsibleId]?.unit_id || ""] || "—" : "—";
+
+  const filtered = payments.filter((payment) => {
+    if (statusFilter !== "ALL" && payment.status !== statusFilter) return false;
+    if (unitFilter !== "ALL" && payment.unit_id !== unitFilter) return false;
+    if (typeFilter !== "ALL" && payment.payment_type !== typeFilter) return false;
+    if (scopedResponsibleId && payment.responsible_id !== scopedResponsibleId) return false;
+    if (scopedContractId && payment.contract_id !== scopedContractId) return false;
+
     if (search) {
-      const responsibleName = profiles[p.responsible_id]?.toLowerCase() || "";
-      if (!responsibleName.includes(search.toLowerCase())) return false;
+      const q = search.toLowerCase();
+      const responsibleName = profiles[payment.responsible_id]?.full_name.toLowerCase() || "";
+      const studentName = payment.student_id ? studentMap[payment.student_id]?.toLowerCase() || "" : "";
+      const contractName = payment.contract_id ? contractMap[payment.contract_id]?.description.toLowerCase() || "" : "";
+      const description = payment.description.toLowerCase();
+      const type = (typeLabels[payment.payment_type as PaymentType] || payment.payment_type).toLowerCase();
+
+      if (![responsibleName, studentName, contractName, description, type].some((value) => value.includes(q))) {
+        return false;
+      }
     }
+
     return true;
   });
 
-  const filteredStudents = selectedResponsible
-    ? students.filter((s) => s.responsible_id === selectedResponsible)
-    : [];
+  const resetOnlineForm = () => {
+    setSelectedResponsible("");
+    setSelectedStudent("NONE");
+    setSelectedContract("NONE");
+    setChargeValue("");
+    setChargeDueDate("");
+    setBillingType("PIX");
+    setChargeDescription("");
+    setChargePaymentType("AVULSA");
+    setChargeResult(null);
+  };
+
+  const resetManualForm = () => {
+    setManualForm(emptyManualForm);
+  };
+
+  const openManualDialog = (prefill?: Partial<ManualFormState>) => {
+    setManualForm({ ...emptyManualForm, ...prefill });
+    setManualDialogOpen(true);
+  };
 
   const handleCreateCharge = async () => {
     if (!selectedResponsible || !chargeValue || !chargeDueDate) {
-      toast({ title: "Preencha todos os campos obrigatórios", variant: "destructive" });
+      toast({ title: "Preencha os campos obrigatórios", variant: "destructive" });
       return;
     }
 
-    if (parseFloat(chargeValue) < 10) {
-      toast({ title: "O valor mínimo da cobrança é R$ 10,00", variant: "destructive" });
-      return;
-    }
-
-    const resp = responsibles.find((r) => r.id === selectedResponsible);
-    if (!resp?.unit_id) {
-      toast({ title: "Responsável sem unidade vinculada", description: "Atualize o cadastro do cliente antes de gerar a cobrança.", variant: "destructive" });
-      return;
-    }
-
-    setCreating(true);
+    setCreatingCharge(true);
     setChargeResult(null);
 
     const { data, error } = await supabase.functions.invoke("create-asaas-charge", {
       body: {
         responsible_id: selectedResponsible,
-        student_id: selectedStudent || undefined,
+        student_id: selectedStudent !== "NONE" ? selectedStudent : undefined,
+        contract_id: selectedContract !== "NONE" ? selectedContract : undefined,
         value: parseFloat(chargeValue),
         due_date: chargeDueDate,
         billing_type: billingType,
         description: chargeDescription || undefined,
+        payment_type: chargePaymentType,
       },
     });
 
-    setCreating(false);
+    setCreatingCharge(false);
 
-    if (error) {
-      toast({ title: "Erro ao gerar cobrança", description: error.message, variant: "destructive" });
-      return;
-    }
-
-    if (data?.error) {
-      toast({ title: "Erro", description: data.error, variant: "destructive" });
+    if (error || data?.error) {
+      toast({
+        title: "Erro ao gerar cobrança",
+        description: error?.message || data?.error,
+        variant: "destructive",
+      });
       return;
     }
 
     setChargeResult(data as ChargeResult);
-    toast({ title: "Cobrança gerada com sucesso!" });
+    toast({ title: "Cobrança online criada com sucesso!" });
     fetchData();
   };
 
-  const resetForm = () => {
-    setSelectedResponsible("");
-    setSelectedStudent("");
-    setChargeValue("");
-    setChargeDueDate("");
-    setBillingType("PIX");
-    setChargeDescription("");
-    setChargeResult(null);
+  const handleCreateManual = async () => {
+    if (!manualForm.responsibleId || !manualForm.value || !manualForm.dueDate || !manualForm.description.trim()) {
+      toast({ title: "Preencha os campos obrigatórios", variant: "destructive" });
+      return;
+    }
+
+    setCreatingManual(true);
+
+    const { data, error } = await supabase.functions.invoke("manage-payment", {
+      body: {
+        action: "create_manual",
+        responsible_id: manualForm.responsibleId,
+        student_id: manualForm.studentId !== "NONE" ? manualForm.studentId : null,
+        contract_id: manualForm.contractId !== "NONE" ? manualForm.contractId : null,
+        payment_type: manualForm.paymentType,
+        description: manualForm.description,
+        value: parseFloat(manualForm.value),
+        due_date: manualForm.dueDate,
+      },
+    });
+
+    setCreatingManual(false);
+
+    if (error || data?.error) {
+      toast({
+        title: "Erro ao adicionar parcela",
+        description: error?.message || data?.error,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({ title: "Parcela manual adicionada com sucesso!" });
+    setManualDialogOpen(false);
+    resetManualForm();
+    fetchData();
+  };
+
+  const handleOpenEdit = (payment: PaymentRow) => {
+    setEditForm({
+      paymentId: payment.id,
+      value: String(payment.final_value ?? payment.value),
+      dueDate: payment.due_date,
+      description: payment.description,
+      status: (payment.status as PaymentStatus) || "PENDING",
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editForm.paymentId || !editForm.value || !editForm.dueDate || !editForm.description.trim()) {
+      toast({ title: "Preencha os campos obrigatórios", variant: "destructive" });
+      return;
+    }
+
+    setSavingEdit(true);
+
+    const { data, error } = await supabase.functions.invoke("manage-payment", {
+      body: {
+        action: "update",
+        payment_id: editForm.paymentId,
+        value: parseFloat(editForm.value),
+        due_date: editForm.dueDate,
+        description: editForm.description,
+        status: editForm.status,
+      },
+    });
+
+    setSavingEdit(false);
+
+    if (error || data?.error) {
+      toast({
+        title: "Erro ao salvar parcela",
+        description: error?.message || data?.error,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({ title: "Parcela atualizada com sucesso!" });
+    setEditDialogOpen(false);
+    setEditForm(emptyEditForm);
+    fetchData();
+  };
+
+  const handleAction = async () => {
+    if (!actionTarget) return;
+
+    setActionLoading(true);
+
+    const { data, error } = await supabase.functions.invoke("manage-payment", {
+      body: {
+        action: actionTarget.action,
+        payment_id: actionTarget.payment.id,
+      },
+    });
+
+    setActionLoading(false);
+
+    if (error || data?.error) {
+      toast({
+        title: "Não foi possível concluir a ação",
+        description: error?.message || data?.error,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({ title: actionTarget.action === "delete" ? "Parcela excluída com sucesso!" : "Parcela cancelada com sucesso!" });
+    setActionTarget(null);
+    fetchData();
+  };
+
+  const handleOpenWhatsApp = async (payment: PaymentRow) => {
+    setWaPayment(payment);
+    const responsible = profiles[payment.responsible_id];
+    setWaResponsible(responsible ? { full_name: responsible.full_name, phone: responsible.phone } : null);
+    setWaStudent(payment.student_id ? studentMap[payment.student_id] : undefined);
+    setWaDescription(payment.description || `Parcela ${payment.installment_number}`);
+    setWaDialogOpen(true);
+  };
+
+  const clearScopedFilters = () => {
+    navigate("/admin/cobrancas");
   };
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-foreground">Cobranças</h1>
-        <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="gap-1.5">
-              <Plus size={16} /> Gerar Cobrança
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Nova Cobrança</DialogTitle>
-            </DialogHeader>
-
-            {!chargeResult ? (
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-foreground">Cobranças e Parcelas</h1>
+          <p className="text-sm text-muted-foreground">Edite, exclua, cancele e crie parcelas manuais ou cobranças online com dados reais.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Dialog
+            open={manualDialogOpen}
+            onOpenChange={(open) => {
+              setManualDialogOpen(open);
+              if (!open) resetManualForm();
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button variant="outline" className="gap-1.5">
+                <Plus size={16} /> Adicionar Parcela Manual
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Nova Parcela Manual</DialogTitle>
+              </DialogHeader>
               <div className="space-y-4 pt-2">
                 <div className="space-y-1.5">
                   <Label>Responsável *</Label>
-                  <Select value={selectedResponsible} onValueChange={(v) => { setSelectedResponsible(v); setSelectedStudent(""); }}>
+                  <Select
+                    value={manualForm.responsibleId}
+                    onValueChange={(value) => setManualForm((current) => ({
+                      ...current,
+                      responsibleId: value,
+                      studentId: "NONE",
+                      contractId: "NONE",
+                    }))}
+                  >
                     <SelectTrigger><SelectValue placeholder="Selecione o responsável" /></SelectTrigger>
-                      <SelectContent>
-                        {responsibles.map((r) => (
-                          <SelectItem key={r.id} value={r.id}>{r.full_name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                  </Select>
-                </div>
-
-                {filteredStudents.length > 0 && (
-                  <div className="space-y-1.5">
-                    <Label>Aluno (opcional)</Label>
-                    <Select value={selectedStudent} onValueChange={setSelectedStudent}>
-                      <SelectTrigger><SelectValue placeholder="Selecione o aluno" /></SelectTrigger>
-                      <SelectContent>
-                        {filteredStudents.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label>Valor (R$) *</Label>
-                    <Input type="number" step="0.01" min="10" value={chargeValue} onChange={(e) => setChargeValue(e.target.value)} placeholder="10,00" />
-                    {chargeValue && parseFloat(chargeValue) < 10 && (
-                      <p className="text-xs text-destructive">Valor mínimo: R$ 10,00</p>
-                    )}
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Vencimento *</Label>
-                    <Input type="date" value={chargeDueDate} onChange={(e) => setChargeDueDate(e.target.value)} />
-                  </div>
-                </div>
-
-                {/* Show responsible's unit */}
-                {selectedResponsible && (
-                  <div className="rounded-md border border-border bg-muted/50 p-2.5">
-                    <p className="text-xs text-muted-foreground">
-                      Unidade: <span className="font-medium text-foreground">{getResponsibleUnit(selectedResponsible)}</span>
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">A cobrança será gerada na conta Asaas desta unidade.</p>
-                  </div>
-                )}
-
-                <div className="space-y-1.5">
-                  <Label>Forma de Pagamento *</Label>
-                  <Select value={billingType} onValueChange={(v) => setBillingType(v as BillingType)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="PIX">PIX</SelectItem>
-                      <SelectItem value="BOLETO">Boleto</SelectItem>
-                      <SelectItem value="CARD">Cartão de Crédito</SelectItem>
+                      {responsibles.map((responsible) => (
+                        <SelectItem key={responsible.id} value={responsible.id}>{responsible.full_name}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label>Descrição</Label>
-                  <Input value={chargeDescription} onChange={(e) => setChargeDescription(e.target.value)} placeholder="Mensalidade EnsinUP" />
-                </div>
-
-                <Button className="w-full" onClick={handleCreateCharge} disabled={creating}>
-                  {creating ? <><Loader2 size={16} className="animate-spin mr-2" /> Gerando...</> : "Gerar Cobrança"}
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-4 pt-2">
-                <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-2">
-                  <p className="text-sm font-medium text-foreground">✅ Cobrança criada!</p>
-                  <p className="text-xs text-muted-foreground">ID Asaas: {chargeResult.asaas_charge_id}</p>
-                </div>
-
-                {chargeResult.pix_qr_code && (
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-1"><QrCode size={14} /> QR Code PIX</Label>
-                    <div className="flex justify-center p-4 bg-background rounded-lg border border-border">
-                      <img src={`data:image/png;base64,${chargeResult.pix_qr_code}`} alt="QR Code PIX" className="w-48 h-48" />
-                    </div>
-                  </div>
-                )}
-
-                {chargeResult.pix_copy_paste && (
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label>PIX Copia e Cola</Label>
-                    <div className="flex gap-2">
-                      <Input value={chargeResult.pix_copy_paste} readOnly className="text-xs" />
-                      <Button size="icon" variant="outline" onClick={() => { navigator.clipboard.writeText(chargeResult.pix_copy_paste!); toast({ title: "Copiado!" }); }}>
-                        <Copy size={14} />
-                      </Button>
-                    </div>
+                    <Label>Contrato vinculado</Label>
+                    <Select
+                      value={manualForm.contractId}
+                      onValueChange={(value) => {
+                        const contract = contracts.find((item) => item.id === value);
+                        setManualForm((current) => ({
+                          ...current,
+                          contractId: value,
+                          studentId: contract?.student_id || current.studentId,
+                          paymentType: contract?.description?.toLowerCase().includes("apostila") ? "APOSTILA" : value !== "NONE" ? "MENSALIDADE" : current.paymentType,
+                          description: contract?.description || current.description,
+                        }));
+                      }}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Sem contrato" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NONE">Sem contrato</SelectItem>
+                        {manualContracts.map((contract) => (
+                          <SelectItem key={contract.id} value={contract.id}>{contract.description}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                )}
+                  <div className="space-y-1.5">
+                    <Label>Aluno</Label>
+                    <Select value={manualForm.studentId} onValueChange={(value) => setManualForm((current) => ({ ...current, studentId: value }))}>
+                      <SelectTrigger><SelectValue placeholder="Sem aluno" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NONE">Sem aluno</SelectItem>
+                        {manualStudents.map((student) => (
+                          <SelectItem key={student.id} value={student.id}>{student.full_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
 
-                {chargeResult.invoice_url && (
-                  <Button variant="outline" className="w-full gap-1.5" asChild>
-                    <a href={chargeResult.invoice_url} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink size={14} /> Abrir Fatura
-                    </a>
-                  </Button>
-                )}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label>Tipo *</Label>
+                    <Select value={manualForm.paymentType} onValueChange={(value) => setManualForm((current) => ({ ...current, paymentType: value as PaymentType }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="MENSALIDADE">Mensalidade</SelectItem>
+                        <SelectItem value="APOSTILA">Apostila</SelectItem>
+                        <SelectItem value="AVULSA">Avulsa</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Unidade</Label>
+                    <Input value={currentManualUnit} readOnly />
+                  </div>
+                </div>
 
-                {chargeResult.boleto_url && (
-                  <Button variant="outline" className="w-full gap-1.5" asChild>
-                    <a href={chargeResult.boleto_url} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink size={14} /> Abrir Boleto
-                    </a>
-                  </Button>
-                )}
+                <div className="space-y-1.5">
+                  <Label>Descrição *</Label>
+                  <Input value={manualForm.description} onChange={(event) => setManualForm((current) => ({ ...current, description: event.target.value }))} placeholder="Ex: Parcela de reforço" />
+                </div>
 
-                {chargeResult.checkout_url && (
-                  <Button variant="outline" className="w-full gap-1.5" asChild>
-                    <a href={chargeResult.checkout_url} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink size={14} /> Pagar com Cartão
-                    </a>
-                  </Button>
-                )}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label>Valor *</Label>
+                    <Input type="number" min="0.01" step="0.01" value={manualForm.value} onChange={(event) => setManualForm((current) => ({ ...current, value: event.target.value }))} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Vencimento *</Label>
+                    <Input type="date" value={manualForm.dueDate} onChange={(event) => setManualForm((current) => ({ ...current, dueDate: event.target.value }))} />
+                  </div>
+                </div>
 
-                <Button variant="secondary" className="w-full" onClick={resetForm}>
-                  Nova Cobrança
+                <Button className="w-full" onClick={handleCreateManual} disabled={creatingManual}>
+                  {creatingManual ? <><Loader2 size={16} className="animate-spin mr-2" /> Salvando...</> : "Salvar Parcela Manual"}
                 </Button>
               </div>
-            )}
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog
+            open={chargeDialogOpen}
+            onOpenChange={(open) => {
+              setChargeDialogOpen(open);
+              if (!open) resetOnlineForm();
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button className="gap-1.5">
+                <RefreshCw size={16} /> Gerar Cobrança Online
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Nova Cobrança Online</DialogTitle>
+              </DialogHeader>
+              {!chargeResult ? (
+                <div className="space-y-4 pt-2">
+                  <div className="space-y-1.5">
+                    <Label>Responsável *</Label>
+                    <Select
+                      value={selectedResponsible}
+                      onValueChange={(value) => {
+                        setSelectedResponsible(value);
+                        setSelectedStudent("NONE");
+                        setSelectedContract("NONE");
+                      }}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Selecione o responsável" /></SelectTrigger>
+                      <SelectContent>
+                        {responsibles.map((responsible) => (
+                          <SelectItem key={responsible.id} value={responsible.id}>{responsible.full_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label>Contrato vinculado</Label>
+                      <Select
+                        value={selectedContract}
+                        onValueChange={(value) => {
+                          const contract = contracts.find((item) => item.id === value);
+                          setSelectedContract(value);
+                          if (contract?.student_id) setSelectedStudent(contract.student_id);
+                          if (contract?.description) setChargeDescription(contract.description);
+                          if (value !== "NONE") setChargePaymentType(contract?.description?.toLowerCase().includes("apostila") ? "APOSTILA" : "MENSALIDADE");
+                        }}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Sem contrato" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="NONE">Sem contrato</SelectItem>
+                          {chargeContracts.map((contract) => (
+                            <SelectItem key={contract.id} value={contract.id}>{contract.description}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Aluno</Label>
+                      <Select value={selectedStudent} onValueChange={setSelectedStudent}>
+                        <SelectTrigger><SelectValue placeholder="Sem aluno" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="NONE">Sem aluno</SelectItem>
+                          {chargeStudents.map((student) => (
+                            <SelectItem key={student.id} value={student.id}>{student.full_name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label>Tipo *</Label>
+                      <Select value={chargePaymentType} onValueChange={(value) => setChargePaymentType(value as PaymentType)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="MENSALIDADE">Mensalidade</SelectItem>
+                          <SelectItem value="APOSTILA">Apostila</SelectItem>
+                          <SelectItem value="AVULSA">Avulsa</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Forma de pagamento *</Label>
+                      <Select value={billingType} onValueChange={(value) => setBillingType(value as BillingType)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="PIX">PIX</SelectItem>
+                          <SelectItem value="BOLETO">Boleto</SelectItem>
+                          <SelectItem value="CARD">Cartão</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Descrição</Label>
+                    <Input value={chargeDescription} onChange={(event) => setChargeDescription(event.target.value)} placeholder="Ex: Mensalidade EnsinUP" />
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label>Valor *</Label>
+                      <Input type="number" min="10" step="0.01" value={chargeValue} onChange={(event) => setChargeValue(event.target.value)} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Vencimento *</Label>
+                      <Input type="date" value={chargeDueDate} onChange={(event) => setChargeDueDate(event.target.value)} />
+                    </div>
+                  </div>
+
+                  <div className="rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+                    Unidade da cobrança: <span className="font-medium text-foreground">{currentChargeUnit}</span>
+                  </div>
+
+                  <Button className="w-full" onClick={handleCreateCharge} disabled={creatingCharge}>
+                    {creatingCharge ? <><Loader2 size={16} className="animate-spin mr-2" /> Gerando...</> : "Gerar Cobrança"}
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4 pt-2">
+                  <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+                    <p className="text-sm font-semibold text-primary">Cobrança criada com sucesso!</p>
+                    <p className="text-xs text-muted-foreground">ID financeiro: {chargeResult.asaas_charge_id}</p>
+                  </div>
+                  {chargeResult.invoice_url && (
+                    <Button className="w-full" asChild>
+                      <a href={chargeResult.invoice_url} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink size={14} /> Abrir fatura
+                      </a>
+                    </Button>
+                  )}
+                  <Button variant="secondary" className="w-full" onClick={resetOnlineForm}>Gerar outra cobrança</Button>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3">
+      {(scopedResponsibleId || scopedContractId) && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+          <span>
+            Exibindo histórico filtrado
+            {scopedResponsibleId && profiles[scopedResponsibleId] ? ` para ${profiles[scopedResponsibleId].full_name}` : ""}
+            {scopedContractId && contractMap[scopedContractId] ? ` • ${contractMap[scopedContractId].description}` : ""}
+          </span>
+          <Button variant="outline" size="sm" onClick={clearScopedFilters}>Limpar filtro</Button>
+        </div>
+      )}
+
+      <div className="grid gap-3 lg:grid-cols-4">
         <Input
-          className="bg-input border-border text-foreground w-full sm:w-56"
-          placeholder="Buscar responsável..."
+          className="lg:col-span-1"
+          placeholder="Buscar cliente, aluno, contrato ou descrição..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(event) => setSearch(event.target.value)}
         />
         <Select value={unitFilter} onValueChange={setUnitFilter}>
-          <SelectTrigger className="bg-input border-border text-foreground w-full sm:w-40">
-            <SelectValue placeholder="Unidade" />
-          </SelectTrigger>
+          <SelectTrigger><SelectValue placeholder="Unidade" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="ALL">Todas</SelectItem>
-            {units.map((u) => (
-              <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+            <SelectItem value="ALL">Todas as unidades</SelectItem>
+            {units.map((unit) => (
+              <SelectItem key={unit.id} value={unit.id}>{unit.name}</SelectItem>
             ))}
           </SelectContent>
         </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="bg-input border-border text-foreground w-full sm:w-40">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
+          <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="ALL">Todos</SelectItem>
+            <SelectItem value="ALL">Todos os status</SelectItem>
             <SelectItem value="PENDING">Pendente</SelectItem>
             <SelectItem value="PAID">Pago</SelectItem>
             <SelectItem value="OVERDUE">Vencido</SelectItem>
             <SelectItem value="CANCELLED">Cancelado</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger><SelectValue placeholder="Tipo" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">Todos os tipos</SelectItem>
+            <SelectItem value="MENSALIDADE">Mensalidade</SelectItem>
+            <SelectItem value="APOSTILA">Apostila</SelectItem>
+            <SelectItem value="AVULSA">Avulsa</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* Payment list */}
       {loadingData ? (
         <div className="flex justify-center py-12"><Loader2 className="animate-spin text-muted-foreground" /></div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground text-sm">Nenhuma parcela encontrada.</div>
       ) : (
-        <div className="space-y-2">
-          {filtered.map((p) => (
-            <div key={p.id} className="glass-card p-4 flex flex-col sm:flex-row sm:items-center gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">
-                  Parcela {p.installment_number} {p.payment_method ? `• ${p.payment_method}` : ""}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {profiles[p.responsible_id] || "—"} • {unitNames[p.unit_id] || "—"}
-                </p>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-foreground">R$ {Number(p.value).toFixed(2).replace(".", ",")}</p>
-                  <p className="text-xs text-muted-foreground">{new Date(p.due_date + "T12:00:00").toLocaleDateString("pt-BR")}</p>
+        <div className="space-y-3">
+          {filtered.map((payment) => {
+            const responsible = profiles[payment.responsible_id]?.full_name || "—";
+            const contract = payment.contract_id ? contractMap[payment.contract_id]?.description || "—" : "Sem contrato";
+            const student = payment.student_id ? studentMap[payment.student_id] || "—" : "Sem aluno";
+            const unit = unitMap[payment.unit_id] || "—";
+            const paymentValue = Number(payment.final_value ?? payment.value);
+            const paymentType = typeLabels[payment.payment_type as PaymentType] || payment.payment_type || "—";
+            const status = (payment.status as PaymentStatus) || "PENDING";
+
+            return (
+              <div key={payment.id} className="glass-card p-4 space-y-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="space-y-2 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-sm font-semibold text-foreground truncate">{payment.description || `Parcela ${payment.installment_number}`}</h3>
+                      <Badge variant="secondary">{paymentType}</Badge>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${statusClasses[status]}`}>{statusLabels[status]}</span>
+                    </div>
+                    <div className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2 xl:grid-cols-3">
+                      <p><span className="font-medium text-foreground">Cliente:</span> {responsible}</p>
+                      <p><span className="font-medium text-foreground">Aluno:</span> {student}</p>
+                      <p><span className="font-medium text-foreground">Contrato:</span> {contract}</p>
+                      <p><span className="font-medium text-foreground">Parcela:</span> #{payment.installment_number}</p>
+                      <p><span className="font-medium text-foreground">Vencimento:</span> {new Date(`${payment.due_date}T12:00:00`).toLocaleDateString("pt-BR")}</p>
+                      <p><span className="font-medium text-foreground">Unidade:</span> {unit}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-start gap-3 lg:items-end">
+                    <p className="text-lg font-bold text-foreground">R$ {paymentValue.toFixed(2).replace(".", ",")}</p>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <button
+                        className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                        title="Editar parcela"
+                        onClick={() => handleOpenEdit(payment)}
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-warning"
+                        title="Marcar como cancelada"
+                        onClick={() => setActionTarget({ payment, action: "cancel" })}
+                      >
+                        <Ban size={14} />
+                      </button>
+                      <button
+                        className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-destructive"
+                        title="Excluir parcela"
+                        onClick={() => setActionTarget({ payment, action: "delete" })}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                      <button
+                        className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-primary"
+                        title="Gerar nova parcela"
+                        onClick={() => openManualDialog({
+                          responsibleId: payment.responsible_id,
+                          studentId: payment.student_id || "NONE",
+                          contractId: payment.contract_id || "NONE",
+                          paymentType: (payment.payment_type as PaymentType) || "AVULSA",
+                          description: payment.description,
+                          value: String(payment.final_value ?? payment.value),
+                        })}
+                      >
+                        <Plus size={14} />
+                      </button>
+                      {payment.pix_copy_paste && (
+                        <button
+                          className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                          title="Copiar PIX"
+                          onClick={() => {
+                            navigator.clipboard.writeText(payment.pix_copy_paste || "");
+                            toast({ title: "Código PIX copiado!" });
+                          }}
+                        >
+                          <Copy size={14} />
+                        </button>
+                      )}
+                      {(payment.status === "PENDING" || payment.status === "OVERDUE") && (
+                        <button
+                          className="rounded-md p-2 text-success transition-colors hover:bg-success/10"
+                          title="Enviar no WhatsApp"
+                          onClick={() => handleOpenWhatsApp(payment)}
+                        >
+                          <MessageCircle size={14} />
+                        </button>
+                      )}
+                      {(payment.invoice_url || payment.boleto_url || payment.checkout_url) && (
+                        <a
+                          href={payment.invoice_url || payment.boleto_url || payment.checkout_url || "#"}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                          title="Abrir link da cobrança"
+                        >
+                          <ExternalLink size={14} />
+                        </a>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium whitespace-nowrap ${statusClasses[p.status as PaymentStatus] || ""}`}>
-                  {statusLabels[p.status as PaymentStatus] || p.status}
-                </span>
-                <div className="flex gap-1">
-                  {p.pix_copy_paste && (
-                    <button
-                      className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
-                      title="Copiar PIX"
-                      onClick={() => { navigator.clipboard.writeText(p.pix_copy_paste!); toast({ title: "PIX copiado!" }); }}
-                    >
-                      <Copy size={14} />
-                    </button>
-                  )}
-                  {(p.status === "PENDING" || p.status === "OVERDUE") && (
-                    <button
-                      className="p-1.5 text-success hover:bg-success/10 rounded transition-colors"
-                      title="Enviar no WhatsApp"
-                      onClick={() => handleOpenWhatsApp(p)}
-                    >
-                      <MessageCircle size={14} />
-                    </button>
-                  )}
-                  {(p.invoice_url || p.boleto_url || p.checkout_url) && (
-                    <a
-                      href={p.invoice_url || p.boleto_url || p.checkout_url || "#"}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
-                      title="Abrir link"
-                    >
-                      <ExternalLink size={14} />
-                    </a>
-                  )}
-                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
-      {!loadingData && filtered.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground text-sm">Nenhuma cobrança encontrada.</div>
-      )}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Editar Parcela</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label>Descrição *</Label>
+              <Input value={editForm.description} onChange={(event) => setEditForm((current) => ({ ...current, description: event.target.value }))} />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Valor *</Label>
+                <Input type="number" min="0.01" step="0.01" value={editForm.value} onChange={(event) => setEditForm((current) => ({ ...current, value: event.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Vencimento *</Label>
+                <Input type="date" value={editForm.dueDate} onChange={(event) => setEditForm((current) => ({ ...current, dueDate: event.target.value }))} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Status *</Label>
+              <Select value={editForm.status} onValueChange={(value) => setEditForm((current) => ({ ...current, status: value as PaymentStatus }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PENDING">Pendente</SelectItem>
+                  <SelectItem value="OVERDUE">Vencido</SelectItem>
+                  <SelectItem value="PAID">Pago</SelectItem>
+                  <SelectItem value="CANCELLED">Cancelado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button className="w-full" onClick={handleSaveEdit} disabled={savingEdit}>
+              {savingEdit ? <><Loader2 size={16} className="animate-spin mr-2" /> Salvando...</> : "Salvar Alterações"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
-      {/* WhatsApp Dialog */}
+      <AlertDialog open={!!actionTarget} onOpenChange={(open) => !open && setActionTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{actionTarget?.action === "delete" ? "Excluir parcela" : "Cancelar parcela"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {actionTarget?.action === "delete"
+                ? "Confirme a exclusão da parcela. Parcelas pagas não podem ser excluídas."
+                : "A parcela será mantida no histórico, mas ficará com status cancelado."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={actionLoading}>Voltar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleAction} disabled={actionLoading} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+              {actionLoading ? <Loader2 size={14} className="animate-spin mr-2" /> : null}
+              {actionTarget?.action === "delete" ? "Excluir" : "Cancelar parcela"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {waPayment && waResponsible && (
         <WhatsAppDialog
           open={waDialogOpen}
@@ -488,7 +1001,7 @@ const AdminCharges = () => {
           responsibleName={waResponsible.full_name}
           studentName={waStudent}
           description={waDescription}
-          value={Number(waPayment.value)}
+          value={Number(waPayment.final_value ?? waPayment.value)}
           dueDate={waPayment.due_date}
           invoiceUrl={waPayment.invoice_url}
           paymentId={waPayment.id}

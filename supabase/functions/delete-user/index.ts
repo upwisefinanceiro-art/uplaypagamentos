@@ -104,12 +104,14 @@ Deno.serve(async (req) => {
       }
 
       const [contractsRes, paymentsRes] = await Promise.all([
-        supabaseAdmin.from("contracts").select("id").eq("responsible_id", user_id).limit(1),
-        supabaseAdmin.from("payments").select("id").eq("responsible_id", user_id).limit(1),
+        supabaseAdmin.from("contracts").select("id", { count: "exact", head: true }).eq("responsible_id", user_id),
+        supabaseAdmin.from("payments").select("id", { count: "exact", head: true }).eq("responsible_id", user_id),
       ]);
 
-      const hasContracts = (contractsRes.data?.length ?? 0) > 0;
-      const hasPayments = (paymentsRes.data?.length ?? 0) > 0;
+      const contractCount = contractsRes.count ?? 0;
+      const paymentCount = paymentsRes.count ?? 0;
+      const hasContracts = contractCount > 0;
+      const hasPayments = paymentCount > 0;
 
       if (hasContracts || hasPayments) {
         await logAction("DELETE_ATTEMPT", {
@@ -117,10 +119,14 @@ Deno.serve(async (req) => {
           blocked_reason: "financial_history",
           has_contracts: hasContracts,
           has_payments: hasPayments,
+          contract_count: contractCount,
+          payment_count: paymentCount,
         });
         return jsonResponse({
           error: "Este registro possui histórico e não pode ser excluído. Use desativar.",
           has_dependencies: true,
+          contract_count: contractCount,
+          payment_count: paymentCount,
         });
       }
 
