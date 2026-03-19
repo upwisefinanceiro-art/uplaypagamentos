@@ -185,6 +185,7 @@ export type Database = {
           checkout_url: string | null
           contract_id: string | null
           created_at: string
+          description: string
           due_date: string
           final_value: number | null
           id: string
@@ -193,12 +194,14 @@ export type Database = {
           original_value: number | null
           paid_at: string | null
           payment_method: string | null
+          payment_type: string
           pix_copy_paste: string | null
           pix_qr_code: string | null
           punctuality_discount: number | null
           raw_response: Json | null
           responsible_id: string
           status: string
+          student_id: string | null
           unit_id: string
           updated_at: string
           value: number
@@ -210,6 +213,7 @@ export type Database = {
           checkout_url?: string | null
           contract_id?: string | null
           created_at?: string
+          description?: string
           due_date: string
           final_value?: number | null
           id?: string
@@ -218,12 +222,14 @@ export type Database = {
           original_value?: number | null
           paid_at?: string | null
           payment_method?: string | null
+          payment_type?: string
           pix_copy_paste?: string | null
           pix_qr_code?: string | null
           punctuality_discount?: number | null
           raw_response?: Json | null
           responsible_id: string
           status?: string
+          student_id?: string | null
           unit_id: string
           updated_at?: string
           value: number
@@ -235,6 +241,7 @@ export type Database = {
           checkout_url?: string | null
           contract_id?: string | null
           created_at?: string
+          description?: string
           due_date?: string
           final_value?: number | null
           id?: string
@@ -243,12 +250,14 @@ export type Database = {
           original_value?: number | null
           paid_at?: string | null
           payment_method?: string | null
+          payment_type?: string
           pix_copy_paste?: string | null
           pix_qr_code?: string | null
           punctuality_discount?: number | null
           raw_response?: Json | null
           responsible_id?: string
           status?: string
+          student_id?: string | null
           unit_id?: string
           updated_at?: string
           value?: number
@@ -259,6 +268,13 @@ export type Database = {
             columns: ["contract_id"]
             isOneToOne: false
             referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
             referencedColumns: ["id"]
           },
           {
