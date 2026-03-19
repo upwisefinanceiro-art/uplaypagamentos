@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Loader2, UserPlus, UserCheck, Save } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Plus, Loader2, UserPlus, UserCheck, Save, Trash2, ExternalLink } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +8,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
@@ -80,6 +91,7 @@ function validarEmail(email: string): boolean {
 }
 
 const AdminContracts = () => {
+  const navigate = useNavigate();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [contracts, setContracts] = useState<ContractRow[]>([]);
   const [students, setStudents] = useState<StudentRow[]>([]);
@@ -88,6 +100,8 @@ const AdminContracts = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [step, setStep] = useState<"form" | "summary">("form");
+  const [deleteTarget, setDeleteTarget] = useState<ContractRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { toast } = useToast();
   const { profile, hasRole } = useAuth();
 
@@ -359,6 +373,34 @@ const AdminContracts = () => {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleDeleteContract = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+
+    const { data, error } = await supabase.functions.invoke("manage-payment", {
+      body: { action: "delete_contract", contract_id: deleteTarget.id },
+    });
+
+    setDeleting(false);
+
+    if (error || data?.error) {
+      toast({
+        title: "Erro ao excluir contrato",
+        description: error?.message || data?.error,
+        variant: "destructive",
+      });
+      setDeleteTarget(null);
+      return;
+    }
+
+    toast({
+      title: "Contrato excluído",
+      description: data?.message || "Contrato e parcelas removidos com sucesso.",
+    });
+    setDeleteTarget(null);
+    fetchData();
   };
 
   const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -811,32 +853,79 @@ const AdminContracts = () => {
           {contracts.map((c) => (
             <div key={c.id} className="glass-card p-4">
               <div className="flex items-start justify-between">
-                <div>
+                <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-semibold text-foreground">{c.description}</h3>
                   <p className="text-xs text-muted-foreground">
                     {c.responsible_name || "—"} • {(c.units as any)?.name || "—"} • Aluno: {(c.students as any)?.full_name || "—"}
                   </p>
                 </div>
-                <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${c.status === "ACTIVE" ? "status-paid" : "status-cancelled"}`}>
-                  {c.status === "ACTIVE" ? "Ativo" : c.status}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${c.status === "ACTIVE" ? "status-paid" : "status-cancelled"}`}>
+                    {c.status === "ACTIVE" ? "Ativo" : c.status}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
-                {c.course_real_value && c.punctuality_discount && c.punctuality_discount > 0 ? (
-                  <>
-                    <span className="line-through">{fmt(c.course_real_value)}</span>
-                    <span className="text-primary font-medium">{fmt(c.final_value_with_discount || 0)}</span>
-                  </>
-                ) : (
-                  <span>{fmt(c.course_real_value || c.total_value || 0)}</span>
-                )}
-                <span>• {c.installments}x</span>
-                <span>• {c.payment_method || "—"}</span>
+              <div className="flex items-center justify-between mt-3">
+                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                  {c.course_real_value && c.punctuality_discount && c.punctuality_discount > 0 ? (
+                    <>
+                      <span className="line-through">{fmt(c.course_real_value)}</span>
+                      <span className="text-primary font-medium">{fmt(c.final_value_with_discount || 0)}</span>
+                    </>
+                  ) : (
+                    <span>{fmt(c.course_real_value || c.total_value || 0)}</span>
+                  )}
+                  <span>• {c.installments}x</span>
+                  <span>• {c.payment_method || "—"}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => navigate(`/admin/cobrancas?contract=${c.id}`)}
+                  >
+                    <ExternalLink size={12} className="mr-1" /> Parcelas
+                  </Button>
+                  {hasRole("ADMIN_MASTER") && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                      onClick={() => setDeleteTarget(c)}
+                    >
+                      <Trash2 size={12} className="mr-1" /> Excluir
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           ))}
         </div>
       )}
+
+      {/* Delete contract confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-foreground">Excluir contrato</AlertDialogTitle>
+            <AlertDialogDescription>
+              Essa ação excluirá o contrato "{deleteTarget?.description}" e todas as parcelas não pagas vinculadas. Parcelas pagas bloqueiam a exclusão. Deseja continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-border" disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteContract}
+              disabled={deleting}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+            >
+              {deleting ? <Loader2 size={14} className="animate-spin mr-2" /> : null}
+              Excluir Contrato
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

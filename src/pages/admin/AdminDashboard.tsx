@@ -10,11 +10,23 @@ import {
   Calendar,
   TrendingUp,
   MessageCircle,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, subDays, isToday, isBefore, startOfDay, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -28,6 +40,9 @@ import DashboardOverdueList from "@/components/dashboard/DashboardOverdueList";
 import DashboardDueTodayList from "@/components/dashboard/DashboardDueTodayList";
 import DashboardRecentPaid from "@/components/dashboard/DashboardRecentPaid";
 import DashboardUnitSummary from "@/components/dashboard/DashboardUnitSummary";
+import { useToast } from "@/hooks/use-toast";
+
+
 
 export type DashboardPayment = {
   id: string;
@@ -64,6 +79,7 @@ export type DashboardStudent = {
 
 const AdminDashboard = () => {
   const { hasRole, profile: userProfile } = useAuth();
+  const { toast } = useToast();
   const isMaster = hasRole("ADMIN_MASTER");
 
   const [payments, setPayments] = useState<DashboardPayment[]>([]);
@@ -74,6 +90,12 @@ const AdminDashboard = () => {
 
   const [unitFilter, setUnitFilter] = useState("all");
   const [periodFilter, setPeriodFilter] = useState("month");
+
+  // Cleanup state
+  const [cleanupPreview, setCleanupPreview] = useState<any>(null);
+  const [cleanupLoading, setCleanupLoading] = useState(false);
+  const [cleanupResult, setCleanupResult] = useState<any>(null);
+  const [cleanupDialogOpen, setCleanupDialogOpen] = useState(false);
 
   // WhatsApp dialog state
   const [waDialog, setWaDialog] = useState<{
@@ -270,6 +292,45 @@ const AdminDashboard = () => {
     });
   };
 
+  const handleCleanupPreview = async () => {
+    setCleanupLoading(true);
+    setCleanupPreview(null);
+    setCleanupResult(null);
+
+    const { data, error } = await supabase.functions.invoke("clean-test-data", {
+      body: { mode: "preview" },
+    });
+
+    setCleanupLoading(false);
+
+    if (error || data?.error) {
+      toast({ title: "Erro", description: error?.message || data?.error, variant: "destructive" });
+      return;
+    }
+
+    setCleanupPreview(data.preview);
+    setCleanupDialogOpen(true);
+  };
+
+  const handleCleanupExecute = async () => {
+    setCleanupLoading(true);
+
+    const { data, error } = await supabase.functions.invoke("clean-test-data", {
+      body: { mode: "execute" },
+    });
+
+    setCleanupLoading(false);
+
+    if (error || data?.error) {
+      toast({ title: "Erro", description: error?.message || data?.error, variant: "destructive" });
+      return;
+    }
+
+    setCleanupResult(data.result);
+    setCleanupPreview(null);
+    toast({ title: "Limpeza concluída", description: `${data.result.deleted_clients} clientes removidos.` });
+  };
+
   if (loading) {
     return (
       <div className="space-y-6 animate-fade-in">
@@ -390,6 +451,101 @@ const AdminDashboard = () => {
         paymentId={waDialog.paymentId}
         responsibleId={waDialog.responsibleId}
       />
+
+      {/* Cleanup Test Data - ADMIN_MASTER only */}
+      {isMaster && (
+        <div className="glass-card p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Limpeza de Dados de Teste</h3>
+              <p className="text-xs text-muted-foreground">Remove clientes, contratos e parcelas sem pagamentos confirmados</p>
+            </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleCleanupPreview}
+              disabled={cleanupLoading}
+            >
+              {cleanupLoading ? <Loader2 size={14} className="animate-spin mr-2" /> : <Trash2 size={14} className="mr-2" />}
+              Limpar dados de teste
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Cleanup Dialog */}
+      <AlertDialog open={cleanupDialogOpen} onOpenChange={(open) => { if (!open) { setCleanupDialogOpen(false); setCleanupPreview(null); setCleanupResult(null); } }}>
+        <AlertDialogContent className="bg-card border-border sm:max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-foreground">
+              {cleanupResult ? "Relatório de Limpeza" : "Confirmar Limpeza de Dados de Teste"}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                {cleanupPreview && !cleanupResult && (
+                  <>
+                    <p className="text-sm">Esta ação é <strong className="text-destructive">irreversível</strong>. Serão removidos:</p>
+                    <div className="rounded-lg bg-muted p-3 space-y-1 text-sm">
+                      <p>🧑 <strong>{cleanupPreview.deletable_clients}</strong> clientes</p>
+                      <p>📄 <strong>{cleanupPreview.deletable_contracts}</strong> contratos</p>
+                      <p>💰 <strong>{cleanupPreview.deletable_payments}</strong> parcelas/cobranças</p>
+                    </div>
+                    {cleanupPreview.blocked_clients > 0 && (
+                      <div className="rounded-lg bg-muted p-3 space-y-1 text-sm">
+                        <p className="font-semibold text-warning">⚠️ {cleanupPreview.blocked_clients} clientes com pagamentos confirmados NÃO serão removidos:</p>
+                        {cleanupPreview.blocked.map((b: any, i: number) => (
+                          <p key={i} className="text-xs text-muted-foreground">• {b.name} ({b.paid_count} pagamentos)</p>
+                        ))}
+                      </div>
+                    )}
+                    {cleanupPreview.clients?.length > 0 && (
+                      <div className="text-xs text-muted-foreground">
+                        <p className="font-medium mb-1">Clientes que serão removidos:</p>
+                        {cleanupPreview.clients.map((name: string, i: number) => (
+                          <p key={i}>• {name}</p>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+                {cleanupResult && (
+                  <>
+                    <div className="rounded-lg bg-muted p-3 space-y-1 text-sm">
+                      <p>✅ <strong>{cleanupResult.deleted_clients}</strong> clientes removidos</p>
+                      <p>✅ <strong>{cleanupResult.deleted_contracts}</strong> contratos removidos</p>
+                      <p>✅ <strong>{cleanupResult.deleted_payments}</strong> parcelas removidas</p>
+                      <p>✅ <strong>{cleanupResult.deleted_students}</strong> alunos removidos</p>
+                    </div>
+                    {cleanupResult.blocked_clients > 0 && (
+                      <div className="rounded-lg bg-muted p-3 space-y-1 text-sm">
+                        <p className="font-semibold text-warning">⚠️ {cleanupResult.blocked_clients} clientes preservados (possuem pagamentos):</p>
+                        {cleanupResult.blocked?.map((b: any, i: number) => (
+                          <p key={i} className="text-xs text-muted-foreground">• {b.name} ({b.paid_count} pagamentos)</p>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-border" disabled={cleanupLoading}>
+              {cleanupResult ? "Fechar" : "Cancelar"}
+            </AlertDialogCancel>
+            {!cleanupResult && (
+              <AlertDialogAction
+                onClick={(e) => { e.preventDefault(); handleCleanupExecute(); }}
+                disabled={cleanupLoading || (cleanupPreview?.deletable_clients === 0)}
+                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+              >
+                {cleanupLoading ? <Loader2 size={14} className="animate-spin mr-2" /> : null}
+                Executar Limpeza
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

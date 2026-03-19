@@ -17,3 +17,9 @@ verify_jwt = false
 
 [functions.seed-test-data]
 verify_jwt = false
+
+[functions.manage-payment]
+verify_jwt = false
+
+[functions.clean-test-data]
+verify_jwt = false
