@@ -10,7 +10,37 @@ import {
   Calendar,
   TrendingUp,
   MessageCircle,
+  Trash2,
+  Loader2,
 } from "lucide-react";
+import { format, startOfMonth, endOfMonth, subDays, isToday, isBefore, startOfDay, differenceInDays } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import WhatsAppDialog from "@/components/WhatsAppDialog";
+import DashboardKpiCards from "@/components/dashboard/DashboardKpiCards";
+import DashboardOverdueList from "@/components/dashboard/DashboardOverdueList";
+import DashboardDueTodayList from "@/components/dashboard/DashboardDueTodayList";
+import DashboardRecentPaid from "@/components/dashboard/DashboardRecentPaid";
+import DashboardUnitSummary from "@/components/dashboard/DashboardUnitSummary";
+import { useToast } from "@/hooks/use-toast";
 import { format, startOfMonth, endOfMonth, subDays, isToday, isBefore, startOfDay, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
