@@ -283,11 +283,13 @@ const AdminContracts = () => {
 
       if (!finalResponsibleId) throw new Error("ID do responsável não encontrado");
 
+      const finalStudentId = responsibleMode === "existing" ? studentId : finalResponsibleId;
+
       // Insert contract (snapshot of all responsible data)
       const { data: contract, error: contractErr } = await supabase.from("contracts").insert({
         unit_id: resolvedUnitId,
         responsible_id: finalResponsibleId,
-        student_id: responsibleMode === "existing" ? studentId : finalResponsibleId, // placeholder if new
+        student_id: finalStudentId,
         description,
         total_value: realValue,
         installments: numInstallments,
@@ -313,13 +315,18 @@ const AdminContracts = () => {
         zip_code: zipCode,
         notes,
         status: "ACTIVE",
-      }).select("id").single();
+        apostilas_enabled: includeApostilas,
+        apostilas_qty: includeApostilas ? apostilasCount : 0,
+        apostilas_total_value: includeApostilas ? apostilasTotalValue : 0,
+        apostilas_interval_months: includeApostilas ? apostilasIntervalMonths : 3,
+        apostilas_start_date: includeApostilas && apostilasStartDate ? apostilasStartDate : null,
+      } as any).select("id").single();
 
       if (contractErr) throw contractErr;
 
-      // Generate installments
+      // Generate course installments
       const baseDueDate = new Date(firstDueDate + "T12:00:00");
-      const payments = [];
+      const payments: any[] = [];
       for (let i = 0; i < numInstallments; i++) {
         const dueDate = new Date(baseDueDate);
         dueDate.setMonth(dueDate.getMonth() + i);
@@ -327,6 +334,7 @@ const AdminContracts = () => {
           contract_id: contract.id,
           unit_id: resolvedUnitId,
           responsible_id: finalResponsibleId,
+          student_id: finalStudentId,
           installment_number: i + 1,
           due_date: dueDate.toISOString().split("T")[0],
           value: installmentFinalValue,
@@ -334,6 +342,8 @@ const AdminContracts = () => {
           punctuality_discount: installmentDiscount,
           final_value: installmentFinalValue,
           payment_method: paymentMethod,
+          payment_type: "MENSALIDADE",
+          description: `${description} - Parcela ${i + 1}/${numInstallments}`,
           status: "PENDING",
         });
       }
@@ -344,17 +354,25 @@ const AdminContracts = () => {
         for (let i = 0; i < apostilasCount; i++) {
           const dueDate = new Date(apostilasBase);
           dueDate.setMonth(dueDate.getMonth() + (i * apostilasIntervalMonths));
+          // Handle rounding: last installment gets remainder
+          let parcValue = Math.floor(apostilasInstallmentValue * 100) / 100;
+          if (i === apostilasCount - 1) {
+            parcValue = Math.round((apostilasTotalValue - parcValue * (apostilasCount - 1)) * 100) / 100;
+          }
           payments.push({
             contract_id: contract.id,
             unit_id: resolvedUnitId,
             responsible_id: finalResponsibleId,
+            student_id: finalStudentId,
             installment_number: numInstallments + i + 1,
             due_date: dueDate.toISOString().split("T")[0],
-            value: apostilasInstallmentValue,
-            original_value: apostilasInstallmentValue,
+            value: parcValue,
+            original_value: parcValue,
             punctuality_discount: 0,
-            final_value: apostilasInstallmentValue,
+            final_value: parcValue,
             payment_method: paymentMethod,
+            payment_type: "APOSTILA",
+            description: `Apostila ${i + 1}/${apostilasCount}`,
             status: "PENDING",
           });
         }
