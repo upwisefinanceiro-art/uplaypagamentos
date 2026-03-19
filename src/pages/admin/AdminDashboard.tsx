@@ -292,7 +292,45 @@ const AdminDashboard = () => {
     });
   };
 
-  if (loading) {
+  const handleCleanupPreview = async () => {
+    setCleanupLoading(true);
+    setCleanupPreview(null);
+    setCleanupResult(null);
+
+    const { data, error } = await supabase.functions.invoke("clean-test-data", {
+      body: { mode: "preview" },
+    });
+
+    setCleanupLoading(false);
+
+    if (error || data?.error) {
+      toast({ title: "Erro", description: error?.message || data?.error, variant: "destructive" });
+      return;
+    }
+
+    setCleanupPreview(data.preview);
+    setCleanupDialogOpen(true);
+  };
+
+  const handleCleanupExecute = async () => {
+    setCleanupLoading(true);
+
+    const { data, error } = await supabase.functions.invoke("clean-test-data", {
+      body: { mode: "execute" },
+    });
+
+    setCleanupLoading(false);
+
+    if (error || data?.error) {
+      toast({ title: "Erro", description: error?.message || data?.error, variant: "destructive" });
+      return;
+    }
+
+    setCleanupResult(data.result);
+    setCleanupPreview(null);
+    toast({ title: "Limpeza concluída", description: `${data.result.deleted_clients} clientes removidos.` });
+  };
+
     return (
       <div className="space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
