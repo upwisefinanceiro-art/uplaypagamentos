@@ -283,11 +283,13 @@ const AdminContracts = () => {
 
       if (!finalResponsibleId) throw new Error("ID do responsável não encontrado");
 
+      const finalStudentId = responsibleMode === "existing" ? studentId : finalResponsibleId;
+
       // Insert contract (snapshot of all responsible data)
       const { data: contract, error: contractErr } = await supabase.from("contracts").insert({
         unit_id: resolvedUnitId,
         responsible_id: finalResponsibleId,
-        student_id: responsibleMode === "existing" ? studentId : finalResponsibleId, // placeholder if new
+        student_id: finalStudentId,
         description,
         total_value: realValue,
         installments: numInstallments,
@@ -313,7 +315,12 @@ const AdminContracts = () => {
         zip_code: zipCode,
         notes,
         status: "ACTIVE",
-      }).select("id").single();
+        apostilas_enabled: includeApostilas,
+        apostilas_qty: includeApostilas ? apostilasCount : 0,
+        apostilas_total_value: includeApostilas ? apostilasTotalValue : 0,
+        apostilas_interval_months: includeApostilas ? apostilasIntervalMonths : 3,
+        apostilas_start_date: includeApostilas && apostilasStartDate ? apostilasStartDate : null,
+      } as any).select("id").single();
 
       if (contractErr) throw contractErr;
 
