@@ -354,17 +354,25 @@ const AdminContracts = () => {
         for (let i = 0; i < apostilasCount; i++) {
           const dueDate = new Date(apostilasBase);
           dueDate.setMonth(dueDate.getMonth() + (i * apostilasIntervalMonths));
+          // Handle rounding: last installment gets remainder
+          let parcValue = Math.floor(apostilasInstallmentValue * 100) / 100;
+          if (i === apostilasCount - 1) {
+            parcValue = Math.round((apostilasTotalValue - parcValue * (apostilasCount - 1)) * 100) / 100;
+          }
           payments.push({
             contract_id: contract.id,
             unit_id: resolvedUnitId,
             responsible_id: finalResponsibleId,
+            student_id: finalStudentId,
             installment_number: numInstallments + i + 1,
             due_date: dueDate.toISOString().split("T")[0],
-            value: apostilasInstallmentValue,
-            original_value: apostilasInstallmentValue,
+            value: parcValue,
+            original_value: parcValue,
             punctuality_discount: 0,
-            final_value: apostilasInstallmentValue,
+            final_value: parcValue,
             payment_method: paymentMethod,
+            payment_type: "APOSTILA",
+            description: `Apostila ${i + 1}/${apostilasCount}`,
             status: "PENDING",
           });
         }
