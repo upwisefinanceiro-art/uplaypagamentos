@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { Plus, Loader2, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ChevronDown, ChevronUp, Loader2, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,20 +46,69 @@ interface UnitRow {
   name: string;
 }
 
+interface PaymentRow {
+  id: string;
+  responsible_id: string;
+  contract_id: string | null;
+  student_id: string | null;
+  description: string;
+  payment_type: string;
+  installment_number: number;
+  due_date: string;
+  status: string;
+  value: number;
+  final_value: number | null;
+  unit_id: string;
+}
+
+interface ContractLinkRow {
+  id: string;
+  responsible_id: string;
+  description: string;
+  status: string;
+}
+
 type ActionType = "deactivate" | "reactivate" | "permanent_delete";
+type PaymentStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELLED";
+type PaymentType = "MENSALIDADE" | "APOSTILA" | "AVULSA";
+
+const statusLabels: Record<PaymentStatus, string> = {
+  PENDING: "Pendente",
+  PAID: "Pago",
+  OVERDUE: "Vencido",
+  CANCELLED: "Cancelado",
+};
+
+const statusClasses: Record<PaymentStatus, string> = {
+  PENDING: "status-pending",
+  PAID: "status-paid",
+  OVERDUE: "status-overdue",
+  CANCELLED: "status-cancelled",
+};
+
+const typeLabels: Record<PaymentType, string> = {
+  MENSALIDADE: "Mensalidade",
+  APOSTILA: "Apostila",
+  AVULSA: "Avulsa",
+};
 
 const AdminClients = () => {
+  const navigate = useNavigate();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [clients, setClients] = useState<ClientRow[]>([]);
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [units, setUnits] = useState<UnitRow[]>([]);
+  const [payments, setPayments] = useState<PaymentRow[]>([]);
+  const [contracts, setContracts] = useState<ContractLinkRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState("");
   const [showInactive, setShowInactive] = useState(false);
+  const [expandedClientId, setExpandedClientId] = useState<string | null>(null);
   const [actionTarget, setActionTarget] = useState<{ client: ClientRow; action: ActionType } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [editTarget, setEditTarget] = useState<ClientRow | null>(null);
+  const [dependencyBlocker, setDependencyBlocker] = useState<{ client: ClientRow; paymentCount: number; contractCount: number } | null>(null);
   const { toast } = useToast();
   const { profile, hasRole } = useAuth();
 
@@ -72,20 +122,27 @@ const AdminClients = () => {
   const fetchData = async () => {
     setLoading(true);
 
-    const [profilesRes, rolesRes, studentsRes, unitsRes] = await Promise.all([
+    const [profilesRes, rolesRes, studentsRes, unitsRes, paymentsRes, contractsRes] = await Promise.all([
       supabase.from("profiles").select("id, full_name, cpf, phone, unit_id, active, email, address").order("full_name"),
       supabase.from("user_roles").select("user_id").eq("role", "RESPONSAVEL"),
       supabase.from("students").select("id, full_name, responsible_id").order("full_name"),
       supabase.from("units").select("id, name").order("name"),
+      supabase
+        .from("payments")
+        .select("id, responsible_id, contract_id, student_id, description, payment_type, installment_number, due_date, status, value, final_value, unit_id")
+        .order("due_date", { ascending: false }),
+      supabase.from("contracts").select("id, responsible_id, description, status"),
     ]);
 
     if (profilesRes.data && rolesRes.data) {
-      const responsibleIds = new Set(rolesRes.data.map((r: { user_id: string }) => r.user_id));
+      const responsibleIds = new Set(rolesRes.data.map((row: { user_id: string }) => row.user_id));
       setClients(profilesRes.data.filter((row) => responsibleIds.has(row.id)) as ClientRow[]);
     }
 
     if (studentsRes.data) setStudents(studentsRes.data as StudentRow[]);
     if (unitsRes.data) setUnits(unitsRes.data as UnitRow[]);
+    if (paymentsRes.data) setPayments(paymentsRes.data as PaymentRow[]);
+    if (contractsRes.data) setContracts(contractsRes.data as ContractLinkRow[]);
     setLoading(false);
   };
 
@@ -96,6 +153,9 @@ const AdminClients = () => {
   useEffect(() => {
     if (profile?.unit_id && !formUnitId) setFormUnitId(profile.unit_id);
   }, [profile, formUnitId]);
+
+  const unitMap = useMemo(() => Object.fromEntries(units.map((unit) => [unit.id, unit.name])), [units]);
+  const studentMap = useMemo(() => Object.fromEntries(students.map((student) => [student.id, student.full_name])), [students]);
 
   const resetForm = () => {
     setFormName("");
@@ -170,6 +230,18 @@ const AdminClients = () => {
     await fetchData();
   };
 
+  const handleDeleteRequest = (client: ClientRow) => {
+    const paymentCount = payments.filter((payment) => payment.responsible_id === client.id).length;
+    const contractCount = contracts.filter((contract) => contract.responsible_id === client.id).length;
+
+    if (paymentCount > 0 || contractCount > 0) {
+      setDependencyBlocker({ client, paymentCount, contractCount });
+      return;
+    }
+
+    setActionTarget({ client, action: "permanent_delete" });
+  };
+
   const handleAction = async () => {
     if (!actionTarget) return;
     setActionLoading(true);
@@ -183,10 +255,12 @@ const AdminClients = () => {
     const { data, error } = await supabase.functions.invoke("delete-user", { body });
 
     if (error || data?.error) {
+      const paymentCount = data?.payment_count ?? 0;
+      const contractCount = data?.contract_count ?? 0;
       toast({
         title: "Erro",
         description: data?.has_dependencies
-          ? "Este registro possui histórico e não pode ser excluído. Use desativar."
+          ? `Este cliente possui ${paymentCount} parcelas/cobranças vinculadas${contractCount ? ` e ${contractCount} contratos` : ""}. Acesse o histórico financeiro antes de excluir.`
           : error?.message || data?.error,
         variant: "destructive",
       });
@@ -204,16 +278,14 @@ const AdminClients = () => {
     await fetchData();
   };
 
-  const unitMap: Record<string, string> = {};
-  units.forEach((unit) => {
-    unitMap[unit.id] = unit.name;
-  });
-
   const getStudents = (responsibleId: string) =>
     students
       .filter((student) => student.responsible_id === responsibleId)
       .map((student) => student.full_name)
       .join(", ");
+
+  const getClientPayments = (responsibleId: string) => payments.filter((payment) => payment.responsible_id === responsibleId);
+  const getClientContracts = (responsibleId: string) => contracts.filter((contract) => contract.responsible_id === responsibleId);
 
   const filtered = clients.filter((client) => {
     if (!showInactive && !client.active) return false;
@@ -319,13 +391,7 @@ const AdminClients = () => {
               </div>
 
               <Button type="submit" className="w-full" disabled={creating}>
-                {creating ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin mr-2" /> Salvando...
-                  </>
-                ) : (
-                  "Salvar"
-                )}
+                {creating ? <><Loader2 size={16} className="animate-spin mr-2" /> Salvando...</> : "Salvar"}
               </Button>
             </form>
           </DialogContent>
@@ -349,32 +415,110 @@ const AdminClients = () => {
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map((client) => (
-            <div key={client.id} className={`glass-card p-4 flex items-center justify-between ${!client.active ? "opacity-60" : ""}`}>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-semibold text-foreground">{client.full_name}</h3>
-                  {!client.active && (
-                    <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
-                      Inativo
-                    </Badge>
-                  )}
+          {filtered.map((client) => {
+            const linkedPayments = getClientPayments(client.id);
+            const linkedContracts = getClientContracts(client.id);
+            const isExpanded = expandedClientId === client.id;
+
+            return (
+              <div key={client.id} className={`glass-card p-4 space-y-4 ${!client.active ? "opacity-60" : ""}`}>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-2 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-sm font-semibold text-foreground">{client.full_name}</h3>
+                      {!client.active && (
+                        <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                          Inativo
+                        </Badge>
+                      )}
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                        {linkedPayments.length} parcelas
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{client.cpf} • {unitMap[client.unit_id || ""] || "—"}</p>
+                    {(client.phone || client.email) && (
+                      <p className="text-xs text-muted-foreground">{[client.phone, client.email].filter(Boolean).join(" • ")}</p>
+                    )}
+                    {getStudents(client.id) && <p className="text-xs text-muted-foreground">Aluno(s): {getStudents(client.id)}</p>}
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <Button variant="outline" size="sm" onClick={() => setExpandedClientId(isExpanded ? null : client.id)}>
+                        {isExpanded ? <ChevronUp size={14} className="mr-1" /> : <ChevronDown size={14} className="mr-1" />}
+                        Parcelas vinculadas
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => navigate(`/admin/cobrancas?responsible=${client.id}`)}>
+                        Abrir financeiro
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => navigate(`/admin/cobrancas?responsible=${client.id}&create=manual`)}>
+                        Adicionar parcela
+                      </Button>
+                    </div>
+                  </div>
+                  <UserActionButtons
+                    active={client.active}
+                    onEdit={() => setEditTarget(client)}
+                    onDeactivate={() => setActionTarget({ client, action: "deactivate" })}
+                    onReactivate={() => setActionTarget({ client, action: "reactivate" })}
+                    onPermanentDelete={() => handleDeleteRequest(client)}
+                  />
                 </div>
-                <p className="text-xs text-muted-foreground">{client.cpf} • {unitMap[client.unit_id || ""] || "—"}</p>
-                {(client.phone || client.email) && (
-                  <p className="text-xs text-muted-foreground">{[client.phone, client.email].filter(Boolean).join(" • ")}</p>
+
+                {isExpanded && (
+                  <div className="space-y-3 border-t border-border/60 pt-4">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <div>
+                        <h4 className="text-sm font-semibold text-foreground">Parcelas vinculadas</h4>
+                        <p className="text-xs text-muted-foreground">
+                          {linkedPayments.length} parcelas/cobranças • {linkedContracts.length} contratos
+                        </p>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => navigate(`/admin/cobrancas?responsible=${client.id}`)}>
+                        Ver no módulo financeiro
+                      </Button>
+                    </div>
+
+                    {linkedPayments.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+                        Nenhuma parcela vinculada a este cliente.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {linkedPayments.map((payment) => (
+                          <div key={payment.id} className="rounded-lg border border-border bg-background/50 p-3">
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                              <div className="space-y-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <p className="text-sm font-medium text-foreground">{payment.description || `Parcela ${payment.installment_number}`}</p>
+                                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                    {typeLabels[payment.payment_type as PaymentType] || payment.payment_type}
+                                  </Badge>
+                                  <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${statusClasses[payment.status as PaymentStatus] || ""}`}>
+                                    {statusLabels[payment.status as PaymentStatus] || payment.status}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                  Aluno: {payment.student_id ? studentMap[payment.student_id] || "—" : "Sem aluno"}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Contrato: {payment.contract_id ? linkedContracts.find((contract) => contract.id === payment.contract_id)?.description || "—" : "Sem contrato"}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Unidade: {unitMap[payment.unit_id] || "—"}
+                                </p>
+                              </div>
+                              <div className="text-left sm:text-right">
+                                <p className="text-sm font-semibold text-foreground">R$ {Number(payment.final_value ?? payment.value).toFixed(2).replace(".", ",")}</p>
+                                <p className="text-xs text-muted-foreground">Vence em {new Date(`${payment.due_date}T12:00:00`).toLocaleDateString("pt-BR")}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
-                {getStudents(client.id) && <p className="text-xs text-muted-foreground">Aluno(s): {getStudents(client.id)}</p>}
               </div>
-              <UserActionButtons
-                active={client.active}
-                onEdit={() => setEditTarget(client)}
-                onDeactivate={() => setActionTarget({ client, action: "deactivate" })}
-                onReactivate={() => setActionTarget({ client, action: "reactivate" })}
-                onPermanentDelete={() => setActionTarget({ client, action: "permanent_delete" })}
-              />
-            </div>
-          ))}
+            );
+          })}
 
           {filtered.length === 0 && (
             <div className="text-center py-12 text-muted-foreground text-sm">Nenhum cliente encontrado.</div>
@@ -420,6 +564,40 @@ const AdminClients = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!dependencyBlocker} onOpenChange={(open) => !open && setDependencyBlocker(null)}>
+        <DialogContent className="bg-card border-border sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Exclusão bloqueada</DialogTitle>
+          </DialogHeader>
+          {dependencyBlocker && (
+            <div className="space-y-4 text-sm text-muted-foreground">
+              <p>
+                Este cliente possui {dependencyBlocker.paymentCount} parcelas/cobranças vinculadas{dependencyBlocker.contractCount ? ` e ${dependencyBlocker.contractCount} contratos` : ""}. Acesse o histórico financeiro antes de excluir.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setExpandedClientId(dependencyBlocker.client.id);
+                    setDependencyBlocker(null);
+                  }}
+                >
+                  Ver parcelas vinculadas
+                </Button>
+                <Button
+                  onClick={() => {
+                    navigate(`/admin/cobrancas?responsible=${dependencyBlocker.client.id}`);
+                    setDependencyBlocker(null);
+                  }}
+                >
+                  Abrir histórico financeiro
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
