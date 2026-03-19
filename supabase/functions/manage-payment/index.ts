@@ -15,7 +15,7 @@ type AppRole = "ADMIN_MASTER" | "ADMIN_UNIDADE" | "RESPONSAVEL";
 type PaymentStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELLED";
 type PaymentType = "MENSALIDADE" | "APOSTILA" | "AVULSA";
 
-type Action = "update" | "delete" | "cancel" | "create_manual";
+type Action = "update" | "delete" | "cancel" | "create_manual" | "delete_contract";
 
 interface ManagePaymentPayload {
   action: Action;
