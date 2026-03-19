@@ -13,6 +13,7 @@ interface ChargeInput {
   due_date: string;
   billing_type: "PIX" | "BOLETO" | "CARD";
   description?: string;
+  payment_type?: "MENSALIDADE" | "APOSTILA" | "AVULSA";
 }
 
 Deno.serve(async (req) => {
