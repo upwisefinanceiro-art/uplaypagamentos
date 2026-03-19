@@ -79,6 +79,7 @@ export type DashboardStudent = {
 
 const AdminDashboard = () => {
   const { hasRole, profile: userProfile } = useAuth();
+  const { toast } = useToast();
   const isMaster = hasRole("ADMIN_MASTER");
 
   const [payments, setPayments] = useState<DashboardPayment[]>([]);
