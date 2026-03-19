@@ -48,6 +48,11 @@ export type Database = {
         Row: {
           address: string | null
           address_number: string | null
+          apostilas_enabled: boolean
+          apostilas_interval_months: number | null
+          apostilas_qty: number | null
+          apostilas_start_date: string | null
+          apostilas_total_value: number | null
           asaas_customer_id: string | null
           birth_date: string | null
           city: string | null
@@ -84,6 +89,11 @@ export type Database = {
         Insert: {
           address?: string | null
           address_number?: string | null
+          apostilas_enabled?: boolean
+          apostilas_interval_months?: number | null
+          apostilas_qty?: number | null
+          apostilas_start_date?: string | null
+          apostilas_total_value?: number | null
           asaas_customer_id?: string | null
           birth_date?: string | null
           city?: string | null
@@ -120,6 +130,11 @@ export type Database = {
         Update: {
           address?: string | null
           address_number?: string | null
+          apostilas_enabled?: boolean
+          apostilas_interval_months?: number | null
+          apostilas_qty?: number | null
+          apostilas_start_date?: string | null
+          apostilas_total_value?: number | null
           asaas_customer_id?: string | null
           birth_date?: string | null
           city?: string | null
