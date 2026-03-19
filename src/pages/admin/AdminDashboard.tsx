@@ -331,6 +331,7 @@ const AdminDashboard = () => {
     toast({ title: "Limpeza concluída", description: `${data.result.deleted_clients} clientes removidos.` });
   };
 
+  if (loading) {
     return (
       <div className="space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
