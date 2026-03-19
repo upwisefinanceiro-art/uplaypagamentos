@@ -91,6 +91,7 @@ function validarEmail(email: string): boolean {
 }
 
 const AdminContracts = () => {
+  const navigate = useNavigate();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [contracts, setContracts] = useState<ContractRow[]>([]);
   const [students, setStudents] = useState<StudentRow[]>([]);
@@ -99,6 +100,8 @@ const AdminContracts = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [step, setStep] = useState<"form" | "summary">("form");
+  const [deleteTarget, setDeleteTarget] = useState<ContractRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { toast } = useToast();
   const { profile, hasRole } = useAuth();
 
