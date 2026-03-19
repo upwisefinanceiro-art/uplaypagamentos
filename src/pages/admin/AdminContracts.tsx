@@ -324,9 +324,9 @@ const AdminContracts = () => {
 
       if (contractErr) throw contractErr;
 
-      // Generate installments
+      // Generate course installments
       const baseDueDate = new Date(firstDueDate + "T12:00:00");
-      const payments = [];
+      const payments: any[] = [];
       for (let i = 0; i < numInstallments; i++) {
         const dueDate = new Date(baseDueDate);
         dueDate.setMonth(dueDate.getMonth() + i);
@@ -334,6 +334,7 @@ const AdminContracts = () => {
           contract_id: contract.id,
           unit_id: resolvedUnitId,
           responsible_id: finalResponsibleId,
+          student_id: finalStudentId,
           installment_number: i + 1,
           due_date: dueDate.toISOString().split("T")[0],
           value: installmentFinalValue,
@@ -341,6 +342,8 @@ const AdminContracts = () => {
           punctuality_discount: installmentDiscount,
           final_value: installmentFinalValue,
           payment_method: paymentMethod,
+          payment_type: "MENSALIDADE",
+          description: `${description} - Parcela ${i + 1}/${numInstallments}`,
           status: "PENDING",
         });
       }
