@@ -162,6 +162,7 @@ const AdminContracts = () => {
   const [paymentMethod, setPaymentMethod] = useState("");
   const [notes, setNotes] = useState("");
   const [password, setPassword] = useState("");
+  const [contractNumber, setContractNumber] = useState("");
   const [saveResponsibleToBase, setSaveResponsibleToBase] = useState(false);
 
   // Apostilas state
