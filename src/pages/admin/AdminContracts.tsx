@@ -90,9 +90,28 @@ function validarEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+function sanitizeMoneyInput(value: string): string {
+  return value.replace(/[^\d,\.\s]/g, "").replace(/\s+/g, "");
+}
+
 function parseMoneyInput(value: string): number {
-  const normalized = value.replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
+  const cleaned = sanitizeMoneyInput(value);
+  if (!cleaned) return 0;
+
+  const lastComma = cleaned.lastIndexOf(",");
+  const lastDot = cleaned.lastIndexOf(".");
+  const decimalSeparatorIndex = Math.max(lastComma, lastDot);
+
+  if (decimalSeparatorIndex === -1) {
+    const parsedInteger = Number.parseFloat(cleaned.replace(/\D/g, ""));
+    return Number.isFinite(parsedInteger) ? parsedInteger : 0;
+  }
+
+  const integerPart = cleaned.slice(0, decimalSeparatorIndex).replace(/\D/g, "") || "0";
+  const decimalPart = cleaned.slice(decimalSeparatorIndex + 1).replace(/\D/g, "").slice(0, 2);
+  const normalized = decimalPart ? `${integerPart}.${decimalPart}` : integerPart;
   const parsed = Number.parseFloat(normalized);
+
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
