@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Loader2, UserPlus, UserCheck, Save, Trash2, ExternalLink } from "lucide-react";
+import { Plus, Loader2, UserPlus, UserCheck, Save, Trash2, ExternalLink, Search } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -102,6 +102,7 @@ const AdminContracts = () => {
   const [step, setStep] = useState<"form" | "summary">("form");
   const [deleteTarget, setDeleteTarget] = useState<ContractRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
   const { profile, hasRole } = useAuth();
 
@@ -154,13 +155,15 @@ const AdminContracts = () => {
     return students.filter(s => s.responsible_id === responsibleId);
   }, [responsibleId, responsibleMode, students]);
 
+  // valor_real = valor unitário por parcela (NÃO é total do curso)
   const realValue = parseFloat(courseRealValue) || 0;
   const discount = parseFloat(punctualityDiscount) || 0;
   const finalValue = Math.max(0, realValue - discount);
   const numInstallments = parseInt(installments) || 0;
-  const installmentRealValue = realValue > 0 && numInstallments > 0 ? realValue / numInstallments : 0;
-  const installmentFinalValue = finalValue > 0 && numInstallments > 0 ? finalValue / numInstallments : 0;
-  const installmentDiscount = installmentRealValue - installmentFinalValue;
+  // Cada parcela tem o mesmo valor unitário (sem divisão)
+  const installmentRealValue = realValue;
+  const installmentFinalValue = finalValue;
+  const installmentDiscount = discount;
 
   // Apostilas computed
   const apostilasTotalValue = parseFloat(apostilasTotal) || 0;
@@ -291,7 +294,7 @@ const AdminContracts = () => {
         responsible_id: finalResponsibleId,
         student_id: finalStudentId,
         description,
-        total_value: realValue,
+        total_value: realValue * numInstallments,
         installments: numInstallments,
         start_date: startDate,
         first_due_date: firstDueDate,
@@ -630,23 +633,9 @@ const AdminContracts = () => {
     <div>
       <h3 className="text-sm font-semibold text-primary mb-3">D. Parcelamento</h3>
       <div className="space-y-3">
-        <div className="grid grid-cols-3 gap-3">
-          <div className="space-y-1">
-            <Label className="text-foreground text-xs">Valor Real do Curso *</Label>
-            <Input className="bg-input border-border text-foreground" type="number" step="0.01" min="0" placeholder="0,00" value={courseRealValue} onChange={e => setCourseRealValue(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-foreground text-xs">Desc. Pontualidade</Label>
-            <Input className="bg-input border-border text-foreground" type="number" step="0.01" min="0" placeholder="0,00" value={punctualityDiscount} onChange={e => setPunctualityDiscount(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-foreground text-xs">Valor Final</Label>
-            <Input className="bg-input border-border text-foreground" readOnly value={fmt(finalValue)} />
-          </div>
-        </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
-            <Label className="text-foreground text-xs">Nº de Parcelas *</Label>
+            <Label className="text-foreground text-xs">Nº de Parcelas (mensalidades) *</Label>
             <Input className="bg-input border-border text-foreground" type="number" min="1" value={installments} onChange={e => setInstallments(e.target.value)} />
           </div>
           <div className="space-y-1">
@@ -654,13 +643,30 @@ const AdminContracts = () => {
             <Input className="bg-input border-border text-foreground" type="number" min="1" max="28" placeholder="Herda do 1º vencimento" value={dueDay} onChange={e => setDueDay(e.target.value)} />
           </div>
         </div>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Valor da Parcela (sem desconto) *</Label>
+            <Input className="bg-input border-border text-foreground" type="number" step="0.01" min="0" placeholder="219,90" value={courseRealValue} onChange={e => setCourseRealValue(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Desc. Pontualidade / parcela</Label>
+            <Input className="bg-input border-border text-foreground" type="number" step="0.01" min="0" placeholder="30,00" value={punctualityDiscount} onChange={e => setPunctualityDiscount(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Valor c/ Desconto</Label>
+            <Input className="bg-input border-border text-foreground" readOnly value={fmt(finalValue)} />
+          </div>
+        </div>
         {realValue > 0 && numInstallments > 0 && (
-          <div className="p-3 rounded-md bg-muted space-y-1">
-            <p className="text-xs text-muted-foreground">Parcela sem desconto: <span className="font-semibold text-foreground">{fmt(installmentRealValue)}</span></p>
+          <div className="p-3 rounded-md bg-muted space-y-2">
+            <p className="text-xs text-muted-foreground">Parcela sem desconto: <span className="font-semibold text-foreground">{fmt(realValue)}</span></p>
             {discount > 0 && (
-              <p className="text-xs text-muted-foreground">Desc. pontualidade/parcela: <span className="font-semibold text-destructive">-{fmt(installmentDiscount)}</span></p>
+              <p className="text-xs text-muted-foreground">Desc. pontualidade/parcela: <span className="font-semibold text-destructive">-{fmt(discount)}</span></p>
             )}
-            <p className="text-xs text-muted-foreground">Parcela com desconto: <span className="font-semibold text-primary">{fmt(installmentFinalValue)}</span></p>
+            <p className="text-xs text-muted-foreground">Parcela com desconto: <span className="font-semibold text-primary">{fmt(finalValue)}</span></p>
+            <Separator />
+            <p className="text-xs text-muted-foreground">Total sem desconto ({numInstallments}x): <span className="font-semibold text-foreground">{fmt(realValue * numInstallments)}</span></p>
+            <p className="text-xs text-muted-foreground">Total com desconto ({numInstallments}x): <span className="font-semibold text-primary">{fmt(finalValue * numInstallments)}</span></p>
           </div>
         )}
       </div>
@@ -708,20 +714,39 @@ const AdminContracts = () => {
               Parcelas das apostilas geradas a cada {apostilasIntervalMonths} {apostilasIntervalMonths === 1 ? "mês" : "meses"}
             </p>
             {apostilasTotalValue > 0 && apostilasCount > 0 && apostilasStartDate && (
-              <div className="p-3 rounded-md bg-muted space-y-1">
-                <p className="text-xs text-muted-foreground">
-                  Valor por parcela: <span className="font-semibold text-primary">{fmt(apostilasInstallmentValue)}</span>
-                </p>
-                <p className="text-xs font-medium text-muted-foreground mt-2">Vencimentos:</p>
-                {Array.from({ length: apostilasCount }).map((_, i) => {
-                  const d = new Date(apostilasStartDate + "T12:00:00");
-                  d.setMonth(d.getMonth() + (i * apostilasIntervalMonths));
-                  return (
-                    <p key={i} className="text-xs text-foreground">
-                      {i + 1}ª — {d.toLocaleDateString("pt-BR")}
-                    </p>
-                  );
-                })}
+              <div className="p-3 rounded-md bg-muted space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Valor total:</span>
+                  <span className="font-semibold text-foreground">{fmt(apostilasTotalValue)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Valor unitário/apostila:</span>
+                  <span className="font-semibold text-primary">{fmt(apostilasInstallmentValue)}</span>
+                </div>
+                <Separator />
+                <p className="text-xs font-medium text-muted-foreground">Cronograma de vencimentos:</p>
+                <div className="border border-border rounded-md overflow-hidden">
+                  <div className="grid grid-cols-3 bg-muted/80 px-3 py-1.5 text-xs font-semibold text-muted-foreground">
+                    <span>#</span>
+                    <span>Vencimento</span>
+                    <span className="text-right">Valor</span>
+                  </div>
+                  {Array.from({ length: apostilasCount }).map((_, i) => {
+                    const d = new Date(apostilasStartDate + "T12:00:00");
+                    d.setMonth(d.getMonth() + (i * apostilasIntervalMonths));
+                    let parcValue = Math.floor(apostilasInstallmentValue * 100) / 100;
+                    if (i === apostilasCount - 1) {
+                      parcValue = Math.round((apostilasTotalValue - parcValue * (apostilasCount - 1)) * 100) / 100;
+                    }
+                    return (
+                      <div key={i} className="grid grid-cols-3 px-3 py-1.5 text-xs border-t border-border">
+                        <span className="text-foreground">Apostila {i + 1}</span>
+                        <span className="text-foreground">{d.toLocaleDateString("pt-BR")}</span>
+                        <span className="text-right font-medium text-primary">{fmt(parcValue)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
@@ -729,6 +754,18 @@ const AdminContracts = () => {
       </div>
     </div>
   );
+
+  const filteredContracts = useMemo(() => {
+    if (!searchTerm.trim()) return contracts;
+    const term = searchTerm.toLowerCase();
+    return contracts.filter(c =>
+      c.description?.toLowerCase().includes(term) ||
+      c.responsible_name?.toLowerCase().includes(term) ||
+      c.cpf?.includes(term) ||
+      c.id?.toLowerCase().includes(term) ||
+      (c.students as any)?.full_name?.toLowerCase().includes(term)
+    );
+  }, [contracts, searchTerm]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -808,18 +845,22 @@ const AdminContracts = () => {
                     <span className="text-foreground font-medium">{unitName}</span>
                     <span className="text-muted-foreground">Curso:</span>
                     <span className="text-foreground font-medium">{description}</span>
-                    <span className="text-muted-foreground">Valor Real:</span>
+                    <span className="text-muted-foreground">Parcela s/ desconto:</span>
                     <span className="text-foreground">{fmt(realValue)}</span>
                     {discount > 0 && (
                       <>
-                        <span className="text-muted-foreground">Desc. Pontualidade:</span>
+                        <span className="text-muted-foreground">Desc. Pontualidade/parcela:</span>
                         <span className="text-destructive">-{fmt(discount)}</span>
                       </>
                     )}
-                    <span className="text-muted-foreground">Valor Final:</span>
+                    <span className="text-muted-foreground">Parcela c/ desconto:</span>
                     <span className="text-primary font-bold">{fmt(finalValue)}</span>
-                    <span className="text-muted-foreground">Parcelas:</span>
-                    <span className="text-foreground">{installments}x de {fmt(installmentFinalValue)}</span>
+                    <span className="text-muted-foreground">Mensalidades:</span>
+                    <span className="text-foreground">{installments}x de {fmt(finalValue)}</span>
+                    <span className="text-muted-foreground">Total s/ desconto:</span>
+                    <span className="text-foreground">{fmt(realValue * numInstallments)}</span>
+                    <span className="text-muted-foreground">Total c/ desconto:</span>
+                    <span className="text-primary font-bold">{fmt(finalValue * numInstallments)}</span>
                     <span className="text-muted-foreground">1º Vencimento:</span>
                     <span className="text-foreground">{firstDueDate ? new Date(firstDueDate + "T12:00:00").toLocaleDateString("pt-BR") : ""}</span>
                     <span className="text-muted-foreground">Pagamento:</span>
@@ -861,14 +902,25 @@ const AdminContracts = () => {
         </Dialog>
       </div>
 
+      {/* Search */}
+      <div className="relative">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          className="bg-input border-border text-foreground pl-9"
+          placeholder="Buscar por nº do contrato, nome, CPF, aluno..."
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
+        />
+      </div>
+
       {/* Contracts List */}
       {loading ? (
         <div className="flex justify-center py-10"><Loader2 className="animate-spin text-primary" size={24} /></div>
-      ) : contracts.length === 0 ? (
+      ) : filteredContracts.length === 0 ? (
         <div className="text-center py-10 text-muted-foreground text-sm">Nenhum contrato encontrado.</div>
       ) : (
         <div className="space-y-3">
-          {contracts.map((c) => (
+          {filteredContracts.map((c) => (
             <div key={c.id} className="glass-card p-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
