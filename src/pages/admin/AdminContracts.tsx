@@ -987,8 +987,13 @@ const AdminContracts = () => {
             <div key={c.id} className="glass-card p-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-semibold text-foreground">{c.description}</h3>
-                  <p className="text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    {c.contract_number && (
+                      <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded text-muted-foreground">#{c.contract_number}</span>
+                    )}
+                    <h3 className="text-sm font-semibold text-foreground">{c.description}</h3>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
                     {c.responsible_name || "—"} • {(c.units as any)?.name || "—"} • Aluno: {(c.students as any)?.full_name || "—"}
                   </p>
                 </div>
