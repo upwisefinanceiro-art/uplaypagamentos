@@ -26,6 +26,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 interface ContractRow {
   id: string;
+  contract_number: string | null;
   description: string;
   responsible_name: string | null;
   cpf: string | null;
