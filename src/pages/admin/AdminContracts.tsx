@@ -90,9 +90,28 @@ function validarEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+function sanitizeMoneyInput(value: string): string {
+  return value.replace(/[^\d,\.\s]/g, "").replace(/\s+/g, "");
+}
+
 function parseMoneyInput(value: string): number {
-  const normalized = value.replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
+  const cleaned = sanitizeMoneyInput(value);
+  if (!cleaned) return 0;
+
+  const lastComma = cleaned.lastIndexOf(",");
+  const lastDot = cleaned.lastIndexOf(".");
+  const decimalSeparatorIndex = Math.max(lastComma, lastDot);
+
+  if (decimalSeparatorIndex === -1) {
+    const parsedInteger = Number.parseFloat(cleaned.replace(/\D/g, ""));
+    return Number.isFinite(parsedInteger) ? parsedInteger : 0;
+  }
+
+  const integerPart = cleaned.slice(0, decimalSeparatorIndex).replace(/\D/g, "") || "0";
+  const decimalPart = cleaned.slice(decimalSeparatorIndex + 1).replace(/\D/g, "").slice(0, 2);
+  const normalized = decimalPart ? `${integerPart}.${decimalPart}` : integerPart;
   const parsed = Number.parseFloat(normalized);
+
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
@@ -656,15 +675,34 @@ const AdminContracts = () => {
         <div className="grid grid-cols-3 gap-3">
           <div className="space-y-1">
             <Label className="text-foreground text-xs">Valor real por mensalidade *</Label>
-            <Input className="bg-input border-border text-foreground" type="text" inputMode="decimal" placeholder="219,90" value={courseRealValue} onChange={e => setCourseRealValue(e.target.value)} />
+            <Input
+              className="bg-input border-border text-foreground"
+              type="text"
+              inputMode="decimal"
+              placeholder="219,90"
+              value={courseRealValue}
+              onChange={e => setCourseRealValue(sanitizeMoneyInput(e.target.value))}
+            />
           </div>
           <div className="space-y-1">
             <Label className="text-foreground text-xs">Desc. pontualidade por mensalidade</Label>
-            <Input className="bg-input border-border text-foreground" type="text" inputMode="decimal" placeholder="30,00" value={punctualityDiscount} onChange={e => setPunctualityDiscount(e.target.value)} />
+            <Input
+              className="bg-input border-border text-foreground"
+              type="text"
+              inputMode="decimal"
+              placeholder="30,00"
+              value={punctualityDiscount}
+              onChange={e => setPunctualityDiscount(sanitizeMoneyInput(e.target.value))}
+            />
           </div>
           <div className="space-y-1">
             <Label className="text-foreground text-xs">Valor final por mensalidade</Label>
-            <Input className="bg-input border-border text-foreground" readOnly value={fmt(finalValue)} />
+            <div className="flex h-10 w-full items-center rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground">
+              {fmt(finalValue)}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Calculado automaticamente: valor real - desconto por mensalidade.
+            </p>
           </div>
         </div>
         {realValue > 0 && numInstallments > 0 && (
