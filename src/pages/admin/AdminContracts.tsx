@@ -698,7 +698,7 @@ const AdminContracts = () => {
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-foreground text-xs">Desc. pontualidade por mensalidade</Label>
+            <Label className="text-foreground text-xs">Desc. de pontualidade</Label>
             <Input
               className="bg-input border-border text-foreground"
               type="text"
