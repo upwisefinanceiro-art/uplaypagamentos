@@ -824,6 +824,7 @@ const AdminContracts = () => {
       c.description?.toLowerCase().includes(term) ||
       c.responsible_name?.toLowerCase().includes(term) ||
       c.cpf?.includes(term) ||
+      c.contract_number?.toLowerCase().includes(term) ||
       c.id?.toLowerCase().includes(term) ||
       (c.students as any)?.full_name?.toLowerCase().includes(term)
     );
