@@ -293,7 +293,7 @@ const AdminContracts = () => {
         responsible_id: finalResponsibleId,
         student_id: finalStudentId,
         description,
-        total_value: realValue,
+        total_value: realValue * numInstallments,
         installments: numInstallments,
         start_date: startDate,
         first_due_date: firstDueDate,
