@@ -26,6 +26,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 interface ContractRow {
   id: string;
+  contract_number: string | null;
   description: string;
   responsible_name: string | null;
   cpf: string | null;
@@ -57,6 +58,7 @@ interface ResponsibleRow {
   full_name: string;
   cpf: string;
   phone: string | null;
+  email: string | null;
   unit_id: string | null;
   asaas_customer_id: string | null;
 }
@@ -161,6 +163,7 @@ const AdminContracts = () => {
   const [paymentMethod, setPaymentMethod] = useState("");
   const [notes, setNotes] = useState("");
   const [password, setPassword] = useState("");
+  const [contractNumber, setContractNumber] = useState("");
   const [saveResponsibleToBase, setSaveResponsibleToBase] = useState(false);
 
   // Apostilas state
@@ -205,7 +208,7 @@ const AdminContracts = () => {
     const [contractsRes, studentsRes, responsiblesRes, unitsRes] = await Promise.all([
       supabase.from("contracts").select("*, units(name), students(full_name)").order("created_at", { ascending: false }),
       supabase.from("students").select("id, full_name, responsible_id, unit_id").eq("active", true),
-      supabase.from("profiles").select("id, full_name, cpf, phone, unit_id, asaas_customer_id").eq("active", true),
+      supabase.from("profiles").select("id, full_name, cpf, phone, email, unit_id, asaas_customer_id").eq("active", true),
       supabase.from("units").select("id, name").eq("active", true),
     ]);
     if (contractsRes.data) setContracts(contractsRes.data as any);
@@ -223,6 +226,7 @@ const AdminContracts = () => {
       setResponsibleName(resp.full_name);
       setCpf(resp.cpf || "");
       setPhone(resp.phone || "");
+      setEmail(resp.email || "");
     }
   };
 
@@ -234,7 +238,7 @@ const AdminContracts = () => {
     setZipCode(""); setUnitId(""); setDescription(""); setStartDate("");
     setFirstDueDate(""); setCourseRealValue(""); setPunctualityDiscount("0");
     setInstallments("1"); setDueDay(""); setPaymentMethod(""); setNotes("");
-    setPassword(""); setStep("form"); setSaveResponsibleToBase(false);
+    setPassword(""); setContractNumber(""); setStep("form"); setSaveResponsibleToBase(false);
     setIncludeApostilas(false); setApostilasTotal(""); setApostilasQty("1");
     setApostilasStartDate(""); setApostilasInterval("3");
   };
@@ -316,7 +320,9 @@ const AdminContracts = () => {
       const finalStudentId = responsibleMode === "existing" ? studentId : finalResponsibleId;
 
       // Insert contract (snapshot of all responsible data)
+      const generatedNumber = contractNumber.trim() || Date.now().toString().slice(-6);
       const { data: contract, error: contractErr } = await supabase.from("contracts").insert({
+        contract_number: generatedNumber,
         unit_id: resolvedUnitId,
         responsible_id: finalResponsibleId,
         student_id: finalStudentId,
@@ -622,9 +628,16 @@ const AdminContracts = () => {
     <div>
       <h3 className="text-sm font-semibold text-primary mb-3">C. Dados Financeiros</h3>
       <div className="space-y-3">
-        <div className="space-y-1">
-          <Label className="text-foreground text-xs">Curso / Descrição *</Label>
-          <Input className="bg-input border-border text-foreground" placeholder="Ex: Informática Básica" value={description} onChange={e => setDescription(e.target.value)} />
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Nº do Contrato</Label>
+            <Input className="bg-input border-border text-foreground" placeholder="Ex: 637080" value={contractNumber} onChange={e => setContractNumber(e.target.value)} />
+            <p className="text-[11px] text-muted-foreground">Identificador para busca. Deixe vazio para gerar automaticamente.</p>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Curso / Descrição *</Label>
+            <Input className="bg-input border-border text-foreground" placeholder="Ex: Informática Básica" value={description} onChange={e => setDescription(e.target.value)} />
+          </div>
         </div>
         {resolvedUnitId && (
           <div className="p-2 rounded-md bg-muted">
@@ -811,6 +824,7 @@ const AdminContracts = () => {
       c.description?.toLowerCase().includes(term) ||
       c.responsible_name?.toLowerCase().includes(term) ||
       c.cpf?.includes(term) ||
+      c.contract_number?.toLowerCase().includes(term) ||
       c.id?.toLowerCase().includes(term) ||
       (c.students as any)?.full_name?.toLowerCase().includes(term)
     );
@@ -884,6 +898,12 @@ const AdminContracts = () => {
                   <Separator />
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Contrato</p>
                   <div className="grid grid-cols-2 gap-y-2 text-sm">
+                    {(contractNumber.trim() || true) && (
+                      <>
+                        <span className="text-muted-foreground">Nº Contrato:</span>
+                        <span className="text-foreground font-mono">{contractNumber.trim() || "(gerado automaticamente)"}</span>
+                      </>
+                    )}
                     {responsibleMode === "existing" && selectedStudent && (
                       <>
                         <span className="text-muted-foreground">Aluno:</span>
@@ -973,8 +993,13 @@ const AdminContracts = () => {
             <div key={c.id} className="glass-card p-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-semibold text-foreground">{c.description}</h3>
-                  <p className="text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    {c.contract_number && (
+                      <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded text-muted-foreground">#{c.contract_number}</span>
+                    )}
+                    <h3 className="text-sm font-semibold text-foreground">{c.description}</h3>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
                     {c.responsible_name || "—"} • {(c.units as any)?.name || "—"} • Aluno: {(c.students as any)?.full_name || "—"}
                   </p>
                 </div>

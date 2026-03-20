@@ -57,6 +57,7 @@ export type Database = {
           birth_date: string | null
           city: string | null
           complement: string | null
+          contract_number: string | null
           course_real_value: number | null
           cpf: string | null
           created_at: string
@@ -98,6 +99,7 @@ export type Database = {
           birth_date?: string | null
           city?: string | null
           complement?: string | null
+          contract_number?: string | null
           course_real_value?: number | null
           cpf?: string | null
           created_at?: string
@@ -139,6 +141,7 @@ export type Database = {
           birth_date?: string | null
           city?: string | null
           complement?: string | null
+          contract_number?: string | null
           course_real_value?: number | null
           cpf?: string | null
           created_at?: string
