@@ -755,6 +755,18 @@ const AdminContracts = () => {
     </div>
   );
 
+  const filteredContracts = useMemo(() => {
+    if (!searchTerm.trim()) return contracts;
+    const term = searchTerm.toLowerCase();
+    return contracts.filter(c =>
+      c.description?.toLowerCase().includes(term) ||
+      c.responsible_name?.toLowerCase().includes(term) ||
+      c.cpf?.includes(term) ||
+      c.id?.toLowerCase().includes(term) ||
+      (c.students as any)?.full_name?.toLowerCase().includes(term)
+    );
+  }, [contracts, searchTerm]);
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
