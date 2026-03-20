@@ -226,6 +226,7 @@ const AdminContracts = () => {
       setResponsibleName(resp.full_name);
       setCpf(resp.cpf || "");
       setPhone(resp.phone || "");
+      setEmail(resp.email || "");
     }
   };
 
