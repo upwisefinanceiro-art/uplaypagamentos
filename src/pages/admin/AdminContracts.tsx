@@ -632,23 +632,9 @@ const AdminContracts = () => {
     <div>
       <h3 className="text-sm font-semibold text-primary mb-3">D. Parcelamento</h3>
       <div className="space-y-3">
-        <div className="grid grid-cols-3 gap-3">
-          <div className="space-y-1">
-            <Label className="text-foreground text-xs">Valor Real do Curso *</Label>
-            <Input className="bg-input border-border text-foreground" type="number" step="0.01" min="0" placeholder="0,00" value={courseRealValue} onChange={e => setCourseRealValue(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-foreground text-xs">Desc. Pontualidade</Label>
-            <Input className="bg-input border-border text-foreground" type="number" step="0.01" min="0" placeholder="0,00" value={punctualityDiscount} onChange={e => setPunctualityDiscount(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-foreground text-xs">Valor Final</Label>
-            <Input className="bg-input border-border text-foreground" readOnly value={fmt(finalValue)} />
-          </div>
-        </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
-            <Label className="text-foreground text-xs">Nº de Parcelas *</Label>
+            <Label className="text-foreground text-xs">Nº de Parcelas (mensalidades) *</Label>
             <Input className="bg-input border-border text-foreground" type="number" min="1" value={installments} onChange={e => setInstallments(e.target.value)} />
           </div>
           <div className="space-y-1">
@@ -656,13 +642,30 @@ const AdminContracts = () => {
             <Input className="bg-input border-border text-foreground" type="number" min="1" max="28" placeholder="Herda do 1º vencimento" value={dueDay} onChange={e => setDueDay(e.target.value)} />
           </div>
         </div>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Valor da Parcela (sem desconto) *</Label>
+            <Input className="bg-input border-border text-foreground" type="number" step="0.01" min="0" placeholder="219,90" value={courseRealValue} onChange={e => setCourseRealValue(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Desc. Pontualidade / parcela</Label>
+            <Input className="bg-input border-border text-foreground" type="number" step="0.01" min="0" placeholder="30,00" value={punctualityDiscount} onChange={e => setPunctualityDiscount(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Valor c/ Desconto</Label>
+            <Input className="bg-input border-border text-foreground" readOnly value={fmt(finalValue)} />
+          </div>
+        </div>
         {realValue > 0 && numInstallments > 0 && (
-          <div className="p-3 rounded-md bg-muted space-y-1">
-            <p className="text-xs text-muted-foreground">Parcela sem desconto: <span className="font-semibold text-foreground">{fmt(installmentRealValue)}</span></p>
+          <div className="p-3 rounded-md bg-muted space-y-2">
+            <p className="text-xs text-muted-foreground">Parcela sem desconto: <span className="font-semibold text-foreground">{fmt(realValue)}</span></p>
             {discount > 0 && (
-              <p className="text-xs text-muted-foreground">Desc. pontualidade/parcela: <span className="font-semibold text-destructive">-{fmt(installmentDiscount)}</span></p>
+              <p className="text-xs text-muted-foreground">Desc. pontualidade/parcela: <span className="font-semibold text-destructive">-{fmt(discount)}</span></p>
             )}
-            <p className="text-xs text-muted-foreground">Parcela com desconto: <span className="font-semibold text-primary">{fmt(installmentFinalValue)}</span></p>
+            <p className="text-xs text-muted-foreground">Parcela com desconto: <span className="font-semibold text-primary">{fmt(finalValue)}</span></p>
+            <Separator />
+            <p className="text-xs text-muted-foreground">Total sem desconto ({numInstallments}x): <span className="font-semibold text-foreground">{fmt(realValue * numInstallments)}</span></p>
+            <p className="text-xs text-muted-foreground">Total com desconto ({numInstallments}x): <span className="font-semibold text-primary">{fmt(finalValue * numInstallments)}</span></p>
           </div>
         )}
       </div>
