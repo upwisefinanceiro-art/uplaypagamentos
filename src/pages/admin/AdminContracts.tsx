@@ -90,6 +90,12 @@ function validarEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+function parseMoneyInput(value: string): number {
+  const normalized = value.replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 const AdminContracts = () => {
   const navigate = useNavigate();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -155,18 +161,20 @@ const AdminContracts = () => {
     return students.filter(s => s.responsible_id === responsibleId);
   }, [responsibleId, responsibleMode, students]);
 
-  // valor_real = valor unitário por parcela (NÃO é total do curso)
-  const realValue = parseFloat(courseRealValue) || 0;
-  const discount = parseFloat(punctualityDiscount) || 0;
+  // valor_real = valor unitário por mensalidade (NÃO é total do curso)
+  const realValue = parseMoneyInput(courseRealValue);
+  const discount = parseMoneyInput(punctualityDiscount);
   const finalValue = Math.max(0, realValue - discount);
   const numInstallments = parseInt(installments) || 0;
-  // Cada parcela tem o mesmo valor unitário (sem divisão)
+  // Cada mensalidade mantém exatamente o valor informado, sem divisão
   const installmentRealValue = realValue;
   const installmentFinalValue = finalValue;
   const installmentDiscount = discount;
+  const courseTotalWithoutDiscount = installmentRealValue * numInstallments;
+  const courseTotalWithDiscount = installmentFinalValue * numInstallments;
 
   // Apostilas computed
-  const apostilasTotalValue = parseFloat(apostilasTotal) || 0;
+  const apostilasTotalValue = parseMoneyInput(apostilasTotal);
   const apostilasCount = parseInt(apostilasQty) || 0;
   const apostilasIntervalMonths = parseInt(apostilasInterval) || 3;
   const apostilasInstallmentValue = apostilasTotalValue > 0 && apostilasCount > 0 ? apostilasTotalValue / apostilasCount : 0;
@@ -294,13 +302,13 @@ const AdminContracts = () => {
         responsible_id: finalResponsibleId,
         student_id: finalStudentId,
         description,
-        total_value: realValue * numInstallments,
+        total_value: courseTotalWithoutDiscount,
         installments: numInstallments,
         start_date: startDate,
         first_due_date: firstDueDate,
-        course_real_value: realValue,
-        punctuality_discount: discount,
-        final_value_with_discount: finalValue,
+        course_real_value: installmentRealValue,
+        punctuality_discount: installmentDiscount,
+        final_value_with_discount: installmentFinalValue,
         due_day: parseInt(dueDay) || parseInt(firstDueDate.split("-")[2]) || 1,
         payment_method: paymentMethod,
         responsible_name: responsibleName,
@@ -645,28 +653,29 @@ const AdminContracts = () => {
         </div>
         <div className="grid grid-cols-3 gap-3">
           <div className="space-y-1">
-            <Label className="text-foreground text-xs">Valor da Parcela (sem desconto) *</Label>
-            <Input className="bg-input border-border text-foreground" type="number" step="0.01" min="0" placeholder="219,90" value={courseRealValue} onChange={e => setCourseRealValue(e.target.value)} />
+            <Label className="text-foreground text-xs">Valor real por mensalidade *</Label>
+            <Input className="bg-input border-border text-foreground" type="text" inputMode="decimal" placeholder="219,90" value={courseRealValue} onChange={e => setCourseRealValue(e.target.value)} />
           </div>
           <div className="space-y-1">
-            <Label className="text-foreground text-xs">Desc. Pontualidade / parcela</Label>
-            <Input className="bg-input border-border text-foreground" type="number" step="0.01" min="0" placeholder="30,00" value={punctualityDiscount} onChange={e => setPunctualityDiscount(e.target.value)} />
+            <Label className="text-foreground text-xs">Desc. pontualidade por mensalidade</Label>
+            <Input className="bg-input border-border text-foreground" type="text" inputMode="decimal" placeholder="30,00" value={punctualityDiscount} onChange={e => setPunctualityDiscount(e.target.value)} />
           </div>
           <div className="space-y-1">
-            <Label className="text-foreground text-xs">Valor c/ Desconto</Label>
+            <Label className="text-foreground text-xs">Valor final por mensalidade</Label>
             <Input className="bg-input border-border text-foreground" readOnly value={fmt(finalValue)} />
           </div>
         </div>
         {realValue > 0 && numInstallments > 0 && (
           <div className="p-3 rounded-md bg-muted space-y-2">
-            <p className="text-xs text-muted-foreground">Parcela sem desconto: <span className="font-semibold text-foreground">{fmt(realValue)}</span></p>
+            <p className="text-xs text-muted-foreground">Parcela sem desconto: <span className="font-semibold text-foreground">{fmt(installmentRealValue)}</span></p>
             {discount > 0 && (
-              <p className="text-xs text-muted-foreground">Desc. pontualidade/parcela: <span className="font-semibold text-destructive">-{fmt(discount)}</span></p>
+              <p className="text-xs text-muted-foreground">Desc. pontualidade/parcela: <span className="font-semibold text-destructive">-{fmt(installmentDiscount)}</span></p>
             )}
-            <p className="text-xs text-muted-foreground">Parcela com desconto: <span className="font-semibold text-primary">{fmt(finalValue)}</span></p>
+            <p className="text-xs text-muted-foreground">Parcela com desconto: <span className="font-semibold text-primary">{fmt(installmentFinalValue)}</span></p>
+            <p className="text-xs text-muted-foreground">Mensalidades geradas: <span className="font-semibold text-foreground">{numInstallments} parcelas com esses mesmos valores por parcela</span></p>
             <Separator />
-            <p className="text-xs text-muted-foreground">Total sem desconto ({numInstallments}x): <span className="font-semibold text-foreground">{fmt(realValue * numInstallments)}</span></p>
-            <p className="text-xs text-muted-foreground">Total com desconto ({numInstallments}x): <span className="font-semibold text-primary">{fmt(finalValue * numInstallments)}</span></p>
+            <p className="text-xs text-muted-foreground">Total sem desconto ({numInstallments}x): <span className="font-semibold text-foreground">{fmt(courseTotalWithoutDiscount)}</span></p>
+            <p className="text-xs text-muted-foreground">Total com desconto ({numInstallments}x): <span className="font-semibold text-primary">{fmt(courseTotalWithDiscount)}</span></p>
           </div>
         )}
       </div>
@@ -693,7 +702,7 @@ const AdminContracts = () => {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-foreground text-xs">Valor Total das Apostilas *</Label>
-                <Input className="bg-input border-border text-foreground" type="number" step="0.01" min="0" placeholder="0,00" value={apostilasTotal} onChange={e => setApostilasTotal(e.target.value)} />
+                <Input className="bg-input border-border text-foreground" type="text" inputMode="decimal" placeholder="0,00" value={apostilasTotal} onChange={e => setApostilasTotal(e.target.value)} />
               </div>
               <div className="space-y-1">
                 <Label className="text-foreground text-xs">Quantidade de Parcelas *</Label>
@@ -846,21 +855,21 @@ const AdminContracts = () => {
                     <span className="text-muted-foreground">Curso:</span>
                     <span className="text-foreground font-medium">{description}</span>
                     <span className="text-muted-foreground">Parcela s/ desconto:</span>
-                    <span className="text-foreground">{fmt(realValue)}</span>
+                    <span className="text-foreground">{fmt(installmentRealValue)}</span>
                     {discount > 0 && (
                       <>
                         <span className="text-muted-foreground">Desc. Pontualidade/parcela:</span>
-                        <span className="text-destructive">-{fmt(discount)}</span>
+                        <span className="text-destructive">-{fmt(installmentDiscount)}</span>
                       </>
                     )}
                     <span className="text-muted-foreground">Parcela c/ desconto:</span>
-                    <span className="text-primary font-bold">{fmt(finalValue)}</span>
+                    <span className="text-primary font-bold">{fmt(installmentFinalValue)}</span>
                     <span className="text-muted-foreground">Mensalidades:</span>
-                    <span className="text-foreground">{installments}x de {fmt(finalValue)}</span>
+                    <span className="text-foreground">{installments}x de {fmt(installmentFinalValue)}</span>
                     <span className="text-muted-foreground">Total s/ desconto:</span>
-                    <span className="text-foreground">{fmt(realValue * numInstallments)}</span>
+                    <span className="text-foreground">{fmt(courseTotalWithoutDiscount)}</span>
                     <span className="text-muted-foreground">Total c/ desconto:</span>
-                    <span className="text-primary font-bold">{fmt(finalValue * numInstallments)}</span>
+                    <span className="text-primary font-bold">{fmt(courseTotalWithDiscount)}</span>
                     <span className="text-muted-foreground">1º Vencimento:</span>
                     <span className="text-foreground">{firstDueDate ? new Date(firstDueDate + "T12:00:00").toLocaleDateString("pt-BR") : ""}</span>
                     <span className="text-muted-foreground">Pagamento:</span>
