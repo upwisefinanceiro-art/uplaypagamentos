@@ -320,7 +320,9 @@ const AdminContracts = () => {
       const finalStudentId = responsibleMode === "existing" ? studentId : finalResponsibleId;
 
       // Insert contract (snapshot of all responsible data)
+      const generatedNumber = contractNumber.trim() || Date.now().toString().slice(-6);
       const { data: contract, error: contractErr } = await supabase.from("contracts").insert({
+        contract_number: generatedNumber,
         unit_id: resolvedUnitId,
         responsible_id: finalResponsibleId,
         student_id: finalStudentId,
