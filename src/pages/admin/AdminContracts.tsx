@@ -898,6 +898,12 @@ const AdminContracts = () => {
                   <Separator />
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Contrato</p>
                   <div className="grid grid-cols-2 gap-y-2 text-sm">
+                    {(contractNumber.trim() || true) && (
+                      <>
+                        <span className="text-muted-foreground">Nº Contrato:</span>
+                        <span className="text-foreground font-mono">{contractNumber.trim() || "(gerado automaticamente)"}</span>
+                      </>
+                    )}
                     {responsibleMode === "existing" && selectedStudent && (
                       <>
                         <span className="text-muted-foreground">Aluno:</span>
