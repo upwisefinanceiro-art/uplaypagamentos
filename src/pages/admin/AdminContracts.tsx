@@ -713,20 +713,39 @@ const AdminContracts = () => {
               Parcelas das apostilas geradas a cada {apostilasIntervalMonths} {apostilasIntervalMonths === 1 ? "mês" : "meses"}
             </p>
             {apostilasTotalValue > 0 && apostilasCount > 0 && apostilasStartDate && (
-              <div className="p-3 rounded-md bg-muted space-y-1">
-                <p className="text-xs text-muted-foreground">
-                  Valor por parcela: <span className="font-semibold text-primary">{fmt(apostilasInstallmentValue)}</span>
-                </p>
-                <p className="text-xs font-medium text-muted-foreground mt-2">Vencimentos:</p>
-                {Array.from({ length: apostilasCount }).map((_, i) => {
-                  const d = new Date(apostilasStartDate + "T12:00:00");
-                  d.setMonth(d.getMonth() + (i * apostilasIntervalMonths));
-                  return (
-                    <p key={i} className="text-xs text-foreground">
-                      {i + 1}ª — {d.toLocaleDateString("pt-BR")}
-                    </p>
-                  );
-                })}
+              <div className="p-3 rounded-md bg-muted space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Valor total:</span>
+                  <span className="font-semibold text-foreground">{fmt(apostilasTotalValue)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Valor unitário/apostila:</span>
+                  <span className="font-semibold text-primary">{fmt(apostilasInstallmentValue)}</span>
+                </div>
+                <Separator />
+                <p className="text-xs font-medium text-muted-foreground">Cronograma de vencimentos:</p>
+                <div className="border border-border rounded-md overflow-hidden">
+                  <div className="grid grid-cols-3 bg-muted/80 px-3 py-1.5 text-xs font-semibold text-muted-foreground">
+                    <span>#</span>
+                    <span>Vencimento</span>
+                    <span className="text-right">Valor</span>
+                  </div>
+                  {Array.from({ length: apostilasCount }).map((_, i) => {
+                    const d = new Date(apostilasStartDate + "T12:00:00");
+                    d.setMonth(d.getMonth() + (i * apostilasIntervalMonths));
+                    let parcValue = Math.floor(apostilasInstallmentValue * 100) / 100;
+                    if (i === apostilasCount - 1) {
+                      parcValue = Math.round((apostilasTotalValue - parcValue * (apostilasCount - 1)) * 100) / 100;
+                    }
+                    return (
+                      <div key={i} className="grid grid-cols-3 px-3 py-1.5 text-xs border-t border-border">
+                        <span className="text-foreground">Apostila {i + 1}</span>
+                        <span className="text-foreground">{d.toLocaleDateString("pt-BR")}</span>
+                        <span className="text-right font-medium text-primary">{fmt(parcValue)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
