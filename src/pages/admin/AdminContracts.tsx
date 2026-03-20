@@ -630,6 +630,8 @@ const AdminContracts = () => {
               <SelectItem value="PIX">PIX</SelectItem>
               <SelectItem value="BOLETO">Boleto</SelectItem>
               <SelectItem value="CARD">Cartão</SelectItem>
+              <SelectItem value="DINHEIRO">Dinheiro</SelectItem>
+              <SelectItem value="ASAAS">Asaas</SelectItem>
             </SelectContent>
           </Select>
         </div>
