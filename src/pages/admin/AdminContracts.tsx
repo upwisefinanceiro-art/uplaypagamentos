@@ -626,9 +626,16 @@ const AdminContracts = () => {
     <div>
       <h3 className="text-sm font-semibold text-primary mb-3">C. Dados Financeiros</h3>
       <div className="space-y-3">
-        <div className="space-y-1">
-          <Label className="text-foreground text-xs">Curso / Descrição *</Label>
-          <Input className="bg-input border-border text-foreground" placeholder="Ex: Informática Básica" value={description} onChange={e => setDescription(e.target.value)} />
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Nº do Contrato</Label>
+            <Input className="bg-input border-border text-foreground" placeholder="Ex: 637080" value={contractNumber} onChange={e => setContractNumber(e.target.value)} />
+            <p className="text-[11px] text-muted-foreground">Identificador para busca. Deixe vazio para gerar automaticamente.</p>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Curso / Descrição *</Label>
+            <Input className="bg-input border-border text-foreground" placeholder="Ex: Informática Básica" value={description} onChange={e => setDescription(e.target.value)} />
+          </div>
         </div>
         {resolvedUnitId && (
           <div className="p-2 rounded-md bg-muted">
