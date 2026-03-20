@@ -832,18 +832,22 @@ const AdminContracts = () => {
                     <span className="text-foreground font-medium">{unitName}</span>
                     <span className="text-muted-foreground">Curso:</span>
                     <span className="text-foreground font-medium">{description}</span>
-                    <span className="text-muted-foreground">Valor Real:</span>
+                    <span className="text-muted-foreground">Parcela s/ desconto:</span>
                     <span className="text-foreground">{fmt(realValue)}</span>
                     {discount > 0 && (
                       <>
-                        <span className="text-muted-foreground">Desc. Pontualidade:</span>
+                        <span className="text-muted-foreground">Desc. Pontualidade/parcela:</span>
                         <span className="text-destructive">-{fmt(discount)}</span>
                       </>
                     )}
-                    <span className="text-muted-foreground">Valor Final:</span>
+                    <span className="text-muted-foreground">Parcela c/ desconto:</span>
                     <span className="text-primary font-bold">{fmt(finalValue)}</span>
-                    <span className="text-muted-foreground">Parcelas:</span>
-                    <span className="text-foreground">{installments}x de {fmt(installmentFinalValue)}</span>
+                    <span className="text-muted-foreground">Mensalidades:</span>
+                    <span className="text-foreground">{installments}x de {fmt(finalValue)}</span>
+                    <span className="text-muted-foreground">Total s/ desconto:</span>
+                    <span className="text-foreground">{fmt(realValue * numInstallments)}</span>
+                    <span className="text-muted-foreground">Total c/ desconto:</span>
+                    <span className="text-primary font-bold">{fmt(finalValue * numInstallments)}</span>
                     <span className="text-muted-foreground">1º Vencimento:</span>
                     <span className="text-foreground">{firstDueDate ? new Date(firstDueDate + "T12:00:00").toLocaleDateString("pt-BR") : ""}</span>
                     <span className="text-muted-foreground">Pagamento:</span>
