@@ -675,15 +675,34 @@ const AdminContracts = () => {
         <div className="grid grid-cols-3 gap-3">
           <div className="space-y-1">
             <Label className="text-foreground text-xs">Valor real por mensalidade *</Label>
-            <Input className="bg-input border-border text-foreground" type="text" inputMode="decimal" placeholder="219,90" value={courseRealValue} onChange={e => setCourseRealValue(e.target.value)} />
+            <Input
+              className="bg-input border-border text-foreground"
+              type="text"
+              inputMode="decimal"
+              placeholder="219,90"
+              value={courseRealValue}
+              onChange={e => setCourseRealValue(sanitizeMoneyInput(e.target.value))}
+            />
           </div>
           <div className="space-y-1">
             <Label className="text-foreground text-xs">Desc. pontualidade por mensalidade</Label>
-            <Input className="bg-input border-border text-foreground" type="text" inputMode="decimal" placeholder="30,00" value={punctualityDiscount} onChange={e => setPunctualityDiscount(e.target.value)} />
+            <Input
+              className="bg-input border-border text-foreground"
+              type="text"
+              inputMode="decimal"
+              placeholder="30,00"
+              value={punctualityDiscount}
+              onChange={e => setPunctualityDiscount(sanitizeMoneyInput(e.target.value))}
+            />
           </div>
           <div className="space-y-1">
             <Label className="text-foreground text-xs">Valor final por mensalidade</Label>
-            <Input className="bg-input border-border text-foreground" readOnly value={fmt(finalValue)} />
+            <div className="flex h-10 w-full items-center rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground">
+              {fmt(finalValue)}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Calculado automaticamente: valor real - desconto por mensalidade.
+            </p>
           </div>
         </div>
         {realValue > 0 && numInstallments > 0 && (
