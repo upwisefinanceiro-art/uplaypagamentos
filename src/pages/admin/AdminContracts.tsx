@@ -902,14 +902,25 @@ const AdminContracts = () => {
         </Dialog>
       </div>
 
+      {/* Search */}
+      <div className="relative">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          className="bg-input border-border text-foreground pl-9"
+          placeholder="Buscar por nº do contrato, nome, CPF, aluno..."
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
+        />
+      </div>
+
       {/* Contracts List */}
       {loading ? (
         <div className="flex justify-center py-10"><Loader2 className="animate-spin text-primary" size={24} /></div>
-      ) : contracts.length === 0 ? (
+      ) : filteredContracts.length === 0 ? (
         <div className="text-center py-10 text-muted-foreground text-sm">Nenhum contrato encontrado.</div>
       ) : (
         <div className="space-y-3">
-          {contracts.map((c) => (
+          {filteredContracts.map((c) => (
             <div key={c.id} className="glass-card p-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
