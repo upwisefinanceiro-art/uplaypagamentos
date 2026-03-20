@@ -102,6 +102,7 @@ const AdminContracts = () => {
   const [step, setStep] = useState<"form" | "summary">("form");
   const [deleteTarget, setDeleteTarget] = useState<ContractRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
   const { profile, hasRole } = useAuth();
 
