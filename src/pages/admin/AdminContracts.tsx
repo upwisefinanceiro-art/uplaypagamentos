@@ -58,6 +58,7 @@ interface ResponsibleRow {
   full_name: string;
   cpf: string;
   phone: string | null;
+  email: string | null;
   unit_id: string | null;
   asaas_customer_id: string | null;
 }
