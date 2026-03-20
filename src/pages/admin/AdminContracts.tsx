@@ -154,13 +154,15 @@ const AdminContracts = () => {
     return students.filter(s => s.responsible_id === responsibleId);
   }, [responsibleId, responsibleMode, students]);
 
+  // valor_real = valor unitário por parcela (NÃO é total do curso)
   const realValue = parseFloat(courseRealValue) || 0;
   const discount = parseFloat(punctualityDiscount) || 0;
   const finalValue = Math.max(0, realValue - discount);
   const numInstallments = parseInt(installments) || 0;
-  const installmentRealValue = realValue > 0 && numInstallments > 0 ? realValue / numInstallments : 0;
-  const installmentFinalValue = finalValue > 0 && numInstallments > 0 ? finalValue / numInstallments : 0;
-  const installmentDiscount = installmentRealValue - installmentFinalValue;
+  // Cada parcela tem o mesmo valor unitário (sem divisão)
+  const installmentRealValue = realValue;
+  const installmentFinalValue = finalValue;
+  const installmentDiscount = discount;
 
   // Apostilas computed
   const apostilasTotalValue = parseFloat(apostilasTotal) || 0;
