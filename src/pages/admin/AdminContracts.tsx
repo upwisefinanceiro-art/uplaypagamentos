@@ -927,10 +927,16 @@ const AdminContracts = () => {
                         <span className="text-foreground font-mono">{contractNumber.trim() || "(gerado automaticamente)"}</span>
                       </>
                     )}
-                    {responsibleMode === "existing" && selectedStudent && (
+                    {(responsibleMode === "existing" && selectedStudent) && (
                       <>
                         <span className="text-muted-foreground">Aluno:</span>
                         <span className="text-foreground font-medium">{selectedStudent.full_name}</span>
+                      </>
+                    )}
+                    {responsibleMode === "new" && newStudentName.trim() && (
+                      <>
+                        <span className="text-muted-foreground">Aluno:</span>
+                        <span className="text-foreground font-medium">{newStudentName}</span>
                       </>
                     )}
                     <span className="text-muted-foreground">Unidade:</span>
