@@ -323,7 +323,17 @@ const AdminContracts = () => {
 
       if (!finalResponsibleId) throw new Error("ID do responsável não encontrado");
 
-      const finalStudentId = responsibleMode === "existing" ? studentId : finalResponsibleId;
+      let finalStudentId = studentId;
+      if (responsibleMode === "new") {
+        // Create student record first
+        const { data: newStudent, error: studentErr } = await supabase.from("students").insert({
+          full_name: newStudentName.trim(),
+          responsible_id: finalResponsibleId,
+          unit_id: resolvedUnitId,
+        }).select("id").single();
+        if (studentErr) throw new Error("Erro ao criar aluno: " + studentErr.message);
+        finalStudentId = newStudent.id;
+      }
 
       // Insert contract (snapshot of all responsible data)
       const generatedNumber = contractNumber.trim() || Date.now().toString().slice(-6);
