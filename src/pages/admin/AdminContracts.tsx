@@ -139,6 +139,7 @@ const AdminContracts = () => {
   // Form state
   const [responsibleId, setResponsibleId] = useState("");
   const [studentId, setStudentId] = useState("");
+  const [newStudentName, setNewStudentName] = useState("");
   const [responsibleName, setResponsibleName] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [rg, setRg] = useState("");
