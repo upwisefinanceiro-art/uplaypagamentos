@@ -265,6 +265,7 @@ const AdminContracts = () => {
     if (!zipCode.trim()) return "CEP é obrigatório";
     if (!resolvedUnitId) return "Unidade é obrigatória";
     if (responsibleMode === "existing" && !studentId) return "Selecione o aluno";
+    if (responsibleMode === "new" && !newStudentName.trim()) return "Nome do aluno é obrigatório";
     if (responsibleMode === "new" && saveResponsibleToBase && !password.trim()) return "Senha do responsável é obrigatória para salvar na base";
     if (!description.trim()) return "Curso/descrição é obrigatório";
     if (!startDate) return "Data de início é obrigatória";
