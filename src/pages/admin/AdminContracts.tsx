@@ -554,6 +554,13 @@ const AdminContracts = () => {
         </div>
       )}
 
+      {responsibleMode === "new" && (
+        <div className="space-y-1 mb-3">
+          <Label className="text-foreground text-xs">Nome do Aluno *</Label>
+          <Input className="bg-input border-border text-foreground" placeholder="Nome completo do aluno" value={newStudentName} onChange={e => setNewStudentName(e.target.value)} />
+        </div>
+      )}
+
       {/* Personal data fields - shown in both modes (editable snapshot) */}
       <p className="text-xs font-medium text-muted-foreground mb-2">Dados Pessoais</p>
       <div className="space-y-3">
