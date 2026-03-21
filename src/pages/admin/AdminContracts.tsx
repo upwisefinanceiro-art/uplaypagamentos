@@ -139,6 +139,7 @@ const AdminContracts = () => {
   // Form state
   const [responsibleId, setResponsibleId] = useState("");
   const [studentId, setStudentId] = useState("");
+  const [newStudentName, setNewStudentName] = useState("");
   const [responsibleName, setResponsibleName] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [rg, setRg] = useState("");
@@ -264,6 +265,7 @@ const AdminContracts = () => {
     if (!zipCode.trim()) return "CEP é obrigatório";
     if (!resolvedUnitId) return "Unidade é obrigatória";
     if (responsibleMode === "existing" && !studentId) return "Selecione o aluno";
+    if (responsibleMode === "new" && !newStudentName.trim()) return "Nome do aluno é obrigatório";
     if (responsibleMode === "new" && saveResponsibleToBase && !password.trim()) return "Senha do responsável é obrigatória para salvar na base";
     if (!description.trim()) return "Curso/descrição é obrigatório";
     if (!startDate) return "Data de início é obrigatória";
@@ -321,7 +323,17 @@ const AdminContracts = () => {
 
       if (!finalResponsibleId) throw new Error("ID do responsável não encontrado");
 
-      const finalStudentId = responsibleMode === "existing" ? studentId : finalResponsibleId;
+      let finalStudentId = studentId;
+      if (responsibleMode === "new") {
+        // Create student record first
+        const { data: newStudent, error: studentErr } = await supabase.from("students").insert({
+          full_name: newStudentName.trim(),
+          responsible_id: finalResponsibleId,
+          unit_id: resolvedUnitId,
+        }).select("id").single();
+        if (studentErr) throw new Error("Erro ao criar aluno: " + studentErr.message);
+        finalStudentId = newStudent.id;
+      }
 
       // Insert contract (snapshot of all responsible data)
       const generatedNumber = contractNumber.trim() || Date.now().toString().slice(-6);
@@ -539,6 +551,13 @@ const AdminContracts = () => {
               <Input className="bg-input border-border text-foreground" type="password" placeholder="Mínimo 6 caracteres" value={password} onChange={e => setPassword(e.target.value)} />
             </div>
           )}
+        </div>
+      )}
+
+      {responsibleMode === "new" && (
+        <div className="space-y-1 mb-3">
+          <Label className="text-foreground text-xs">Nome do Aluno *</Label>
+          <Input className="bg-input border-border text-foreground" placeholder="Nome completo do aluno" value={newStudentName} onChange={e => setNewStudentName(e.target.value)} />
         </div>
       )}
 
@@ -908,10 +927,16 @@ const AdminContracts = () => {
                         <span className="text-foreground font-mono">{contractNumber.trim() || "(gerado automaticamente)"}</span>
                       </>
                     )}
-                    {responsibleMode === "existing" && selectedStudent && (
+                    {(responsibleMode === "existing" && selectedStudent) && (
                       <>
                         <span className="text-muted-foreground">Aluno:</span>
                         <span className="text-foreground font-medium">{selectedStudent.full_name}</span>
+                      </>
+                    )}
+                    {responsibleMode === "new" && newStudentName.trim() && (
+                      <>
+                        <span className="text-muted-foreground">Aluno:</span>
+                        <span className="text-foreground font-medium">{newStudentName}</span>
                       </>
                     )}
                     <span className="text-muted-foreground">Unidade:</span>
