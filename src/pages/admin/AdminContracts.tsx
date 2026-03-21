@@ -205,15 +205,19 @@ const AdminContracts = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const [contractsRes, studentsRes, responsiblesRes, unitsRes] = await Promise.all([
+    const [contractsRes, studentsRes, responsiblesRes, unitsRes, adminRolesRes] = await Promise.all([
       supabase.from("contracts").select("*, units(name), students(full_name)").order("created_at", { ascending: false }),
       supabase.from("students").select("id, full_name, responsible_id, unit_id").eq("active", true),
       supabase.from("profiles").select("id, full_name, cpf, phone, email, unit_id, asaas_customer_id").eq("active", true),
       supabase.from("units").select("id, name").eq("active", true),
+      supabase.from("user_roles").select("user_id").in("role", ["ADMIN_MASTER", "ADMIN_UNIDADE"]),
     ]);
     if (contractsRes.data) setContracts(contractsRes.data as any);
     if (studentsRes.data) setStudents(studentsRes.data);
-    if (responsiblesRes.data) setResponsibles(responsiblesRes.data as any);
+    const adminIds = new Set((adminRolesRes.data || []).map((r: any) => r.user_id));
+    if (responsiblesRes.data) {
+      setResponsibles((responsiblesRes.data as any).filter((p: any) => !adminIds.has(p.id)));
+    }
     if (unitsRes.data) setUnits(unitsRes.data);
     setLoading(false);
   };
