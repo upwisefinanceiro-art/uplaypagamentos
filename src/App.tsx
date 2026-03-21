@@ -14,6 +14,7 @@ import AppPaymentDetail from "./pages/app/AppPaymentDetail";
 import AppProfile from "./pages/app/AppProfile";
 import AdminLayout from "./components/layouts/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminAdmins from "./pages/admin/AdminAdmins";
 import AdminUnits from "./pages/admin/AdminUnits";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminClients from "./pages/admin/AdminClients";
@@ -53,6 +54,7 @@ const App = () => (
               </ProtectedRoute>
             }>
               <Route index element={<AdminDashboard />} />
+              <Route path="administradores" element={<AdminAdmins />} />
               <Route path="unidades" element={<AdminUnits />} />
               <Route path="usuarios" element={<AdminUsers />} />
               <Route path="clientes" element={<AdminClients />} />
