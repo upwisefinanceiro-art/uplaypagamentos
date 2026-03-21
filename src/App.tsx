@@ -54,6 +54,7 @@ const App = () => (
               </ProtectedRoute>
             }>
               <Route index element={<AdminDashboard />} />
+              <Route path="administradores" element={<AdminAdmins />} />
               <Route path="unidades" element={<AdminUnits />} />
               <Route path="usuarios" element={<AdminUsers />} />
               <Route path="clientes" element={<AdminClients />} />
