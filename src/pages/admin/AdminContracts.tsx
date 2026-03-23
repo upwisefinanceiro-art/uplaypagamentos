@@ -900,8 +900,11 @@ const AdminContracts = () => {
                     <span className="text-right">Valor</span>
                   </div>
                   {Array.from({ length: apostilasCount }).map((_, i) => {
-                    const d = new Date(apostilasStartDate + "T12:00:00");
-                    d.setMonth(d.getMonth() + (i * apostilasIntervalMonths));
+                    const base = new Date(apostilasStartDate + "T12:00:00");
+                    const dayOfM = base.getDate();
+                    const d = addMonths(base, i * apostilasIntervalMonths);
+                    const ld = lastDayOfMonth(d).getDate();
+                    const adjusted = setDateFns(d, Math.min(dayOfM, ld));
                     let parcValue = Math.floor(apostilasInstallmentValue * 100) / 100;
                     if (i === apostilasCount - 1) {
                       parcValue = Math.round((apostilasTotalValue - parcValue * (apostilasCount - 1)) * 100) / 100;
