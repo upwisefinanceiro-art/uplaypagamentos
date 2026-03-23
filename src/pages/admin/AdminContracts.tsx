@@ -678,8 +678,17 @@ const AdminContracts = () => {
             <Input className="bg-input border-border text-foreground" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
           </div>
           <div className="space-y-1">
-            <Label className="text-foreground text-xs">Data do 1º Vencimento *</Label>
-            <Input className="bg-input border-border text-foreground" type="date" value={firstDueDate} onChange={e => setFirstDueDate(e.target.value)} />
+            <Label className="text-foreground text-xs">Método de Pagamento *</Label>
+            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+              <SelectTrigger className="bg-input border-border text-foreground"><SelectValue placeholder="Selecione" /></SelectTrigger>
+              <SelectContent className="bg-card border-border">
+                <SelectItem value="PIX">PIX</SelectItem>
+                <SelectItem value="BOLETO">Boleto</SelectItem>
+                <SelectItem value="CARD">Cartão</SelectItem>
+                <SelectItem value="DINHEIRO">Dinheiro</SelectItem>
+                <SelectItem value="ASAAS">Asaas</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
         <div className="space-y-1">
