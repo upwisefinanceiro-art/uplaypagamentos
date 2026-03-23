@@ -76,6 +76,7 @@ export type DashboardStudent = {
   unit_id: string;
   full_name: string;
   responsible_id: string;
+  birth_date: string | null;
 };
 
 const AdminDashboard = () => {
