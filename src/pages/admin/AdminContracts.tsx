@@ -695,18 +695,75 @@ const AdminContracts = () => {
     </div>
   );
 
+  // Generate installment dates for preview
+  const generateInstallmentDates = (baseDateStr: string, count: number) => {
+    if (!baseDateStr || count <= 0) return [];
+    const baseDate = new Date(baseDateStr + "T12:00:00");
+    const dayOfMonth = baseDate.getDate();
+    const dates: Date[] = [];
+    for (let i = 0; i < count; i++) {
+      const d = addMonths(baseDate, i);
+      // Clamp to last day of month if needed
+      const lastDay = lastDayOfMonth(d).getDate();
+      const clampedDay = Math.min(dayOfMonth, lastDay);
+      const adjusted = setDateFns(d, clampedDay);
+      dates.push(adjusted);
+    }
+    return dates;
+  };
+
+  const installmentDates = useMemo(() => generateInstallmentDates(firstDueDate, numInstallments), [firstDueDate, numInstallments]);
+
+  const firstDueDateObj = firstDueDate ? new Date(firstDueDate + "T12:00:00") : undefined;
+
   const renderInstallmentSection = () => (
     <div>
       <h3 className="text-sm font-semibold text-primary mb-3">D. Parcelamento</h3>
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
-            <Label className="text-foreground text-xs">Nº de Parcelas (mensalidades) *</Label>
-            <Input className="bg-input border-border text-foreground" type="number" min="1" value={installments} onChange={e => setInstallments(e.target.value)} />
+            <Label className="text-foreground text-xs">Data do 1º Vencimento *</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal bg-input border-border text-foreground",
+                    !firstDueDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {firstDueDateObj ? format(firstDueDateObj, "dd/MM/yyyy", { locale: ptBR }) : <span>Selecione a data</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={firstDueDateObj}
+                  onSelect={(date) => {
+                    if (date) {
+                      const y = date.getFullYear();
+                      const m = String(date.getMonth() + 1).padStart(2, "0");
+                      const d = String(date.getDate()).padStart(2, "0");
+                      setFirstDueDate(`${y}-${m}-${d}`);
+                    } else {
+                      setFirstDueDate("");
+                    }
+                  }}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+            {firstDueDate && (
+              <p className="text-[11px] text-muted-foreground">
+                Dia de vencimento: <span className="font-semibold text-foreground">{new Date(firstDueDate + "T12:00:00").getDate()}</span> (aplicado a todas as parcelas)
+              </p>
+            )}
           </div>
           <div className="space-y-1">
-            <Label className="text-foreground text-xs">Dia de Vencimento</Label>
-            <Input className="bg-input border-border text-foreground" type="number" min="1" max="28" placeholder="Herda do 1º vencimento" value={dueDay} onChange={e => setDueDay(e.target.value)} />
+            <Label className="text-foreground text-xs">Nº de Parcelas (mensalidades) *</Label>
+            <Input className="bg-input border-border text-foreground" type="number" min="1" value={installments} onChange={e => setInstallments(e.target.value)} />
           </div>
         </div>
         <div className="grid grid-cols-3 gap-3">
@@ -749,10 +806,29 @@ const AdminContracts = () => {
               <p className="text-xs text-muted-foreground">Desc. pontualidade/parcela: <span className="font-semibold text-destructive">-{fmt(installmentDiscount)}</span></p>
             )}
             <p className="text-xs text-muted-foreground">Parcela com desconto: <span className="font-semibold text-primary">{fmt(installmentFinalValue)}</span></p>
-            <p className="text-xs text-muted-foreground">Mensalidades geradas: <span className="font-semibold text-foreground">{numInstallments} parcelas com esses mesmos valores por parcela</span></p>
             <Separator />
             <p className="text-xs text-muted-foreground">Total sem desconto ({numInstallments}x): <span className="font-semibold text-foreground">{fmt(courseTotalWithoutDiscount)}</span></p>
             <p className="text-xs text-muted-foreground">Total com desconto ({numInstallments}x): <span className="font-semibold text-primary">{fmt(courseTotalWithDiscount)}</span></p>
+          </div>
+        )}
+        {/* Installment dates preview */}
+        {installmentDates.length > 0 && realValue > 0 && (
+          <div className="p-3 rounded-md border border-border bg-muted/30 space-y-2">
+            <p className="text-xs font-medium text-primary">Próximos vencimentos:</p>
+            <div className="border border-border rounded-md overflow-hidden">
+              <div className="grid grid-cols-3 bg-muted/80 px-3 py-1.5 text-xs font-semibold text-muted-foreground">
+                <span>#</span>
+                <span>Vencimento</span>
+                <span className="text-right">Valor</span>
+              </div>
+              {installmentDates.map((d, i) => (
+                <div key={i} className="grid grid-cols-3 px-3 py-1.5 text-xs border-t border-border">
+                  <span className="text-foreground">Parcela {i + 1}</span>
+                  <span className="text-foreground">{format(d, "dd/MM/yyyy", { locale: ptBR })}</span>
+                  <span className="text-right font-medium text-primary">{fmt(installmentFinalValue)}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
