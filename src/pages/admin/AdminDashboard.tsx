@@ -264,6 +264,35 @@ const AdminDashboard = () => {
     };
   }, [payments, students, units, unitFilter, periodFilter]);
 
+  // Birthday computation
+  const todayBirthdays = useMemo((): BirthdayPerson[] => {
+    const now = new Date();
+    const todayMonth = now.getMonth() + 1;
+    const todayDay = now.getDate();
+
+    const result: BirthdayPerson[] = [];
+
+    // Students with birth_date
+    students.filter(s => s.active && s.birth_date).forEach(s => {
+      const [, m, d] = s.birth_date!.split("-").map(Number);
+      if (m === todayMonth && d === todayDay) {
+        result.push({
+          id: s.id,
+          name: s.full_name,
+          type: "Aluno",
+          birthDate: s.birth_date!,
+          unitName: getUnitName(s.unit_id),
+          phone: getProfilePhone(s.responsible_id),
+        });
+      }
+    });
+
+    return unitFilter === "all" ? result : result.filter(b => {
+      const st = students.find(s => s.id === b.id);
+      return st && st.unit_id === unitFilter;
+    });
+  }, [students, units, profiles, unitFilter]);
+
   const getProfileName = (id: string) =>
     profiles.find((p) => p.id === id)?.full_name ?? "—";
 
