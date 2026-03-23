@@ -381,19 +381,22 @@ const AdminContracts = () => {
 
       if (contractErr) throw contractErr;
 
-      // Generate course installments
+      // Generate course installments using clamped dates
       const baseDueDate = new Date(firstDueDate + "T12:00:00");
+      const baseDayOfMonth = baseDueDate.getDate();
       const payments: any[] = [];
       for (let i = 0; i < numInstallments; i++) {
-        const dueDate = new Date(baseDueDate);
-        dueDate.setMonth(dueDate.getMonth() + i);
+        const d = addMonths(baseDueDate, i);
+        const lastDay = lastDayOfMonth(d).getDate();
+        const clampedDay = Math.min(baseDayOfMonth, lastDay);
+        const dueDate = setDateFns(d, clampedDay);
         payments.push({
           contract_id: contract.id,
           unit_id: resolvedUnitId,
           responsible_id: finalResponsibleId,
           student_id: finalStudentId,
           installment_number: i + 1,
-          due_date: dueDate.toISOString().split("T")[0],
+          due_date: format(dueDate, "yyyy-MM-dd"),
           value: installmentFinalValue,
           original_value: installmentRealValue,
           punctuality_discount: installmentDiscount,
