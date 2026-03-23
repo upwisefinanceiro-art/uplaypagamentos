@@ -40,6 +40,7 @@ import DashboardOverdueList from "@/components/dashboard/DashboardOverdueList";
 import DashboardDueTodayList from "@/components/dashboard/DashboardDueTodayList";
 import DashboardRecentPaid from "@/components/dashboard/DashboardRecentPaid";
 import DashboardUnitSummary from "@/components/dashboard/DashboardUnitSummary";
+import DashboardBirthdays, { type BirthdayPerson } from "@/components/dashboard/DashboardBirthdays";
 import { useToast } from "@/hooks/use-toast";
 
 
