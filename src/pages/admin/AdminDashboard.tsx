@@ -441,6 +441,12 @@ const AdminDashboard = () => {
         formatCurrency={formatCurrency}
       />
 
+      {/* Birthdays */}
+      <DashboardBirthdays
+        birthdays={todayBirthdays}
+        onSendGreeting={openBirthdayWhatsApp}
+      />
+
       {/* Main lists grid */}
       <div className="grid lg:grid-cols-2 gap-4">
         {/* Overdue */}
