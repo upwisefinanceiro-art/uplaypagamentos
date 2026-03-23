@@ -131,7 +131,7 @@ const AdminDashboard = () => {
           ? supabase.from("units").select("id, name").eq("active", true)
           : supabase.from("units").select("id, name").eq("id", userProfile?.unit_id ?? ""),
         supabase.from("profiles").select("id, full_name, phone"),
-        supabase.from("students").select("id, active, unit_id, full_name, responsible_id"),
+        supabase.from("students").select("id, active, unit_id, full_name, responsible_id, birth_date"),
       ]);
 
       if (paymentsRes.data) setPayments(paymentsRes.data);
