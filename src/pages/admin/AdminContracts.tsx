@@ -165,7 +165,7 @@ const AdminContracts = () => {
   const [courseRealValue, setCourseRealValue] = useState("");
   const [punctualityDiscount, setPunctualityDiscount] = useState("0");
   const [installments, setInstallments] = useState("1");
-  const [dueDay, setDueDay] = useState("");
+  // dueDay is now derived from firstDueDate
   const [paymentMethod, setPaymentMethod] = useState("");
   const [notes, setNotes] = useState("");
   const [password, setPassword] = useState("");
