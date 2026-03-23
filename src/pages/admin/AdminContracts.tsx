@@ -1,6 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Loader2, UserPlus, UserCheck, Save, Trash2, ExternalLink, Search } from "lucide-react";
+import { Plus, Loader2, UserPlus, UserCheck, Save, Trash2, ExternalLink, Search, CalendarIcon } from "lucide-react";
+import { format, addMonths, lastDayOfMonth, setDate as setDateFns } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
