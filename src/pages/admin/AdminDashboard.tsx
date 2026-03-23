@@ -40,6 +40,7 @@ import DashboardOverdueList from "@/components/dashboard/DashboardOverdueList";
 import DashboardDueTodayList from "@/components/dashboard/DashboardDueTodayList";
 import DashboardRecentPaid from "@/components/dashboard/DashboardRecentPaid";
 import DashboardUnitSummary from "@/components/dashboard/DashboardUnitSummary";
+import DashboardBirthdays, { type BirthdayPerson } from "@/components/dashboard/DashboardBirthdays";
 import { useToast } from "@/hooks/use-toast";
 
 
@@ -75,6 +76,7 @@ export type DashboardStudent = {
   unit_id: string;
   full_name: string;
   responsible_id: string;
+  birth_date: string | null;
 };
 
 const AdminDashboard = () => {
@@ -129,7 +131,7 @@ const AdminDashboard = () => {
           ? supabase.from("units").select("id, name").eq("active", true)
           : supabase.from("units").select("id, name").eq("id", userProfile?.unit_id ?? ""),
         supabase.from("profiles").select("id, full_name, phone"),
-        supabase.from("students").select("id, active, unit_id, full_name, responsible_id"),
+        supabase.from("students").select("id, active, unit_id, full_name, responsible_id, birth_date"),
       ]);
 
       if (paymentsRes.data) setPayments(paymentsRes.data);
@@ -262,6 +264,35 @@ const AdminDashboard = () => {
     };
   }, [payments, students, units, unitFilter, periodFilter]);
 
+  // Birthday computation
+  const todayBirthdays = useMemo((): BirthdayPerson[] => {
+    const now = new Date();
+    const todayMonth = now.getMonth() + 1;
+    const todayDay = now.getDate();
+
+    const result: BirthdayPerson[] = [];
+
+    // Students with birth_date
+    students.filter(s => s.active && s.birth_date).forEach(s => {
+      const [, m, d] = s.birth_date!.split("-").map(Number);
+      if (m === todayMonth && d === todayDay) {
+        result.push({
+          id: s.id,
+          name: s.full_name,
+          type: "Aluno",
+          birthDate: s.birth_date!,
+          unitName: getUnitName(s.unit_id),
+          phone: getProfilePhone(s.responsible_id),
+        });
+      }
+    });
+
+    return unitFilter === "all" ? result : result.filter(b => {
+      const st = students.find(s => s.id === b.id);
+      return st && st.unit_id === unitFilter;
+    });
+  }, [students, units, profiles, unitFilter]);
+
   const getProfileName = (id: string) =>
     profiles.find((p) => p.id === id)?.full_name ?? "—";
 
@@ -276,6 +307,18 @@ const AdminDashboard = () => {
 
   const formatCurrency = (v: number) =>
     v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  const openBirthdayWhatsApp = (person: BirthdayPerson) => {
+    const msg = `Olá, ${person.name}! A equipe da EnsinUP deseja um feliz aniversário! 🎉`;
+    if (person.phone) {
+      const digits = person.phone.replace(/\D/g, "");
+      const clean = digits.startsWith("55") ? digits : `55${digits}`;
+      window.open(`https://wa.me/${clean}?text=${encodeURIComponent(msg)}`, "_blank");
+    } else {
+      navigator.clipboard.writeText(msg);
+      toast({ title: "Mensagem copiada!", description: "O contato não possui telefone cadastrado. A mensagem foi copiada." });
+    }
+  };
 
   const openWhatsApp = (payment: DashboardPayment) => {
     const student = getStudentByResponsible(payment.responsible_id);
@@ -396,6 +439,12 @@ const AdminDashboard = () => {
         activeStudents={filtered.activeStudents}
         inadimplencia={filtered.inadimplencia}
         formatCurrency={formatCurrency}
+      />
+
+      {/* Birthdays */}
+      <DashboardBirthdays
+        birthdays={todayBirthdays}
+        onSendGreeting={openBirthdayWhatsApp}
       />
 
       {/* Main lists grid */}
