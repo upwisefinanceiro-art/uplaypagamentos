@@ -308,6 +308,18 @@ const AdminDashboard = () => {
   const formatCurrency = (v: number) =>
     v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+  const openBirthdayWhatsApp = (person: BirthdayPerson) => {
+    const msg = `Olá, ${person.name}! A equipe da EnsinUP deseja um feliz aniversário! 🎉`;
+    if (person.phone) {
+      const digits = person.phone.replace(/\D/g, "");
+      const clean = digits.startsWith("55") ? digits : `55${digits}`;
+      window.open(`https://wa.me/${clean}?text=${encodeURIComponent(msg)}`, "_blank");
+    } else {
+      navigator.clipboard.writeText(msg);
+      toast({ title: "Mensagem copiada!", description: "O contato não possui telefone cadastrado. A mensagem foi copiada." });
+    }
+  };
+
   const openWhatsApp = (payment: DashboardPayment) => {
     const student = getStudentByResponsible(payment.responsible_id);
     setWaDialog({
