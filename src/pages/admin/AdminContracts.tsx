@@ -411,9 +411,12 @@ const AdminContracts = () => {
       // Generate apostilas installments (trimestral by default)
       if (includeApostilas && apostilasCount > 0 && apostilasTotalValue > 0 && apostilasStartDate) {
         const apostilasBase = new Date(apostilasStartDate + "T12:00:00");
+        const apostilasDayOfMonth = apostilasBase.getDate();
         for (let i = 0; i < apostilasCount; i++) {
-          const dueDate = new Date(apostilasBase);
-          dueDate.setMonth(dueDate.getMonth() + (i * apostilasIntervalMonths));
+          const d = addMonths(apostilasBase, i * apostilasIntervalMonths);
+          const lastDay = lastDayOfMonth(d).getDate();
+          const clampedDay = Math.min(apostilasDayOfMonth, lastDay);
+          const dueDate = setDateFns(d, clampedDay);
           // Handle rounding: last installment gets remainder
           let parcValue = Math.floor(apostilasInstallmentValue * 100) / 100;
           if (i === apostilasCount - 1) {
