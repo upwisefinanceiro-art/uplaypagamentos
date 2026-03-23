@@ -912,7 +912,7 @@ const AdminContracts = () => {
                     return (
                       <div key={i} className="grid grid-cols-3 px-3 py-1.5 text-xs border-t border-border">
                         <span className="text-foreground">Apostila {i + 1}</span>
-                        <span className="text-foreground">{d.toLocaleDateString("pt-BR")}</span>
+                        <span className="text-foreground">{format(adjusted, "dd/MM/yyyy", { locale: ptBR })}</span>
                         <span className="text-right font-medium text-primary">{fmt(parcValue)}</span>
                       </div>
                     );
