@@ -355,7 +355,7 @@ const AdminContracts = () => {
         course_real_value: installmentRealValue,
         punctuality_discount: installmentDiscount,
         final_value_with_discount: installmentFinalValue,
-        due_day: parseInt(dueDay) || parseInt(firstDueDate.split("-")[2]) || 1,
+        due_day: firstDueDate ? parseInt(firstDueDate.split("-")[2]) || 1 : 1,
         payment_method: paymentMethod,
         responsible_name: responsibleName,
         birth_date: birthDate,
