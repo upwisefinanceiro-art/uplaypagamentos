@@ -1,6 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Loader2, UserPlus, UserCheck, Save, Trash2, ExternalLink, Search } from "lucide-react";
+import { Plus, Loader2, UserPlus, UserCheck, Save, Trash2, ExternalLink, Search, CalendarIcon } from "lucide-react";
+import { format, addMonths, lastDayOfMonth, setDate as setDateFns } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -160,7 +165,7 @@ const AdminContracts = () => {
   const [courseRealValue, setCourseRealValue] = useState("");
   const [punctualityDiscount, setPunctualityDiscount] = useState("0");
   const [installments, setInstallments] = useState("1");
-  const [dueDay, setDueDay] = useState("");
+  // dueDay is now derived from firstDueDate
   const [paymentMethod, setPaymentMethod] = useState("");
   const [notes, setNotes] = useState("");
   const [password, setPassword] = useState("");
@@ -242,7 +247,7 @@ const AdminContracts = () => {
     setComplement(""); setNeighborhood(""); setCity(""); setState("");
     setZipCode(""); setUnitId(""); setDescription(""); setStartDate("");
     setFirstDueDate(""); setCourseRealValue(""); setPunctualityDiscount("0");
-    setInstallments("1"); setDueDay(""); setPaymentMethod(""); setNotes("");
+    setInstallments("1"); setPaymentMethod(""); setNotes("");
     setPassword(""); setContractNumber(""); setStep("form"); setSaveResponsibleToBase(false);
     setIncludeApostilas(false); setApostilasTotal(""); setApostilasQty("1");
     setApostilasStartDate(""); setApostilasInterval("3");
@@ -350,7 +355,7 @@ const AdminContracts = () => {
         course_real_value: installmentRealValue,
         punctuality_discount: installmentDiscount,
         final_value_with_discount: installmentFinalValue,
-        due_day: parseInt(dueDay) || parseInt(firstDueDate.split("-")[2]) || 1,
+        due_day: firstDueDate ? parseInt(firstDueDate.split("-")[2]) || 1 : 1,
         payment_method: paymentMethod,
         responsible_name: responsibleName,
         birth_date: birthDate,
@@ -376,19 +381,22 @@ const AdminContracts = () => {
 
       if (contractErr) throw contractErr;
 
-      // Generate course installments
+      // Generate course installments using clamped dates
       const baseDueDate = new Date(firstDueDate + "T12:00:00");
+      const baseDayOfMonth = baseDueDate.getDate();
       const payments: any[] = [];
       for (let i = 0; i < numInstallments; i++) {
-        const dueDate = new Date(baseDueDate);
-        dueDate.setMonth(dueDate.getMonth() + i);
+        const d = addMonths(baseDueDate, i);
+        const lastDay = lastDayOfMonth(d).getDate();
+        const clampedDay = Math.min(baseDayOfMonth, lastDay);
+        const dueDate = setDateFns(d, clampedDay);
         payments.push({
           contract_id: contract.id,
           unit_id: resolvedUnitId,
           responsible_id: finalResponsibleId,
           student_id: finalStudentId,
           installment_number: i + 1,
-          due_date: dueDate.toISOString().split("T")[0],
+          due_date: format(dueDate, "yyyy-MM-dd"),
           value: installmentFinalValue,
           original_value: installmentRealValue,
           punctuality_discount: installmentDiscount,
@@ -403,9 +411,12 @@ const AdminContracts = () => {
       // Generate apostilas installments (trimestral by default)
       if (includeApostilas && apostilasCount > 0 && apostilasTotalValue > 0 && apostilasStartDate) {
         const apostilasBase = new Date(apostilasStartDate + "T12:00:00");
+        const apostilasDayOfMonth = apostilasBase.getDate();
         for (let i = 0; i < apostilasCount; i++) {
-          const dueDate = new Date(apostilasBase);
-          dueDate.setMonth(dueDate.getMonth() + (i * apostilasIntervalMonths));
+          const d = addMonths(apostilasBase, i * apostilasIntervalMonths);
+          const lastDay = lastDayOfMonth(d).getDate();
+          const clampedDay = Math.min(apostilasDayOfMonth, lastDay);
+          const dueDate = setDateFns(d, clampedDay);
           // Handle rounding: last installment gets remainder
           let parcValue = Math.floor(apostilasInstallmentValue * 100) / 100;
           if (i === apostilasCount - 1) {
@@ -417,7 +428,7 @@ const AdminContracts = () => {
             responsible_id: finalResponsibleId,
             student_id: finalStudentId,
             installment_number: numInstallments + i + 1,
-            due_date: dueDate.toISOString().split("T")[0],
+            due_date: format(dueDate, "yyyy-MM-dd"),
             value: parcValue,
             original_value: parcValue,
             punctuality_discount: 0,
@@ -673,26 +684,43 @@ const AdminContracts = () => {
             <Input className="bg-input border-border text-foreground" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
           </div>
           <div className="space-y-1">
-            <Label className="text-foreground text-xs">Data do 1º Vencimento *</Label>
-            <Input className="bg-input border-border text-foreground" type="date" value={firstDueDate} onChange={e => setFirstDueDate(e.target.value)} />
+            <Label className="text-foreground text-xs">Método de Pagamento *</Label>
+            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+              <SelectTrigger className="bg-input border-border text-foreground"><SelectValue placeholder="Selecione" /></SelectTrigger>
+              <SelectContent className="bg-card border-border">
+                <SelectItem value="PIX">PIX</SelectItem>
+                <SelectItem value="BOLETO">Boleto</SelectItem>
+                <SelectItem value="CARD">Cartão</SelectItem>
+                <SelectItem value="DINHEIRO">Dinheiro</SelectItem>
+                <SelectItem value="ASAAS">Asaas</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        </div>
-        <div className="space-y-1">
-          <Label className="text-foreground text-xs">Método de Pagamento *</Label>
-          <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-            <SelectTrigger className="bg-input border-border text-foreground"><SelectValue placeholder="Selecione" /></SelectTrigger>
-            <SelectContent className="bg-card border-border">
-              <SelectItem value="PIX">PIX</SelectItem>
-              <SelectItem value="BOLETO">Boleto</SelectItem>
-              <SelectItem value="CARD">Cartão</SelectItem>
-              <SelectItem value="DINHEIRO">Dinheiro</SelectItem>
-              <SelectItem value="ASAAS">Asaas</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
       </div>
     </div>
   );
+
+  // Generate installment dates for preview
+  const generateInstallmentDates = (baseDateStr: string, count: number) => {
+    if (!baseDateStr || count <= 0) return [];
+    const baseDate = new Date(baseDateStr + "T12:00:00");
+    const dayOfMonth = baseDate.getDate();
+    const dates: Date[] = [];
+    for (let i = 0; i < count; i++) {
+      const d = addMonths(baseDate, i);
+      // Clamp to last day of month if needed
+      const lastDay = lastDayOfMonth(d).getDate();
+      const clampedDay = Math.min(dayOfMonth, lastDay);
+      const adjusted = setDateFns(d, clampedDay);
+      dates.push(adjusted);
+    }
+    return dates;
+  };
+
+  const installmentDates = useMemo(() => generateInstallmentDates(firstDueDate, numInstallments), [firstDueDate, numInstallments]);
+
+  const firstDueDateObj = firstDueDate ? new Date(firstDueDate + "T12:00:00") : undefined;
 
   const renderInstallmentSection = () => (
     <div>
@@ -700,12 +728,48 @@ const AdminContracts = () => {
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
-            <Label className="text-foreground text-xs">Nº de Parcelas (mensalidades) *</Label>
-            <Input className="bg-input border-border text-foreground" type="number" min="1" value={installments} onChange={e => setInstallments(e.target.value)} />
+            <Label className="text-foreground text-xs">Data do 1º Vencimento *</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal bg-input border-border text-foreground",
+                    !firstDueDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {firstDueDateObj ? format(firstDueDateObj, "dd/MM/yyyy", { locale: ptBR }) : <span>Selecione a data</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={firstDueDateObj}
+                  onSelect={(date) => {
+                    if (date) {
+                      const y = date.getFullYear();
+                      const m = String(date.getMonth() + 1).padStart(2, "0");
+                      const d = String(date.getDate()).padStart(2, "0");
+                      setFirstDueDate(`${y}-${m}-${d}`);
+                    } else {
+                      setFirstDueDate("");
+                    }
+                  }}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+            {firstDueDate && (
+              <p className="text-[11px] text-muted-foreground">
+                Dia de vencimento: <span className="font-semibold text-foreground">{new Date(firstDueDate + "T12:00:00").getDate()}</span> (aplicado a todas as parcelas)
+              </p>
+            )}
           </div>
           <div className="space-y-1">
-            <Label className="text-foreground text-xs">Dia de Vencimento</Label>
-            <Input className="bg-input border-border text-foreground" type="number" min="1" max="28" placeholder="Herda do 1º vencimento" value={dueDay} onChange={e => setDueDay(e.target.value)} />
+            <Label className="text-foreground text-xs">Nº de Parcelas (mensalidades) *</Label>
+            <Input className="bg-input border-border text-foreground" type="number" min="1" value={installments} onChange={e => setInstallments(e.target.value)} />
           </div>
         </div>
         <div className="grid grid-cols-3 gap-3">
@@ -748,10 +812,29 @@ const AdminContracts = () => {
               <p className="text-xs text-muted-foreground">Desc. pontualidade/parcela: <span className="font-semibold text-destructive">-{fmt(installmentDiscount)}</span></p>
             )}
             <p className="text-xs text-muted-foreground">Parcela com desconto: <span className="font-semibold text-primary">{fmt(installmentFinalValue)}</span></p>
-            <p className="text-xs text-muted-foreground">Mensalidades geradas: <span className="font-semibold text-foreground">{numInstallments} parcelas com esses mesmos valores por parcela</span></p>
             <Separator />
             <p className="text-xs text-muted-foreground">Total sem desconto ({numInstallments}x): <span className="font-semibold text-foreground">{fmt(courseTotalWithoutDiscount)}</span></p>
             <p className="text-xs text-muted-foreground">Total com desconto ({numInstallments}x): <span className="font-semibold text-primary">{fmt(courseTotalWithDiscount)}</span></p>
+          </div>
+        )}
+        {/* Installment dates preview */}
+        {installmentDates.length > 0 && realValue > 0 && (
+          <div className="p-3 rounded-md border border-border bg-muted/30 space-y-2">
+            <p className="text-xs font-medium text-primary">Próximos vencimentos:</p>
+            <div className="border border-border rounded-md overflow-hidden">
+              <div className="grid grid-cols-3 bg-muted/80 px-3 py-1.5 text-xs font-semibold text-muted-foreground">
+                <span>#</span>
+                <span>Vencimento</span>
+                <span className="text-right">Valor</span>
+              </div>
+              {installmentDates.map((d, i) => (
+                <div key={i} className="grid grid-cols-3 px-3 py-1.5 text-xs border-t border-border">
+                  <span className="text-foreground">Parcela {i + 1}</span>
+                  <span className="text-foreground">{format(d, "dd/MM/yyyy", { locale: ptBR })}</span>
+                  <span className="text-right font-medium text-primary">{fmt(installmentFinalValue)}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -817,8 +900,11 @@ const AdminContracts = () => {
                     <span className="text-right">Valor</span>
                   </div>
                   {Array.from({ length: apostilasCount }).map((_, i) => {
-                    const d = new Date(apostilasStartDate + "T12:00:00");
-                    d.setMonth(d.getMonth() + (i * apostilasIntervalMonths));
+                    const base = new Date(apostilasStartDate + "T12:00:00");
+                    const dayOfM = base.getDate();
+                    const d = addMonths(base, i * apostilasIntervalMonths);
+                    const ld = lastDayOfMonth(d).getDate();
+                    const adjusted = setDateFns(d, Math.min(dayOfM, ld));
                     let parcValue = Math.floor(apostilasInstallmentValue * 100) / 100;
                     if (i === apostilasCount - 1) {
                       parcValue = Math.round((apostilasTotalValue - parcValue * (apostilasCount - 1)) * 100) / 100;
@@ -826,7 +912,7 @@ const AdminContracts = () => {
                     return (
                       <div key={i} className="grid grid-cols-3 px-3 py-1.5 text-xs border-t border-border">
                         <span className="text-foreground">Apostila {i + 1}</span>
-                        <span className="text-foreground">{d.toLocaleDateString("pt-BR")}</span>
+                        <span className="text-foreground">{format(adjusted, "dd/MM/yyyy", { locale: ptBR })}</span>
                         <span className="text-right font-medium text-primary">{fmt(parcValue)}</span>
                       </div>
                     );
