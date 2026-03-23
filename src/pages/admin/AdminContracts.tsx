@@ -428,7 +428,7 @@ const AdminContracts = () => {
             responsible_id: finalResponsibleId,
             student_id: finalStudentId,
             installment_number: numInstallments + i + 1,
-            due_date: dueDate.toISOString().split("T")[0],
+            due_date: format(dueDate, "yyyy-MM-dd"),
             value: parcValue,
             original_value: parcValue,
             punctuality_discount: 0,
