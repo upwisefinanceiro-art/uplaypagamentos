@@ -397,6 +397,58 @@ const AppPaymentDetail = () => {
               <CheckCircle2 size={14} /> Marcar Pago
             </Button>
           )}
+
+          {/* Sync with Asaas */}
+          {isAdmin && !payment.asaas_payment_id && payment.payment_method !== "DINHEIRO" && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 text-xs border-warning/30 text-warning hover:bg-warning/10"
+              disabled={syncing}
+              onClick={async () => {
+                setSyncing(true);
+                const { data, error } = await supabase.functions.invoke("sync-asaas-payment", {
+                  body: { payment_id: payment.id },
+                });
+                setSyncing(false);
+                if (error || data?.error) {
+                  toast({ title: "Erro ao sincronizar", description: error?.message || data?.error, variant: "destructive" });
+                } else {
+                  toast({ title: data?.action === "created" ? "Cobrança criada no Asaas!" : "Dados atualizados!" });
+                  // Reload page data
+                  window.location.reload();
+                }
+              }}
+            >
+              {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              Enviar ao Asaas
+            </Button>
+          )}
+
+          {isAdmin && payment.asaas_payment_id && !(payment.invoice_url || payment.boleto_url) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2 text-xs"
+              disabled={syncing}
+              onClick={async () => {
+                setSyncing(true);
+                const { data, error } = await supabase.functions.invoke("sync-asaas-payment", {
+                  body: { payment_id: payment.id },
+                });
+                setSyncing(false);
+                if (error || data?.error) {
+                  toast({ title: "Erro ao sincronizar", description: error?.message || data?.error, variant: "destructive" });
+                } else {
+                  toast({ title: "Dados atualizados do Asaas!" });
+                  window.location.reload();
+                }
+              }}
+            >
+              {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              Sincronizar
+            </Button>
+          )}
         </div>
       </div>
 
