@@ -991,9 +991,43 @@ const AdminCharges = () => {
                       </button>
                     </div>
 
-                    {/* Fallback: no Asaas */}
-                    {!payment.asaas_payment_id && (
-                      <span className="text-[10px] text-warning italic">Cobrança não enviada ao Asaas</span>
+                    {/* Sync with Asaas */}
+                    {!payment.asaas_payment_id && payment.payment_method !== "DINHEIRO" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 text-xs h-7 border-warning/40 text-warning hover:bg-warning/10"
+                        disabled={syncingPaymentId === payment.id}
+                        onClick={() => handleSyncPayment(payment.id)}
+                      >
+                        {syncingPaymentId === payment.id ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <RefreshCw size={12} />
+                        )}
+                        Enviar ao Asaas
+                      </Button>
+                    )}
+
+                    {payment.asaas_payment_id && !(payment.invoice_url || payment.boleto_url) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1.5 text-xs h-7"
+                        disabled={syncingPaymentId === payment.id}
+                        onClick={() => handleSyncPayment(payment.id)}
+                      >
+                        {syncingPaymentId === payment.id ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <RefreshCw size={12} />
+                        )}
+                        Sincronizar
+                      </Button>
+                    )}
+
+                    {!payment.asaas_payment_id && payment.payment_method === "DINHEIRO" && (
+                      <span className="text-[10px] text-muted-foreground italic">Pagamento em dinheiro</span>
                     )}
                   </div>
                 </div>
