@@ -857,30 +857,105 @@ const AdminCharges = () => {
 
                   <div className="flex flex-col items-start gap-3 lg:items-end">
                     <p className="text-lg font-bold text-foreground">R$ {paymentValue.toFixed(2).replace(".", ",")}</p>
-                    <div className="flex flex-wrap items-center gap-1">
+
+                    {/* Action buttons row */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {/* Abrir Boleto / Fatura */}
+                      {(payment.invoice_url || payment.boleto_url || payment.checkout_url) ? (
+                        <a
+                          href={payment.invoice_url || payment.boleto_url || payment.checkout_url || "#"}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <Button variant="outline" size="sm" className="gap-1.5 text-xs h-7">
+                            <ExternalLink size={12} /> Abrir Boleto
+                          </Button>
+                        </a>
+                      ) : (
+                        payment.asaas_payment_id && (
+                          <span className="text-[10px] text-muted-foreground italic">Sem link disponível</span>
+                        )
+                      )}
+
+                      {/* Copiar Link */}
+                      {(payment.invoice_url || payment.boleto_url || payment.checkout_url) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 text-xs h-7"
+                          onClick={() => {
+                            const link = payment.invoice_url || payment.boleto_url || payment.checkout_url || "";
+                            navigator.clipboard.writeText(link);
+                            toast({ title: "Link copiado!" });
+                          }}
+                        >
+                          <Copy size={12} /> Copiar Link
+                        </Button>
+                      )}
+
+                      {/* PIX Copia e Cola */}
+                      {payment.pix_copy_paste && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 text-xs h-7"
+                          onClick={() => {
+                            navigator.clipboard.writeText(payment.pix_copy_paste || "");
+                            toast({ title: "Código PIX copiado!" });
+                          }}
+                        >
+                          <Copy size={12} /> PIX
+                        </Button>
+                      )}
+
+                      {/* WhatsApp */}
+                      {(payment.status === "PENDING" || payment.status === "OVERDUE") && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="gap-1.5 text-xs h-7 text-success hover:text-success hover:bg-success/10"
+                          onClick={() => handleOpenWhatsApp(payment)}
+                        >
+                          <MessageCircle size={12} /> WhatsApp
+                        </Button>
+                      )}
+
+                      {/* Ver detalhes */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1.5 text-xs h-7"
+                        onClick={() => navigate(`/app/payment/${payment.id}`)}
+                      >
+                        <ExternalLink size={12} /> Detalhes
+                      </Button>
+                    </div>
+
+                    {/* Management icons */}
+                    <div className="flex items-center gap-0.5">
                       <button
-                        className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                         title="Editar parcela"
                         onClick={() => handleOpenEdit(payment)}
                       >
-                        <Pencil size={14} />
+                        <Pencil size={13} />
                       </button>
                       <button
-                        className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-warning"
-                        title="Marcar como cancelada"
+                        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-warning"
+                        title="Cancelar parcela"
                         onClick={() => setActionTarget({ payment, action: "cancel" })}
                       >
-                        <Ban size={14} />
+                        <Ban size={13} />
                       </button>
                       <button
-                        className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-destructive"
+                        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-destructive"
                         title="Excluir parcela"
                         onClick={() => setActionTarget({ payment, action: "delete" })}
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={13} />
                       </button>
                       <button
-                        className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-primary"
+                        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-primary"
                         title="Gerar nova parcela"
                         onClick={() => openManualDialog({
                           responsibleId: payment.responsible_id,
@@ -891,41 +966,14 @@ const AdminCharges = () => {
                           value: String(payment.final_value ?? payment.value),
                         })}
                       >
-                        <Plus size={14} />
+                        <Plus size={13} />
                       </button>
-                      {payment.pix_copy_paste && (
-                        <button
-                          className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                          title="Copiar PIX"
-                          onClick={() => {
-                            navigator.clipboard.writeText(payment.pix_copy_paste || "");
-                            toast({ title: "Código PIX copiado!" });
-                          }}
-                        >
-                          <Copy size={14} />
-                        </button>
-                      )}
-                      {(payment.status === "PENDING" || payment.status === "OVERDUE") && (
-                        <button
-                          className="rounded-md p-2 text-success transition-colors hover:bg-success/10"
-                          title="Enviar no WhatsApp"
-                          onClick={() => handleOpenWhatsApp(payment)}
-                        >
-                          <MessageCircle size={14} />
-                        </button>
-                      )}
-                      {(payment.invoice_url || payment.boleto_url || payment.checkout_url) && (
-                        <a
-                          href={payment.invoice_url || payment.boleto_url || payment.checkout_url || "#"}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                          title="Abrir link da cobrança"
-                        >
-                          <ExternalLink size={14} />
-                        </a>
-                      )}
                     </div>
+
+                    {/* Fallback: no Asaas */}
+                    {!payment.asaas_payment_id && (
+                      <span className="text-[10px] text-warning italic">Cobrança não enviada ao Asaas</span>
+                    )}
                   </div>
                 </div>
               </div>
