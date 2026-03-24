@@ -432,6 +432,8 @@ export type Database = {
           name: string
           phone: string | null
           updated_at: string
+          usar_whatsapp_padrao: boolean
+          whatsapp_financeiro: string | null
         }
         Insert: {
           active?: boolean
@@ -445,6 +447,8 @@ export type Database = {
           name: string
           phone?: string | null
           updated_at?: string
+          usar_whatsapp_padrao?: boolean
+          whatsapp_financeiro?: string | null
         }
         Update: {
           active?: boolean
@@ -458,6 +462,8 @@ export type Database = {
           name?: string
           phone?: string | null
           updated_at?: string
+          usar_whatsapp_padrao?: boolean
+          whatsapp_financeiro?: string | null
         }
         Relationships: []
       }
