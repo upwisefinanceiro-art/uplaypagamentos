@@ -5,6 +5,20 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function respond(body: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function validateCpf(cpf: string): boolean {
+  const clean = cpf.replace(/\D/g, "");
+  if (clean.length !== 11 && clean.length !== 14) return false;
+  if (/^(\d)\1+$/.test(clean)) return false;
+  return true;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -12,12 +26,7 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Não autorizado" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (!authHeader) return respond({ error: "Não autorizado" }, 401);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -28,23 +37,13 @@ Deno.serve(async (req) => {
     });
 
     const { data: { user: caller } } = await supabaseUser.auth.getUser();
-    if (!caller) {
-      return new Response(JSON.stringify({ error: "Não autorizado" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (!caller) return respond({ error: "Não autorizado" }, 401);
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
     const body = await req.json();
-    const { payment_id, action } = body;
+    const { payment_id } = body;
 
-    if (!payment_id) {
-      return new Response(JSON.stringify({ error: "payment_id é obrigatório" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (!payment_id) return respond({ error: "payment_id é obrigatório" }, 400);
 
     // Check caller is admin
     const { data: callerRoles } = await supabaseAdmin
@@ -55,13 +54,7 @@ Deno.serve(async (req) => {
     const isAdmin = callerRoles?.some((r: { role: string }) =>
       r.role === "ADMIN_MASTER" || r.role === "ADMIN_UNIDADE"
     );
-
-    if (!isAdmin) {
-      return new Response(JSON.stringify({ error: "Sem permissão" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (!isAdmin) return respond({ error: "Sem permissão" }, 403);
 
     // Get payment
     const { data: payment, error: payErr } = await supabaseAdmin
@@ -70,12 +63,7 @@ Deno.serve(async (req) => {
       .eq("id", payment_id)
       .single();
 
-    if (payErr || !payment) {
-      return new Response(JSON.stringify({ error: "Pagamento não encontrado" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (payErr || !payment) return respond({ error: "Pagamento não encontrado" }, 404);
 
     // Get unit with Asaas credentials
     const { data: unit, error: unitErr } = await supabaseAdmin
@@ -85,26 +73,23 @@ Deno.serve(async (req) => {
       .single();
 
     if (unitErr || !unit?.asaas_api_key) {
-      return new Response(JSON.stringify({ error: "Unidade sem credenciais Asaas configuradas" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return respond({ error: "Unidade sem credenciais Asaas configuradas" }, 400);
     }
 
     const baseUrl = unit.asaas_base_url || "https://api.asaas.com/v3";
 
-    // ACTION: "refresh" - payment already has asaas_payment_id, just fetch updated data
+    // ── REFRESH: payment already has asaas_payment_id ──
     if (payment.asaas_payment_id) {
       const asaasRes = await fetch(`${baseUrl}/payments/${payment.asaas_payment_id}`, {
         headers: { access_token: unit.asaas_api_key },
       });
 
       if (!asaasRes.ok) {
-        const errData = await asaasRes.json();
-        return new Response(JSON.stringify({ error: "Erro ao consultar Asaas", details: errData }), {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        const errData = await asaasRes.json().catch(() => ({}));
+        return respond({
+          error: "Erro ao consultar Asaas",
+          details: errData?.errors?.[0]?.description || JSON.stringify(errData),
+        }, 502);
       }
 
       const asaasData = await asaasRes.json();
@@ -126,7 +111,6 @@ Deno.serve(async (req) => {
         } catch { /* non-critical */ }
       }
 
-      // Map Asaas status to our status
       const statusMap: Record<string, string> = {
         PENDING: "PENDING",
         RECEIVED: "PAID",
@@ -151,25 +135,25 @@ Deno.serve(async (req) => {
         updateData.paid_at = asaasData.paymentDate || new Date().toISOString();
       }
 
-      await supabaseAdmin
-        .from("payments")
-        .update(updateData)
-        .eq("id", payment_id);
+      await supabaseAdmin.from("payments").update(updateData).eq("id", payment_id);
 
-      return new Response(JSON.stringify({
+      return respond({
         success: true,
         action: "refreshed",
         invoice_url: updateData.invoice_url,
         boleto_url: updateData.boleto_url,
         pix_copy_paste: updateData.pix_copy_paste,
         status: updateData.status,
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // ACTION: "create" - payment has no asaas_payment_id, create charge in Asaas
+    // ── CREATE: payment has no asaas_payment_id ──
+
+    // Skip DINHEIRO
+    if (payment.payment_method === "DINHEIRO") {
+      return respond({ error: "Cobranças em dinheiro não são enviadas ao Asaas" }, 400);
+    }
+
     // Get responsible
     const { data: responsible, error: respErr } = await supabaseAdmin
       .from("profiles")
@@ -178,13 +162,25 @@ Deno.serve(async (req) => {
       .single();
 
     if (respErr || !responsible) {
-      return new Response(JSON.stringify({ error: "Responsável não encontrado" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return respond({ error: "Responsável não encontrado" }, 404);
     }
 
-    // Ensure customer exists in Asaas
+    // ── VALIDATE required fields ──
+    if (!responsible.cpf || responsible.cpf.trim() === "") {
+      return respond({ error: "CPF do responsável não está cadastrado. Atualize o cadastro antes de sincronizar." }, 400);
+    }
+
+    const cpfClean = responsible.cpf.replace(/\D/g, "");
+
+    if (!validateCpf(cpfClean)) {
+      return respond({ error: `CPF do responsável é inválido: ${responsible.cpf}. Corrija o cadastro.` }, 400);
+    }
+
+    if (!responsible.full_name || responsible.full_name.trim().length < 3) {
+      return respond({ error: "Nome do responsável é obrigatório e deve ter pelo menos 3 caracteres." }, 400);
+    }
+
+    // ── Ensure customer exists in Asaas ──
     let asaasCustomerId = responsible.asaas_customer_id;
 
     if (asaasCustomerId) {
@@ -192,20 +188,31 @@ Deno.serve(async (req) => {
         const checkRes = await fetch(`${baseUrl}/customers/${asaasCustomerId}`, {
           headers: { access_token: unit.asaas_api_key },
         });
-        if (!checkRes.ok) asaasCustomerId = null;
+        if (!checkRes.ok) {
+          console.log(`Customer ${asaasCustomerId} inválido no Asaas, recriando...`);
+          asaasCustomerId = null;
+        }
       } catch {
         asaasCustomerId = null;
       }
     }
 
     if (!asaasCustomerId) {
-      const cpfClean = responsible.cpf.replace(/\D/g, "");
-      const customerPayload = {
-        name: responsible.full_name,
+      const customerPayload: Record<string, unknown> = {
+        name: responsible.full_name.trim(),
         cpfCnpj: cpfClean,
         email: responsible.email || `${cpfClean}@ensinup.app`,
-        mobilePhone: responsible.phone || undefined,
       };
+
+      // Only add phone if valid
+      if (responsible.phone) {
+        const phoneClean = responsible.phone.replace(/\D/g, "");
+        if (phoneClean.length >= 10 && phoneClean.length <= 11) {
+          customerPayload.mobilePhone = phoneClean;
+        }
+      }
+
+      console.log("Criando customer no Asaas:", JSON.stringify(customerPayload));
 
       const customerRes = await fetch(`${baseUrl}/customers`, {
         method: "POST",
@@ -217,36 +224,33 @@ Deno.serve(async (req) => {
       });
 
       const customerData = await customerRes.json();
+
       if (!customerRes.ok) {
-        return new Response(JSON.stringify({ error: "Erro ao criar customer no Asaas", details: customerData }), {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        const detail = customerData?.errors?.[0]?.description
+          || customerData?.errors?.[0]?.code
+          || JSON.stringify(customerData);
+        console.error("Asaas customer error:", JSON.stringify(customerData));
+        return respond({
+          error: `Erro ao criar cliente no Asaas: ${detail}`,
+          details: customerData,
+        }, 502);
       }
 
       asaasCustomerId = customerData.id;
       await supabaseAdmin.from("profiles").update({ asaas_customer_id: asaasCustomerId }).eq("id", payment.responsible_id);
+      console.log("Customer criado:", asaasCustomerId);
     }
 
-    // Determine billing type
+    // ── Determine billing type ──
     const billingTypeMap: Record<string, string> = {
       PIX: "PIX",
       BOLETO: "BOLETO",
       CARD: "CREDIT_CARD",
-      ASAAS: "BOLETO", // Default ASAAS to BOLETO
-      DINHEIRO: "UNDEFINED",
+      ASAAS: "BOLETO",
     };
     const billingType = billingTypeMap[payment.payment_method || "BOLETO"] || "BOLETO";
 
-    // If DINHEIRO, we don't create in Asaas
-    if (payment.payment_method === "DINHEIRO") {
-      return new Response(JSON.stringify({ error: "Cobranças em dinheiro não são enviadas ao Asaas" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Create charge in Asaas
+    // ── Create charge ──
     const chargePayload = {
       customer: asaasCustomerId,
       billingType,
@@ -254,6 +258,8 @@ Deno.serve(async (req) => {
       dueDate: payment.due_date,
       description: payment.description || "Mensalidade EnsinUP",
     };
+
+    console.log("Criando cobrança no Asaas:", JSON.stringify(chargePayload));
 
     const chargeRes = await fetch(`${baseUrl}/payments`, {
       method: "POST",
@@ -267,13 +273,19 @@ Deno.serve(async (req) => {
     const chargeData = await chargeRes.json();
 
     if (!chargeRes.ok) {
-      return new Response(JSON.stringify({ error: "Erro ao criar cobrança no Asaas", details: chargeData }), {
-        status: 502,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      const detail = chargeData?.errors?.[0]?.description
+        || chargeData?.errors?.[0]?.code
+        || JSON.stringify(chargeData);
+      console.error("Asaas charge error:", JSON.stringify(chargeData));
+      return respond({
+        error: `Erro ao criar cobrança no Asaas: ${detail}`,
+        details: chargeData,
+      }, 502);
     }
 
-    // Fetch PIX data if applicable
+    console.log("Cobrança criada:", chargeData.id);
+
+    // ── Fetch PIX data if applicable ──
     let pixQrCode: string | null = null;
     let pixCopyPaste: string | null = null;
 
@@ -290,7 +302,9 @@ Deno.serve(async (req) => {
       } catch { /* non-critical */ }
     }
 
-    // Update payment record
+    // ── Update payment record ──
+    const resolvedMethod = payment.payment_method === "ASAAS" ? "BOLETO" : payment.payment_method;
+
     const updateData = {
       asaas_payment_id: chargeData.id,
       invoice_url: chargeData.invoiceUrl || null,
@@ -299,29 +313,21 @@ Deno.serve(async (req) => {
       pix_qr_code: pixQrCode,
       pix_copy_paste: pixCopyPaste,
       raw_response: chargeData,
-      payment_method: payment.payment_method === "ASAAS" ? "BOLETO" : payment.payment_method,
+      payment_method: resolvedMethod,
     };
 
-    await supabaseAdmin
-      .from("payments")
-      .update(updateData)
-      .eq("id", payment_id);
+    await supabaseAdmin.from("payments").update(updateData).eq("id", payment_id);
 
-    return new Response(JSON.stringify({
+    return respond({
       success: true,
       action: "created",
       asaas_payment_id: chargeData.id,
       invoice_url: updateData.invoice_url,
       boleto_url: updateData.boleto_url,
       pix_copy_paste: pixCopyPaste,
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Erro interno" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.error("sync-asaas-payment error:", err);
+    return respond({ error: err instanceof Error ? err.message : "Erro interno" }, 500);
   }
 });
