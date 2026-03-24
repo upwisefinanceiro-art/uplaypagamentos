@@ -40,6 +40,7 @@ const AppPaymentDetail = () => {
   const [contract, setContract] = useState<any>(null);
   const [student, setStudent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [waDialogOpen, setWaDialogOpen] = useState(false);
 
   const isAdmin = hasRole("ADMIN_MASTER");
