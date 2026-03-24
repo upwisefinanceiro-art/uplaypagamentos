@@ -3,6 +3,7 @@ import { MessageCircle, AlertTriangle, ExternalLink, Copy, Check } from "lucide-
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -76,17 +77,20 @@ const WhatsAppDialog = ({
   const { toast } = useToast();
   const { user } = useAuth();
   const [message, setMessage] = useState("");
+  const [manualPhone, setManualPhone] = useState("");
 
-  const phoneValid = phone ? isValidPhone(phone) : false;
-  const formattedPhone = phone ? formatPhone(phone) : "";
+  const activePhone = manualPhone || (phone ?? "");
+  const phoneValid = activePhone ? isValidPhone(activePhone) : false;
+  const formattedPhone = activePhone ? formatPhone(activePhone) : "";
 
   useEffect(() => {
     if (open) {
+      setManualPhone(phone && isValidPhone(phone) ? "" : "");
       setMessage(
         buildDefaultMessage({ responsibleName, studentName, description, value, dueDate, invoiceUrl })
       );
     }
-  }, [open, responsibleName, studentName, description, value, dueDate, invoiceUrl]);
+  }, [open, responsibleName, studentName, description, value, dueDate, invoiceUrl, phone]);
 
   const [copied, setCopied] = useState(false);
 
@@ -116,13 +120,12 @@ const WhatsAppDialog = ({
 
   const handleSend = () => {
     if (!phoneValid) {
-      toast({ title: "Telefone inválido", description: "O responsável não possui um telefone válido cadastrado.", variant: "destructive" });
+      toast({ title: "Telefone inválido", description: "Digite um telefone válido para enviar.", variant: "destructive" });
       return;
     }
     const waUrl = `https://wa.me/55${formattedPhone}?text=${encodeURIComponent(message)}`;
     window.open(waUrl, "_blank");
     onOpenChange(false);
-    // Log after opening to avoid popup blocker
     logMessage("WHATSAPP_MANUAL");
   };
 
@@ -138,15 +141,15 @@ const WhatsAppDialog = ({
 
         <div className="space-y-4 pt-1">
           {/* Phone info */}
-          <div className="rounded-lg border border-border bg-secondary/30 p-3">
+          <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-2">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted-foreground">Destinatário</p>
                 <p className="text-sm font-medium text-foreground">{responsibleName}</p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-muted-foreground">Telefone</p>
-                {phoneValid ? (
+                <p className="text-xs text-muted-foreground">Telefone cadastrado</p>
+                {phone && isValidPhone(phone) ? (
                   <p className="text-sm font-medium text-foreground">{phone}</p>
                 ) : (
                   <div className="flex items-center gap-1 text-destructive">
@@ -156,6 +159,18 @@ const WhatsAppDialog = ({
                 )}
               </div>
             </div>
+            {!(phone && isValidPhone(phone)) && (
+              <div className="space-y-1">
+                <Label className="text-xs">Digite o telefone manualmente</Label>
+                <Input
+                  value={manualPhone}
+                  onChange={(e) => setManualPhone(e.target.value)}
+                  placeholder="31999999999"
+                  className="text-sm"
+                />
+                <p className="text-[10px] text-muted-foreground">Apenas números, com DDD. Ex: 31996726918</p>
+              </div>
+            )}
           </div>
 
           {/* Editable message */}
