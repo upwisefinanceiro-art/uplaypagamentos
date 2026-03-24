@@ -193,6 +193,7 @@ const AdminCharges = () => {
   const [waResponsible, setWaResponsible] = useState<{ full_name: string; phone: string | null } | null>(null);
   const [waStudent, setWaStudent] = useState<string | undefined>(undefined);
   const [waDescription, setWaDescription] = useState("");
+  const [boletoViewerUrl, setBoletoViewerUrl] = useState<string | null>(null);
 
   const scopedResponsibleId = new URLSearchParams(location.search).get("responsible");
   const scopedContractId = new URLSearchParams(location.search).get("contract");
@@ -495,22 +496,36 @@ const AdminCharges = () => {
 
   const handleSyncPayment = async (paymentId: string) => {
     setSyncingPaymentId(paymentId);
-    const { data, error } = await supabase.functions.invoke("sync-asaas-payment", {
-      body: { payment_id: paymentId },
-    });
-    setSyncingPaymentId(null);
-
-    if (error || data?.error) {
-      toast({
-        title: "Erro ao sincronizar",
-        description: error?.message || data?.error,
-        variant: "destructive",
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-asaas-payment", {
+        body: { payment_id: paymentId },
       });
-      return;
-    }
+      setSyncingPaymentId(null);
 
-    toast({ title: data?.action === "created" ? "Cobrança criada no Asaas!" : "Dados atualizados do Asaas!" });
-    fetchData();
+      if (error) {
+        // Try to extract real error from FunctionsHttpError
+        let errorMsg = error.message;
+        try {
+          if (error.context && typeof error.context.json === "function") {
+            const body = await error.context.json();
+            errorMsg = body?.error || body?.details?.errors?.[0]?.description || errorMsg;
+          }
+        } catch { /* ignore parse errors */ }
+        toast({ title: "Erro ao sincronizar", description: errorMsg, variant: "destructive" });
+        return;
+      }
+
+      if (data?.error) {
+        toast({ title: "Erro ao sincronizar", description: data.error, variant: "destructive" });
+        return;
+      }
+
+      toast({ title: data?.action === "created" ? "Cobrança criada no Asaas!" : "Dados atualizados do Asaas!" });
+      fetchData();
+    } catch (err: unknown) {
+      setSyncingPaymentId(null);
+      toast({ title: "Erro inesperado", description: err instanceof Error ? err.message : "Erro desconhecido", variant: "destructive" });
+    }
   };
 
   const handleOpenWhatsApp = async (payment: PaymentRow) => {
@@ -883,15 +898,25 @@ const AdminCharges = () => {
                     <div className="flex flex-wrap items-center gap-1.5">
                       {/* Abrir Boleto / Fatura */}
                       {(payment.invoice_url || payment.boleto_url || payment.checkout_url) ? (
-                        <a
-                          href={payment.invoice_url || payment.boleto_url || payment.checkout_url || "#"}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <Button variant="outline" size="sm" className="gap-1.5 text-xs h-7">
-                            <ExternalLink size={12} /> Abrir Boleto
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 text-xs h-7"
+                            onClick={() => setBoletoViewerUrl(payment.invoice_url || payment.boleto_url || payment.checkout_url || null)}
+                          >
+                            <ExternalLink size={12} /> Ver Boleto
                           </Button>
-                        </a>
+                          <a
+                            href={payment.invoice_url || payment.boleto_url || payment.checkout_url || "#"}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Button variant="ghost" size="sm" className="gap-1.5 text-xs h-7">
+                              <ExternalLink size={12} /> Abrir externo
+                            </Button>
+                          </a>
+                        </>
                       ) : (
                         payment.asaas_payment_id && (
                           <span className="text-[10px] text-muted-foreground italic">Sem link disponível</span>
@@ -1111,6 +1136,31 @@ const AdminCharges = () => {
           responsibleId={waPayment.responsible_id}
         />
       )}
+
+      {/* Boleto Viewer Dialog */}
+      <Dialog open={!!boletoViewerUrl} onOpenChange={(open) => { if (!open) setBoletoViewerUrl(null); }}>
+        <DialogContent className="sm:max-w-4xl h-[85vh] flex flex-col p-0">
+          <DialogHeader className="p-4 pb-2">
+            <DialogTitle className="flex items-center justify-between">
+              Visualizar Boleto / Fatura
+              <a href={boletoViewerUrl || "#"} target="_blank" rel="noopener noreferrer">
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs">
+                  <ExternalLink size={12} /> Abrir em nova aba
+                </Button>
+              </a>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 px-4 pb-4">
+            {boletoViewerUrl && (
+              <iframe
+                src={boletoViewerUrl}
+                className="w-full h-full rounded-md border"
+                title="Boleto / Fatura"
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
