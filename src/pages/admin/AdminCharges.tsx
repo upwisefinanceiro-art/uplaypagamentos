@@ -1136,6 +1136,31 @@ const AdminCharges = () => {
           responsibleId={waPayment.responsible_id}
         />
       )}
+
+      {/* Boleto Viewer Dialog */}
+      <Dialog open={!!boletoViewerUrl} onOpenChange={(open) => { if (!open) setBoletoViewerUrl(null); }}>
+        <DialogContent className="sm:max-w-4xl h-[85vh] flex flex-col p-0">
+          <DialogHeader className="p-4 pb-2">
+            <DialogTitle className="flex items-center justify-between">
+              Visualizar Boleto / Fatura
+              <a href={boletoViewerUrl || "#"} target="_blank" rel="noopener noreferrer">
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs">
+                  <ExternalLink size={12} /> Abrir em nova aba
+                </Button>
+              </a>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 px-4 pb-4">
+            {boletoViewerUrl && (
+              <iframe
+                src={boletoViewerUrl}
+                className="w-full h-full rounded-md border"
+                title="Boleto / Fatura"
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
