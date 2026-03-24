@@ -495,22 +495,36 @@ const AdminCharges = () => {
 
   const handleSyncPayment = async (paymentId: string) => {
     setSyncingPaymentId(paymentId);
-    const { data, error } = await supabase.functions.invoke("sync-asaas-payment", {
-      body: { payment_id: paymentId },
-    });
-    setSyncingPaymentId(null);
-
-    if (error || data?.error) {
-      toast({
-        title: "Erro ao sincronizar",
-        description: error?.message || data?.error,
-        variant: "destructive",
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-asaas-payment", {
+        body: { payment_id: paymentId },
       });
-      return;
-    }
+      setSyncingPaymentId(null);
 
-    toast({ title: data?.action === "created" ? "Cobrança criada no Asaas!" : "Dados atualizados do Asaas!" });
-    fetchData();
+      if (error) {
+        // Try to extract real error from FunctionsHttpError
+        let errorMsg = error.message;
+        try {
+          if (error.context && typeof error.context.json === "function") {
+            const body = await error.context.json();
+            errorMsg = body?.error || body?.details?.errors?.[0]?.description || errorMsg;
+          }
+        } catch { /* ignore parse errors */ }
+        toast({ title: "Erro ao sincronizar", description: errorMsg, variant: "destructive" });
+        return;
+      }
+
+      if (data?.error) {
+        toast({ title: "Erro ao sincronizar", description: data.error, variant: "destructive" });
+        return;
+      }
+
+      toast({ title: data?.action === "created" ? "Cobrança criada no Asaas!" : "Dados atualizados do Asaas!" });
+      fetchData();
+    } catch (err: unknown) {
+      setSyncingPaymentId(null);
+      toast({ title: "Erro inesperado", description: err instanceof Error ? err.message : "Erro desconhecido", variant: "destructive" });
+    }
   };
 
   const handleOpenWhatsApp = async (payment: PaymentRow) => {
