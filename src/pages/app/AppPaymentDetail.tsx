@@ -4,7 +4,7 @@ import {
   ArrowLeft, Copy, ExternalLink, QrCode, CreditCard, Loader2,
   MessageCircle, Calendar, Receipt, Clock, CheckCircle2,
   XCircle, AlertTriangle, Link2, FileText, User, MapPin,
-  GraduationCap, Building2, Hash, Banknote
+  GraduationCap, Building2, Hash, Banknote, RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
