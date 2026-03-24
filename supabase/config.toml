@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.clean-test-data]
 verify_jwt = false
+
+[functions.sync-asaas-payment]
+verify_jwt = false
