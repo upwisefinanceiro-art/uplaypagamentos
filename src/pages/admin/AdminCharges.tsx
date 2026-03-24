@@ -503,11 +503,11 @@ const AdminCharges = () => {
       setSyncingPaymentId(null);
 
       if (error) {
-        // Try to extract real error from FunctionsHttpError
         let errorMsg = error.message;
         try {
-          if (error.context && typeof error.context.json === "function") {
-            const body = await error.context.json();
+          // FunctionsHttpError wraps non-2xx responses — extract JSON body
+          if ((error as any).context && typeof (error as any).context.json === "function") {
+            const body = await (error as any).context.json();
             errorMsg = body?.error || body?.details?.errors?.[0]?.description || errorMsg;
           }
         } catch { /* ignore parse errors */ }
