@@ -32,6 +32,7 @@ const AdminUnits = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingUnit, setEditingUnit] = useState<UnitRow | null>(null);
   const [saving, setSaving] = useState(false);
+  const [testingUnit, setTestingUnit] = useState<string | null>(null);
 
   // Form state
   const [formName, setFormName] = useState("");
