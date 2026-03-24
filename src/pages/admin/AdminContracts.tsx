@@ -145,6 +145,7 @@ const AdminContracts = () => {
   const [responsibleId, setResponsibleId] = useState("");
   const [studentId, setStudentId] = useState("");
   const [newStudentName, setNewStudentName] = useState("");
+  const [studentBirthDate, setStudentBirthDate] = useState("");
   const [responsibleName, setResponsibleName] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [rg, setRg] = useState("");
@@ -331,11 +332,13 @@ const AdminContracts = () => {
       let finalStudentId = studentId;
       if (responsibleMode === "new") {
         // Create student record first
-        const { data: newStudent, error: studentErr } = await supabase.from("students").insert({
+        const studentInsert: any = {
           full_name: newStudentName.trim(),
           responsible_id: finalResponsibleId,
           unit_id: resolvedUnitId,
-        }).select("id").single();
+        };
+        if (studentBirthDate) studentInsert.birth_date = studentBirthDate;
+        const { data: newStudent, error: studentErr } = await supabase.from("students").insert(studentInsert).select("id").single();
         if (studentErr) throw new Error("Erro ao criar aluno: " + studentErr.message);
         finalStudentId = newStudent.id;
       }
@@ -566,9 +569,17 @@ const AdminContracts = () => {
       )}
 
       {responsibleMode === "new" && (
-        <div className="space-y-1 mb-3">
-          <Label className="text-foreground text-xs">Nome do Aluno *</Label>
-          <Input className="bg-input border-border text-foreground" placeholder="Nome completo do aluno" value={newStudentName} onChange={e => setNewStudentName(e.target.value)} />
+        <div className="space-y-3 mb-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-foreground text-xs">Nome do Aluno *</Label>
+              <Input className="bg-input border-border text-foreground" placeholder="Nome completo do aluno" value={newStudentName} onChange={e => setNewStudentName(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-foreground text-xs">Data de Nascimento do Aluno</Label>
+              <Input className="bg-input border-border text-foreground" type="date" value={studentBirthDate} onChange={e => setStudentBirthDate(e.target.value)} />
+            </div>
+          </div>
         </div>
       )}
 
