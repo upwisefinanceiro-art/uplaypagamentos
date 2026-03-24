@@ -493,6 +493,26 @@ const AdminCharges = () => {
     fetchData();
   };
 
+  const handleSyncPayment = async (paymentId: string) => {
+    setSyncingPaymentId(paymentId);
+    const { data, error } = await supabase.functions.invoke("sync-asaas-payment", {
+      body: { payment_id: paymentId },
+    });
+    setSyncingPaymentId(null);
+
+    if (error || data?.error) {
+      toast({
+        title: "Erro ao sincronizar",
+        description: error?.message || data?.error,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({ title: data?.action === "created" ? "Cobrança criada no Asaas!" : "Dados atualizados do Asaas!" });
+    fetchData();
+  };
+
   const handleOpenWhatsApp = async (payment: PaymentRow) => {
     setWaPayment(payment);
     const responsible = profiles[payment.responsible_id];
