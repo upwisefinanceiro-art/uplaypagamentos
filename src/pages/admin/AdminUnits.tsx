@@ -133,6 +133,34 @@ const AdminUnits = () => {
     return unit.whatsapp_financeiro || `${DEFAULT_WHATSAPP} (padrão)`;
   };
 
+  const handleTestConnection = async (unitId: string) => {
+    setTestingUnit(unitId);
+    try {
+      const { data, error } = await supabase.functions.invoke("test-asaas-connection", {
+        body: { unit_id: unitId },
+      });
+
+      if (error) {
+        toast({ title: "Erro ao testar", description: error.message, variant: "destructive" });
+        return;
+      }
+
+      if (data?.success) {
+        const env = data.environment === "production" ? "Produção" : "Sandbox";
+        toast({
+          title: "✅ Conexão válida",
+          description: `${data.unit_name} — ${env} — Saldo: R$ ${Number(data.balance).toFixed(2)}`,
+        });
+      } else {
+        toast({ title: "❌ Falha na conexão", description: data?.error || "Erro desconhecido", variant: "destructive" });
+      }
+    } catch (err: any) {
+      toast({ title: "Erro", description: err.message, variant: "destructive" });
+    } finally {
+      setTestingUnit(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
