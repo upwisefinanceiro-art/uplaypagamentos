@@ -114,15 +114,16 @@ const WhatsAppDialog = ({
     }
   };
 
-  const handleSend = async () => {
+  const handleSend = () => {
     if (!phoneValid) {
       toast({ title: "Telefone inválido", description: "O responsável não possui um telefone válido cadastrado.", variant: "destructive" });
       return;
     }
-    await logMessage("WHATSAPP_MANUAL");
     const waUrl = `https://wa.me/55${formattedPhone}?text=${encodeURIComponent(message)}`;
     window.open(waUrl, "_blank");
     onOpenChange(false);
+    // Log after opening to avoid popup blocker
+    logMessage("WHATSAPP_MANUAL");
   };
 
   return (
