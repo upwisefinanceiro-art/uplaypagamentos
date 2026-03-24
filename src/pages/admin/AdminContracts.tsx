@@ -332,11 +332,13 @@ const AdminContracts = () => {
       let finalStudentId = studentId;
       if (responsibleMode === "new") {
         // Create student record first
-        const { data: newStudent, error: studentErr } = await supabase.from("students").insert({
+        const studentInsert: any = {
           full_name: newStudentName.trim(),
           responsible_id: finalResponsibleId,
           unit_id: resolvedUnitId,
-        }).select("id").single();
+        };
+        if (studentBirthDate) studentInsert.birth_date = studentBirthDate;
+        const { data: newStudent, error: studentErr } = await supabase.from("students").insert(studentInsert).select("id").single();
         if (studentErr) throw new Error("Erro ao criar aluno: " + studentErr.message);
         finalStudentId = newStudent.id;
       }
