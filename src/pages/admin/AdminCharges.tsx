@@ -177,6 +177,7 @@ const AdminCharges = () => {
   const [editForm, setEditForm] = useState<EditFormState>(emptyEditForm);
   const [actionTarget, setActionTarget] = useState<{ payment: PaymentRow; action: ManagedPaymentAction } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [syncingPaymentId, setSyncingPaymentId] = useState<string | null>(null);
 
   const [selectedResponsible, setSelectedResponsible] = useState("");
   const [selectedStudent, setSelectedStudent] = useState("NONE");
@@ -489,6 +490,26 @@ const AdminCharges = () => {
 
     toast({ title: actionTarget.action === "delete" ? "Parcela excluída com sucesso!" : "Parcela cancelada com sucesso!" });
     setActionTarget(null);
+    fetchData();
+  };
+
+  const handleSyncPayment = async (paymentId: string) => {
+    setSyncingPaymentId(paymentId);
+    const { data, error } = await supabase.functions.invoke("sync-asaas-payment", {
+      body: { payment_id: paymentId },
+    });
+    setSyncingPaymentId(null);
+
+    if (error || data?.error) {
+      toast({
+        title: "Erro ao sincronizar",
+        description: error?.message || data?.error,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({ title: data?.action === "created" ? "Cobrança criada no Asaas!" : "Dados atualizados do Asaas!" });
     fetchData();
   };
 
@@ -970,9 +991,43 @@ const AdminCharges = () => {
                       </button>
                     </div>
 
-                    {/* Fallback: no Asaas */}
-                    {!payment.asaas_payment_id && (
-                      <span className="text-[10px] text-warning italic">Cobrança não enviada ao Asaas</span>
+                    {/* Sync with Asaas */}
+                    {!payment.asaas_payment_id && payment.payment_method !== "DINHEIRO" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 text-xs h-7 border-warning/40 text-warning hover:bg-warning/10"
+                        disabled={syncingPaymentId === payment.id}
+                        onClick={() => handleSyncPayment(payment.id)}
+                      >
+                        {syncingPaymentId === payment.id ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <RefreshCw size={12} />
+                        )}
+                        Enviar ao Asaas
+                      </Button>
+                    )}
+
+                    {payment.asaas_payment_id && !(payment.invoice_url || payment.boleto_url) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1.5 text-xs h-7"
+                        disabled={syncingPaymentId === payment.id}
+                        onClick={() => handleSyncPayment(payment.id)}
+                      >
+                        {syncingPaymentId === payment.id ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <RefreshCw size={12} />
+                        )}
+                        Sincronizar
+                      </Button>
+                    )}
+
+                    {!payment.asaas_payment_id && payment.payment_method === "DINHEIRO" && (
+                      <span className="text-[10px] text-muted-foreground italic">Pagamento em dinheiro</span>
                     )}
                   </div>
                 </div>

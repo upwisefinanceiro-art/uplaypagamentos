@@ -4,7 +4,7 @@ import {
   ArrowLeft, Copy, ExternalLink, QrCode, CreditCard, Loader2,
   MessageCircle, Calendar, Receipt, Clock, CheckCircle2,
   XCircle, AlertTriangle, Link2, FileText, User, MapPin,
-  GraduationCap, Building2, Hash, Banknote
+  GraduationCap, Building2, Hash, Banknote, RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +40,7 @@ const AppPaymentDetail = () => {
   const [contract, setContract] = useState<any>(null);
   const [student, setStudent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [waDialogOpen, setWaDialogOpen] = useState(false);
 
   const isAdmin = hasRole("ADMIN_MASTER");
@@ -394,6 +395,58 @@ const AppPaymentDetail = () => {
               }}
             >
               <CheckCircle2 size={14} /> Marcar Pago
+            </Button>
+          )}
+
+          {/* Sync with Asaas */}
+          {isAdmin && !payment.asaas_payment_id && payment.payment_method !== "DINHEIRO" && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 text-xs border-warning/30 text-warning hover:bg-warning/10"
+              disabled={syncing}
+              onClick={async () => {
+                setSyncing(true);
+                const { data, error } = await supabase.functions.invoke("sync-asaas-payment", {
+                  body: { payment_id: payment.id },
+                });
+                setSyncing(false);
+                if (error || data?.error) {
+                  toast({ title: "Erro ao sincronizar", description: error?.message || data?.error, variant: "destructive" });
+                } else {
+                  toast({ title: data?.action === "created" ? "Cobrança criada no Asaas!" : "Dados atualizados!" });
+                  // Reload page data
+                  window.location.reload();
+                }
+              }}
+            >
+              {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              Enviar ao Asaas
+            </Button>
+          )}
+
+          {isAdmin && payment.asaas_payment_id && !(payment.invoice_url || payment.boleto_url) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2 text-xs"
+              disabled={syncing}
+              onClick={async () => {
+                setSyncing(true);
+                const { data, error } = await supabase.functions.invoke("sync-asaas-payment", {
+                  body: { payment_id: payment.id },
+                });
+                setSyncing(false);
+                if (error || data?.error) {
+                  toast({ title: "Erro ao sincronizar", description: error?.message || data?.error, variant: "destructive" });
+                } else {
+                  toast({ title: "Dados atualizados do Asaas!" });
+                  window.location.reload();
+                }
+              }}
+            >
+              {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              Sincronizar
             </Button>
           )}
         </div>
