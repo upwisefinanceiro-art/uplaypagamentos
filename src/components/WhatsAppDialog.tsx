@@ -77,17 +77,20 @@ const WhatsAppDialog = ({
   const { toast } = useToast();
   const { user } = useAuth();
   const [message, setMessage] = useState("");
+  const [manualPhone, setManualPhone] = useState("");
 
-  const phoneValid = phone ? isValidPhone(phone) : false;
-  const formattedPhone = phone ? formatPhone(phone) : "";
+  const activePhone = manualPhone || (phone ?? "");
+  const phoneValid = activePhone ? isValidPhone(activePhone) : false;
+  const formattedPhone = activePhone ? formatPhone(activePhone) : "";
 
   useEffect(() => {
     if (open) {
+      setManualPhone(phone && isValidPhone(phone) ? "" : "");
       setMessage(
         buildDefaultMessage({ responsibleName, studentName, description, value, dueDate, invoiceUrl })
       );
     }
-  }, [open, responsibleName, studentName, description, value, dueDate, invoiceUrl]);
+  }, [open, responsibleName, studentName, description, value, dueDate, invoiceUrl, phone]);
 
   const [copied, setCopied] = useState(false);
 
@@ -117,13 +120,12 @@ const WhatsAppDialog = ({
 
   const handleSend = () => {
     if (!phoneValid) {
-      toast({ title: "Telefone inválido", description: "O responsável não possui um telefone válido cadastrado.", variant: "destructive" });
+      toast({ title: "Telefone inválido", description: "Digite um telefone válido para enviar.", variant: "destructive" });
       return;
     }
     const waUrl = `https://wa.me/55${formattedPhone}?text=${encodeURIComponent(message)}`;
     window.open(waUrl, "_blank");
     onOpenChange(false);
-    // Log after opening to avoid popup blocker
     logMessage("WHATSAPP_MANUAL");
   };
 
