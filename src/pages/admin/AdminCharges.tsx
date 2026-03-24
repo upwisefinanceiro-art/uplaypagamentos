@@ -898,15 +898,25 @@ const AdminCharges = () => {
                     <div className="flex flex-wrap items-center gap-1.5">
                       {/* Abrir Boleto / Fatura */}
                       {(payment.invoice_url || payment.boleto_url || payment.checkout_url) ? (
-                        <a
-                          href={payment.invoice_url || payment.boleto_url || payment.checkout_url || "#"}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <Button variant="outline" size="sm" className="gap-1.5 text-xs h-7">
-                            <ExternalLink size={12} /> Abrir Boleto
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 text-xs h-7"
+                            onClick={() => setBoletoViewerUrl(payment.invoice_url || payment.boleto_url || payment.checkout_url || null)}
+                          >
+                            <ExternalLink size={12} /> Ver Boleto
                           </Button>
-                        </a>
+                          <a
+                            href={payment.invoice_url || payment.boleto_url || payment.checkout_url || "#"}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Button variant="ghost" size="sm" className="gap-1.5 text-xs h-7">
+                              <ExternalLink size={12} /> Abrir externo
+                            </Button>
+                          </a>
+                        </>
                       ) : (
                         payment.asaas_payment_id && (
                           <span className="text-[10px] text-muted-foreground italic">Sem link disponível</span>
