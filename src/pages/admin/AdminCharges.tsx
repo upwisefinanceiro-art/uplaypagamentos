@@ -193,6 +193,7 @@ const AdminCharges = () => {
   const [waResponsible, setWaResponsible] = useState<{ full_name: string; phone: string | null } | null>(null);
   const [waStudent, setWaStudent] = useState<string | undefined>(undefined);
   const [waDescription, setWaDescription] = useState("");
+  const [boletoViewerUrl, setBoletoViewerUrl] = useState<string | null>(null);
 
   const scopedResponsibleId = new URLSearchParams(location.search).get("responsible");
   const scopedContractId = new URLSearchParams(location.search).get("contract");
