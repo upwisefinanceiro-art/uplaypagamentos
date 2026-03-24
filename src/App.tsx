@@ -44,6 +44,7 @@ const App = () => (
               <Route index element={<AppHome />} />
               <Route path="pagamentos" element={<AppPayments />} />
               <Route path="pagamentos/:id" element={<AppPaymentDetail />} />
+              <Route path="payment/:id" element={<AppPaymentDetail />} />
               <Route path="perfil" element={<AppProfile />} />
             </Route>
 
