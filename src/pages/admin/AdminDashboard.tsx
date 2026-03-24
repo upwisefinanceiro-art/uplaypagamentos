@@ -264,6 +264,21 @@ const AdminDashboard = () => {
     };
   }, [payments, students, units, unitFilter, periodFilter]);
 
+  const getProfileName = (id: string) =>
+    profiles.find((p) => p.id === id)?.full_name ?? "—";
+
+  const getProfilePhone = (id: string) =>
+    profiles.find((p) => p.id === id)?.phone ?? null;
+
+  const getUnitName = (id: string) =>
+    units.find((u) => u.id === id)?.name ?? "—";
+
+  const getStudentByResponsible = (responsibleId: string) =>
+    students.find((s) => s.responsible_id === responsibleId);
+
+  const formatCurrency = (v: number) =>
+    v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
   // Birthday computation
   const todayBirthdays = useMemo((): BirthdayPerson[] => {
     const now = new Date();
@@ -272,7 +287,6 @@ const AdminDashboard = () => {
 
     const result: BirthdayPerson[] = [];
 
-    // Students with birth_date
     students.filter(s => s.active && s.birth_date).forEach(s => {
       const [, m, d] = s.birth_date!.split("-").map(Number);
       if (m === todayMonth && d === todayDay) {
@@ -292,21 +306,6 @@ const AdminDashboard = () => {
       return st && st.unit_id === unitFilter;
     });
   }, [students, units, profiles, unitFilter]);
-
-  const getProfileName = (id: string) =>
-    profiles.find((p) => p.id === id)?.full_name ?? "—";
-
-  const getProfilePhone = (id: string) =>
-    profiles.find((p) => p.id === id)?.phone ?? null;
-
-  const getUnitName = (id: string) =>
-    units.find((u) => u.id === id)?.name ?? "—";
-
-  const getStudentByResponsible = (responsibleId: string) =>
-    students.find((s) => s.responsible_id === responsibleId);
-
-  const formatCurrency = (v: number) =>
-    v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   const openBirthdayWhatsApp = (person: BirthdayPerson) => {
     const msg = `Olá, ${person.name}! A equipe da EnsinUP deseja um feliz aniversário! 🎉`;
