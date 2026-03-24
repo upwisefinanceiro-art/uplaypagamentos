@@ -141,15 +141,15 @@ const WhatsAppDialog = ({
 
         <div className="space-y-4 pt-1">
           {/* Phone info */}
-          <div className="rounded-lg border border-border bg-secondary/30 p-3">
+          <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-2">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted-foreground">Destinatário</p>
                 <p className="text-sm font-medium text-foreground">{responsibleName}</p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-muted-foreground">Telefone</p>
-                {phoneValid ? (
+                <p className="text-xs text-muted-foreground">Telefone cadastrado</p>
+                {phone && isValidPhone(phone) ? (
                   <p className="text-sm font-medium text-foreground">{phone}</p>
                 ) : (
                   <div className="flex items-center gap-1 text-destructive">
@@ -159,6 +159,18 @@ const WhatsAppDialog = ({
                 )}
               </div>
             </div>
+            {!(phone && isValidPhone(phone)) && (
+              <div className="space-y-1">
+                <Label className="text-xs">Digite o telefone manualmente</Label>
+                <Input
+                  value={manualPhone}
+                  onChange={(e) => setManualPhone(e.target.value)}
+                  placeholder="31999999999"
+                  className="text-sm"
+                />
+                <p className="text-[10px] text-muted-foreground">Apenas números, com DDD. Ex: 31996726918</p>
+              </div>
+            )}
           </div>
 
           {/* Editable message */}
