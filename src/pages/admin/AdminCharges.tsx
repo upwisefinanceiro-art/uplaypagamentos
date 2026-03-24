@@ -177,6 +177,7 @@ const AdminCharges = () => {
   const [editForm, setEditForm] = useState<EditFormState>(emptyEditForm);
   const [actionTarget, setActionTarget] = useState<{ payment: PaymentRow; action: ManagedPaymentAction } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [syncingPaymentId, setSyncingPaymentId] = useState<string | null>(null);
 
   const [selectedResponsible, setSelectedResponsible] = useState("");
   const [selectedStudent, setSelectedStudent] = useState("NONE");
