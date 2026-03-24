@@ -301,6 +301,27 @@ const AdminUnits = () => {
                 <code className="text-foreground">{getWhatsAppDisplay(unit)}</code>
               </div>
             </div>
+            <div className="mt-3 pt-3 border-t border-border">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleTestConnection(unit.id)}
+                disabled={testingUnit === unit.id || !unit.asaas_api_key}
+                className="text-xs"
+              >
+                {testingUnit === unit.id ? (
+                  <Loader2 size={12} className="mr-1.5 animate-spin" />
+                ) : unit.asaas_api_key ? (
+                  <Wifi size={12} className="mr-1.5" />
+                ) : (
+                  <WifiOff size={12} className="mr-1.5" />
+                )}
+                {testingUnit === unit.id ? "Testando..." : "Testar conexão Asaas"}
+              </Button>
+              {!unit.asaas_api_key && (
+                <span className="text-[10px] text-destructive ml-2">API Key não configurada</span>
+              )}
+            </div>
           </div>
         ))}
         {units.length === 0 && (
