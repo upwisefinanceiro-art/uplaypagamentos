@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, Eye, EyeOff, Loader2, MessageCircle } from "lucide-react";
+import { Plus, Pencil, Eye, EyeOff, Loader2, MessageCircle, Wifi, WifiOff, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,6 +32,7 @@ const AdminUnits = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingUnit, setEditingUnit] = useState<UnitRow | null>(null);
   const [saving, setSaving] = useState(false);
+  const [testingUnit, setTestingUnit] = useState<string | null>(null);
 
   // Form state
   const [formName, setFormName] = useState("");
@@ -130,6 +131,34 @@ const AdminUnits = () => {
   const getWhatsAppDisplay = (unit: UnitRow) => {
     if (unit.usar_whatsapp_padrao) return `${DEFAULT_WHATSAPP} (padrão)`;
     return unit.whatsapp_financeiro || `${DEFAULT_WHATSAPP} (padrão)`;
+  };
+
+  const handleTestConnection = async (unitId: string) => {
+    setTestingUnit(unitId);
+    try {
+      const { data, error } = await supabase.functions.invoke("test-asaas-connection", {
+        body: { unit_id: unitId },
+      });
+
+      if (error) {
+        toast({ title: "Erro ao testar", description: error.message, variant: "destructive" });
+        return;
+      }
+
+      if (data?.success) {
+        const env = data.environment === "production" ? "Produção" : "Sandbox";
+        toast({
+          title: "✅ Conexão válida",
+          description: `${data.unit_name} — ${env} — Saldo: R$ ${Number(data.balance).toFixed(2)}`,
+        });
+      } else {
+        toast({ title: "❌ Falha na conexão", description: data?.error || "Erro desconhecido", variant: "destructive" });
+      }
+    } catch (err: any) {
+      toast({ title: "Erro", description: err.message, variant: "destructive" });
+    } finally {
+      setTestingUnit(null);
+    }
   };
 
   if (loading) {
@@ -271,6 +300,27 @@ const AdminUnits = () => {
                 <span className="text-muted-foreground w-16">WhatsApp:</span>
                 <code className="text-foreground">{getWhatsAppDisplay(unit)}</code>
               </div>
+            </div>
+            <div className="mt-3 pt-3 border-t border-border">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleTestConnection(unit.id)}
+                disabled={testingUnit === unit.id || !unit.asaas_api_key}
+                className="text-xs"
+              >
+                {testingUnit === unit.id ? (
+                  <Loader2 size={12} className="mr-1.5 animate-spin" />
+                ) : unit.asaas_api_key ? (
+                  <Wifi size={12} className="mr-1.5" />
+                ) : (
+                  <WifiOff size={12} className="mr-1.5" />
+                )}
+                {testingUnit === unit.id ? "Testando..." : "Testar conexão Asaas"}
+              </Button>
+              {!unit.asaas_api_key && (
+                <span className="text-[10px] text-destructive ml-2">API Key não configurada</span>
+              )}
             </div>
           </div>
         ))}
