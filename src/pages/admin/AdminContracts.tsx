@@ -1220,6 +1220,15 @@ const AdminContracts = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <UserEditDialog
+        open={!!editResponsible}
+        onOpenChange={(open) => !open && setEditResponsible(null)}
+        user={editResponsible}
+        units={units}
+        onSaved={fetchData}
+        showUnitSelector={hasRole("ADMIN_MASTER")}
+      />
     </div>
   );
 };
