@@ -941,15 +941,19 @@ const AdminContracts = () => {
 
   const filteredContracts = useMemo(() => {
     if (!searchTerm.trim()) return contracts;
-    const term = searchTerm.toLowerCase();
-    return contracts.filter(c =>
-      c.description?.toLowerCase().includes(term) ||
-      c.responsible_name?.toLowerCase().includes(term) ||
-      c.cpf?.includes(term) ||
-      c.contract_number?.toLowerCase().includes(term) ||
-      c.id?.toLowerCase().includes(term) ||
-      (c.students as any)?.full_name?.toLowerCase().includes(term)
-    );
+    const term = searchTerm.toLowerCase().trim();
+    const termDigits = term.replace(/\D/g, "");
+    return contracts.filter(c => {
+      const cpfDigits = (c.cpf || "").replace(/\D/g, "");
+      return (
+        c.description?.toLowerCase().includes(term) ||
+        c.responsible_name?.toLowerCase().includes(term) ||
+        c.cpf?.includes(term) ||
+        (termDigits.length >= 3 && cpfDigits.includes(termDigits)) ||
+        c.contract_number?.toLowerCase().includes(term) ||
+        (c.students as any)?.full_name?.toLowerCase().includes(term)
+      );
+    });
   }, [contracts, searchTerm]);
 
   return (
