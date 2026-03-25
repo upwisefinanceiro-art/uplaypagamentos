@@ -644,7 +644,7 @@ const AdminClients = () => {
               Cancelar
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleAction}
+              onClick={() => handleAction()}
               disabled={actionLoading}
               className={
                 actionTarget?.action === "reactivate"
