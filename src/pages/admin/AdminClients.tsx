@@ -663,39 +663,54 @@ const AdminClients = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={!!dependencyBlocker} onOpenChange={(open) => !open && setDependencyBlocker(null)}>
-        <DialogContent className="bg-card border-border sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Exclusão bloqueada</DialogTitle>
-          </DialogHeader>
-          {dependencyBlocker && (
-            <div className="space-y-4 text-sm text-muted-foreground">
-              <p>
-                Este cliente possui {dependencyBlocker.paymentCount} parcelas/cobranças vinculadas{dependencyBlocker.contractCount ? ` e ${dependencyBlocker.contractCount} contratos` : ""}. Acesse o histórico financeiro antes de excluir.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setExpandedClientId(dependencyBlocker.client.id);
-                    setDependencyBlocker(null);
-                  }}
-                >
-                  Ver parcelas vinculadas
-                </Button>
-                <Button
-                  onClick={() => {
-                    navigate(`/admin/cobrancas?responsible=${dependencyBlocker.client.id}`);
-                    setDependencyBlocker(null);
-                  }}
-                >
-                  Abrir histórico financeiro
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <AlertDialog open={!!dependencyBlocker} onOpenChange={(open) => !open && setDependencyBlocker(null)}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-foreground">Excluir cliente com registros vinculados?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {dependencyBlocker && (
+                <>
+                  O cliente <strong>"{dependencyBlocker.client.full_name}"</strong> possui{" "}
+                  {dependencyBlocker.paymentCount > 0 && <>{dependencyBlocker.paymentCount} parcelas/cobranças</>}
+                  {dependencyBlocker.paymentCount > 0 && dependencyBlocker.contractCount > 0 && " e "}
+                  {dependencyBlocker.contractCount > 0 && <>{dependencyBlocker.contractCount} contratos</>}
+                  {" "}sem pagamentos confirmados.
+                  <br /><br />
+                  <span className="text-destructive font-semibold">Essa ação é irreversível.</span> Todos os contratos e cobranças não pagas serão excluídos junto com o cliente.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-border">Cancelar</AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (dependencyBlocker) setExpandedClientId(dependencyBlocker.client.id);
+                setDependencyBlocker(null);
+              }}
+            >
+              Ver registros
+            </Button>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+              disabled={actionLoading}
+              onClick={async () => {
+                if (!dependencyBlocker) return;
+                setActionTarget({ client: dependencyBlocker.client, action: "permanent_delete" });
+                setDependencyBlocker(null);
+                // Small delay to let state update
+                setTimeout(() => {
+                  handleAction(true);
+                }, 100);
+              }}
+            >
+              {actionLoading ? <Loader2 size={14} className="animate-spin mr-2" /> : null}
+              Excluir tudo
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
