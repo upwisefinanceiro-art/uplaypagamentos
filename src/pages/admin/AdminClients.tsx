@@ -335,33 +335,49 @@ const AdminClients = () => {
     await fetchData();
   };
 
-  const getStudents = (responsibleId: string) =>
-    students
+  const getStudents = (responsibleId: string, fallbackNames?: string[]) => {
+    const namesFromStudents = students
       .filter((student) => student.responsible_id === responsibleId)
-      .map((student) => student.full_name)
-      .join(", ");
+      .map((student) => student.full_name);
 
-  const getClientPayments = (responsibleId: string) => payments.filter((payment) => payment.responsible_id === responsibleId);
-  const getClientContracts = (responsibleId: string) => contracts.filter((contract) => contract.responsible_id === responsibleId);
+    const combined = [...new Set([...(fallbackNames || []), ...namesFromStudents])];
+    return combined.join(", ");
+  };
+
+  const getClientPayments = (client: ClientRow) => {
+    const contractIds = new Set(client.contract_ids || []);
+
+    return payments.filter((payment) => {
+      if (payment.responsible_id === client.id) return true;
+      if (payment.contract_id && contractIds.has(payment.contract_id)) return true;
+      return false;
+    });
+  };
+
+  const getClientContracts = (client: ClientRow) => {
+    const contractIds = new Set(client.contract_ids || []);
+    return contracts.filter((contract) => contract.responsible_id === client.id || contractIds.has(contract.id));
+  };
 
   const filtered = clients.filter((client) => {
     if (!showInactive && !client.active) return false;
-    if (!search) return true;
+    if (!search.trim()) return true;
 
     const q = search.toLowerCase().trim();
     const qDigits = q.replace(/\D/g, "");
-    const studentNames = getStudents(client.id).toLowerCase();
+    const studentNames = getStudents(client.id, client.student_names).toLowerCase();
     const cpfDigits = (client.cpf || "").replace(/\D/g, "");
     const phoneDigits = (client.phone || "").replace(/\D/g, "");
+    const normalizedEmail = (client.email || "").toLowerCase();
+    const normalizedPhone = (client.phone || "").toLowerCase();
 
     return (
       client.full_name.toLowerCase().includes(q) ||
-      cpfDigits.includes(qDigits) ||
-      (client.cpf || "").includes(q) ||
-      (client.email || "").toLowerCase().includes(q) ||
-      (client.phone || "").includes(q) ||
-      (qDigits.length >= 3 && phoneDigits.includes(qDigits)) ||
-      studentNames.includes(q)
+      normalizedEmail.includes(q) ||
+      studentNames.includes(q) ||
+      (qDigits.length > 0 && cpfDigits.includes(qDigits)) ||
+      (qDigits.length > 0 && phoneDigits.includes(qDigits)) ||
+      normalizedPhone.includes(q)
     );
   });
 
