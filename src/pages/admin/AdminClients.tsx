@@ -288,14 +288,7 @@ const AdminClients = () => {
   };
 
   const handleDeleteRequest = (client: ClientRow) => {
-    const paymentCount = payments.filter((payment) => payment.responsible_id === client.id).length;
-    const contractCount = contracts.filter((contract) => contract.responsible_id === client.id).length;
-
-    if (paymentCount > 0 || contractCount > 0) {
-      setDependencyBlocker({ client, paymentCount, contractCount });
-      return;
-    }
-
+    // Always go to permanent_delete - the edge function handles cascade logic
     setActionTarget({ client, action: "permanent_delete" });
   };
 
