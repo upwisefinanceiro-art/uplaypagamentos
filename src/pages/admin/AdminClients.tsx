@@ -33,6 +33,9 @@ interface ClientRow {
   active: boolean;
   email: string | null;
   address: string | null;
+  source: "profile" | "contract_snapshot";
+  contract_ids?: string[];
+  student_names?: string[];
 }
 
 interface StudentRow {
@@ -64,6 +67,13 @@ interface PaymentRow {
 interface ContractLinkRow {
   id: string;
   responsible_id: string;
+  responsible_name: string | null;
+  cpf: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  unit_id: string;
+  student_id: string | null;
   description: string;
   status: string;
 }
