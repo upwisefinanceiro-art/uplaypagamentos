@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Loader2, UserPlus, UserCheck, Save, Trash2, ExternalLink, Search, CalendarIcon } from "lucide-react";
+import { Plus, Loader2, UserPlus, UserCheck, Save, Trash2, ExternalLink, Search, CalendarIcon, Pencil } from "lucide-react";
 import { format, addMonths, lastDayOfMonth, setDate as setDateFns } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
@@ -28,6 +28,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import UserEditDialog from "@/components/admin/UserEditDialog";
 
 interface ContractRow {
   id: string;
@@ -135,6 +136,7 @@ const AdminContracts = () => {
   const [deleteTarget, setDeleteTarget] = useState<ContractRow | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [editResponsible, setEditResponsible] = useState<{ id: string; full_name: string; cpf: string; phone: string | null; unit_id: string | null; email?: string | null; address?: string | null } | null>(null);
   const { toast } = useToast();
   const { profile, hasRole } = useAuth();
 
@@ -939,15 +941,19 @@ const AdminContracts = () => {
 
   const filteredContracts = useMemo(() => {
     if (!searchTerm.trim()) return contracts;
-    const term = searchTerm.toLowerCase();
-    return contracts.filter(c =>
-      c.description?.toLowerCase().includes(term) ||
-      c.responsible_name?.toLowerCase().includes(term) ||
-      c.cpf?.includes(term) ||
-      c.contract_number?.toLowerCase().includes(term) ||
-      c.id?.toLowerCase().includes(term) ||
-      (c.students as any)?.full_name?.toLowerCase().includes(term)
-    );
+    const term = searchTerm.toLowerCase().trim();
+    const termDigits = term.replace(/\D/g, "");
+    return contracts.filter(c => {
+      const cpfDigits = (c.cpf || "").replace(/\D/g, "");
+      return (
+        c.description?.toLowerCase().includes(term) ||
+        c.responsible_name?.toLowerCase().includes(term) ||
+        c.cpf?.includes(term) ||
+        (termDigits.length >= 3 && cpfDigits.includes(termDigits)) ||
+        c.contract_number?.toLowerCase().includes(term) ||
+        (c.students as any)?.full_name?.toLowerCase().includes(term)
+      );
+    });
   }, [contracts, searchTerm]);
 
   return (
@@ -1153,6 +1159,28 @@ const AdminContracts = () => {
                     variant="ghost"
                     size="sm"
                     className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => {
+                      const resp = responsibles.find(r => r.id === c.responsible_id);
+                      if (resp) {
+                        setEditResponsible({
+                          id: resp.id,
+                          full_name: resp.full_name,
+                          cpf: resp.cpf,
+                          phone: resp.phone,
+                          unit_id: resp.unit_id,
+                          email: resp.email,
+                        });
+                      } else {
+                        toast({ title: "Responsável não encontrado na base", variant: "destructive" });
+                      }
+                    }}
+                  >
+                    <Pencil size={12} className="mr-1" /> Editar Responsável
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
                     onClick={() => navigate(`/admin/cobrancas?contract=${c.id}`)}
                   >
                     <ExternalLink size={12} className="mr-1" /> Parcelas
@@ -1196,6 +1224,15 @@ const AdminContracts = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <UserEditDialog
+        open={!!editResponsible}
+        onOpenChange={(open) => !open && setEditResponsible(null)}
+        user={editResponsible}
+        units={units}
+        onSaved={fetchData}
+        showUnitSelector={hasRole("ADMIN_MASTER")}
+      />
     </div>
   );
 };
