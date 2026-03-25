@@ -288,18 +288,11 @@ const AdminClients = () => {
   };
 
   const handleDeleteRequest = (client: ClientRow) => {
-    const paymentCount = payments.filter((payment) => payment.responsible_id === client.id).length;
-    const contractCount = contracts.filter((contract) => contract.responsible_id === client.id).length;
-
-    if (paymentCount > 0 || contractCount > 0) {
-      setDependencyBlocker({ client, paymentCount, contractCount });
-      return;
-    }
-
+    // Always go to permanent_delete - the edge function handles cascade logic
     setActionTarget({ client, action: "permanent_delete" });
   };
 
-  const handleAction = async () => {
+  const handleAction = async (forceCascade = false) => {
     if (!actionTarget) return;
     setActionLoading(true);
 
@@ -307,17 +300,30 @@ const AdminClients = () => {
     const body: Record<string, unknown> = { user_id: client.id };
 
     if (action === "reactivate") body.action = "reactivate";
-    else if (action === "permanent_delete") body.action = "permanent_delete";
+    else if (action === "permanent_delete") {
+      body.action = "permanent_delete";
+      if (forceCascade) body.force_cascade = true;
+    }
 
     const { data, error } = await supabase.functions.invoke("delete-user", { body });
 
     if (error || data?.error) {
-      const paymentCount = data?.payment_count ?? 0;
-      const contractCount = data?.contract_count ?? 0;
+      // If has unpaid dependencies, offer cascade option
+      if (data?.has_dependencies && !data?.has_paid) {
+        setActionLoading(false);
+        setActionTarget(null);
+        setDependencyBlocker({
+          client,
+          paymentCount: data.payment_count ?? 0,
+          contractCount: data.contract_count ?? 0,
+        });
+        return;
+      }
+
       toast({
         title: "Erro",
-        description: data?.has_dependencies
-          ? `Este cliente possui ${paymentCount} parcelas/cobranças vinculadas${contractCount ? ` e ${contractCount} contratos` : ""}. Acesse o histórico financeiro antes de excluir.`
+        description: data?.has_paid
+          ? `Este cliente possui ${data.paid_count} pagamentos confirmados e não pode ser excluído. Use desativar.`
           : error?.message || data?.error,
         variant: "destructive",
       });
@@ -638,7 +644,7 @@ const AdminClients = () => {
               Cancelar
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleAction}
+              onClick={() => handleAction()}
               disabled={actionLoading}
               className={
                 actionTarget?.action === "reactivate"
@@ -657,39 +663,60 @@ const AdminClients = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={!!dependencyBlocker} onOpenChange={(open) => !open && setDependencyBlocker(null)}>
-        <DialogContent className="bg-card border-border sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Exclusão bloqueada</DialogTitle>
-          </DialogHeader>
-          {dependencyBlocker && (
-            <div className="space-y-4 text-sm text-muted-foreground">
-              <p>
-                Este cliente possui {dependencyBlocker.paymentCount} parcelas/cobranças vinculadas{dependencyBlocker.contractCount ? ` e ${dependencyBlocker.contractCount} contratos` : ""}. Acesse o histórico financeiro antes de excluir.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setExpandedClientId(dependencyBlocker.client.id);
-                    setDependencyBlocker(null);
-                  }}
-                >
-                  Ver parcelas vinculadas
-                </Button>
-                <Button
-                  onClick={() => {
-                    navigate(`/admin/cobrancas?responsible=${dependencyBlocker.client.id}`);
-                    setDependencyBlocker(null);
-                  }}
-                >
-                  Abrir histórico financeiro
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <AlertDialog open={!!dependencyBlocker} onOpenChange={(open) => !open && setDependencyBlocker(null)}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-foreground">Excluir cliente com registros vinculados?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {dependencyBlocker && (
+                <>
+                  O cliente <strong>"{dependencyBlocker.client.full_name}"</strong> possui{" "}
+                  {dependencyBlocker.paymentCount > 0 && <>{dependencyBlocker.paymentCount} parcelas/cobranças</>}
+                  {dependencyBlocker.paymentCount > 0 && dependencyBlocker.contractCount > 0 && " e "}
+                  {dependencyBlocker.contractCount > 0 && <>{dependencyBlocker.contractCount} contratos</>}
+                  {" "}sem pagamentos confirmados.
+                  <br /><br />
+                  <span className="text-destructive font-semibold">Essa ação é irreversível.</span> Todos os contratos e cobranças não pagas serão excluídos junto com o cliente.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-border">Cancelar</AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (dependencyBlocker) setExpandedClientId(dependencyBlocker.client.id);
+                setDependencyBlocker(null);
+              }}
+            >
+              Ver registros
+            </Button>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+              disabled={actionLoading}
+              onClick={async () => {
+                if (!dependencyBlocker) return;
+                setActionLoading(true);
+                const { data, error } = await supabase.functions.invoke("delete-user", {
+                  body: { user_id: dependencyBlocker.client.id, action: "permanent_delete", force_cascade: true },
+                });
+                if (error || data?.error) {
+                  toast({ title: "Erro", description: error?.message || data?.error, variant: "destructive" });
+                } else {
+                  toast({ title: "Cliente excluído permanentemente" });
+                }
+                setActionLoading(false);
+                setDependencyBlocker(null);
+                await fetchData();
+              }}
+            >
+              {actionLoading ? <Loader2 size={14} className="animate-spin mr-2" /> : null}
+              Excluir tudo
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

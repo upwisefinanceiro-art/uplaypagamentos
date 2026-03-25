@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Sem permissão" });
     }
 
-    const { user_id, action } = await req.json();
+    const { user_id, action, force_cascade } = await req.json();
 
     if (!user_id) {
       return jsonResponse({ error: "user_id é obrigatório" });
@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
 
       const [contractsRes, paymentsRes] = await Promise.all([
         supabaseAdmin.from("contracts").select("id", { count: "exact", head: true }).eq("responsible_id", user_id),
-        supabaseAdmin.from("payments").select("id", { count: "exact", head: true }).eq("responsible_id", user_id),
+        supabaseAdmin.from("payments").select("id, status", { count: "exact" }).eq("responsible_id", user_id),
       ]);
 
       const contractCount = contractsRes.count ?? 0;
@@ -113,21 +113,45 @@ Deno.serve(async (req) => {
       const hasContracts = contractCount > 0;
       const hasPayments = paymentCount > 0;
 
-      if (hasContracts || hasPayments) {
+      // Check if there are PAID payments (truly protected)
+      const paidPayments = (paymentsRes.data || []).filter(
+        (p: { status: string }) => ["PAID", "RECEIVED", "CONFIRMED"].includes(p.status)
+      );
+      const hasPaidPayments = paidPayments.length > 0;
+
+      if (hasPaidPayments) {
         await logAction("DELETE_ATTEMPT", {
           requested_action: "permanent_delete",
-          blocked_reason: "financial_history",
-          has_contracts: hasContracts,
-          has_payments: hasPayments,
-          contract_count: contractCount,
-          payment_count: paymentCount,
+          blocked_reason: "has_paid_payments",
+          paid_count: paidPayments.length,
         });
         return jsonResponse({
-          error: "Este registro possui histórico e não pode ser excluído. Use desativar.",
+          error: "Este cliente possui pagamentos confirmados e não pode ser excluído. Use desativar.",
           has_dependencies: true,
+          has_paid: true,
           contract_count: contractCount,
           payment_count: paymentCount,
+          paid_count: paidPayments.length,
         });
+      }
+
+      if ((hasContracts || hasPayments) && !force_cascade) {
+        return jsonResponse({
+          error: "Este cliente possui registros vinculados. Confirme a exclusão em cascata.",
+          has_dependencies: true,
+          has_paid: false,
+          contract_count: contractCount,
+          payment_count: paymentCount,
+          paid_count: 0,
+        });
+      }
+
+      // Force cascade: delete unpaid payments, contracts, then user
+      if (hasPayments) {
+        await supabaseAdmin.from("payments").delete().eq("responsible_id", user_id);
+      }
+      if (hasContracts) {
+        await supabaseAdmin.from("contracts").delete().eq("responsible_id", user_id);
       }
 
       await supabaseAdmin.from("students").delete().eq("responsible_id", user_id);
