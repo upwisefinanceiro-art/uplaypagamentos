@@ -141,12 +141,59 @@ const AdminClients = () => {
         .from("payments")
         .select("id, responsible_id, contract_id, student_id, description, payment_type, installment_number, due_date, status, value, final_value, unit_id")
         .order("due_date", { ascending: false }),
-      supabase.from("contracts").select("id, responsible_id, description, status"),
+      supabase.from("contracts").select("id, responsible_id, responsible_name, cpf, email, phone, address, unit_id, student_id, description, status"),
     ]);
 
-    if (profilesRes.data && rolesRes.data) {
+    if (profilesRes.data && rolesRes.data && studentsRes.data && contractsRes.data) {
       const responsibleIds = new Set(rolesRes.data.map((row: { user_id: string }) => row.user_id));
-      setClients(profilesRes.data.filter((row) => responsibleIds.has(row.id)) as ClientRow[]);
+      const studentNamesByResponsible = new Map<string, string[]>();
+
+      (studentsRes.data as StudentRow[]).forEach((student) => {
+        const names = studentNamesByResponsible.get(student.responsible_id) || [];
+        names.push(student.full_name);
+        studentNamesByResponsible.set(student.responsible_id, names);
+      });
+
+      const profileClients = (profilesRes.data as ClientRow[])
+        .filter((row) => responsibleIds.has(row.id))
+        .map((row) => ({
+          ...row,
+          source: "profile" as const,
+          contract_ids: [],
+          student_names: studentNamesByResponsible.get(row.id) || [],
+        }));
+
+      const profileIds = new Set(profileClients.map((client) => client.id));
+      const snapshotClients = (contractsRes.data as ContractLinkRow[])
+        .filter((contract) => contract.responsible_id && !profileIds.has(contract.responsible_id))
+        .reduce<ClientRow[]>((acc, contract) => {
+          const existing = acc.find((client) => client.id === contract.responsible_id);
+          const studentName = (studentsRes.data as StudentRow[]).find((student) => student.id === contract.student_id)?.full_name;
+
+          if (existing) {
+            existing.contract_ids = [...new Set([...(existing.contract_ids || []), contract.id])];
+            existing.student_names = [...new Set([...(existing.student_names || []), ...(studentName ? [studentName] : [])])];
+            return acc;
+          }
+
+          acc.push({
+            id: contract.responsible_id,
+            full_name: contract.responsible_name || "Responsável sem nome",
+            cpf: contract.cpf || "",
+            phone: contract.phone,
+            unit_id: contract.unit_id,
+            active: true,
+            email: contract.email,
+            address: contract.address,
+            source: "contract_snapshot",
+            contract_ids: [contract.id],
+            student_names: studentName ? [studentName] : [],
+          });
+
+          return acc;
+        }, []);
+
+      setClients([...profileClients, ...snapshotClients].sort((a, b) => a.full_name.localeCompare(b.full_name, "pt-BR")));
     }
 
     if (studentsRes.data) setStudents(studentsRes.data as StudentRow[]);
