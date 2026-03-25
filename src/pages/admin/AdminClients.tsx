@@ -292,7 +292,7 @@ const AdminClients = () => {
     setActionTarget({ client, action: "permanent_delete" });
   };
 
-  const handleAction = async () => {
+  const handleAction = async (forceCascade = false) => {
     if (!actionTarget) return;
     setActionLoading(true);
 
@@ -300,17 +300,30 @@ const AdminClients = () => {
     const body: Record<string, unknown> = { user_id: client.id };
 
     if (action === "reactivate") body.action = "reactivate";
-    else if (action === "permanent_delete") body.action = "permanent_delete";
+    else if (action === "permanent_delete") {
+      body.action = "permanent_delete";
+      if (forceCascade) body.force_cascade = true;
+    }
 
     const { data, error } = await supabase.functions.invoke("delete-user", { body });
 
     if (error || data?.error) {
-      const paymentCount = data?.payment_count ?? 0;
-      const contractCount = data?.contract_count ?? 0;
+      // If has unpaid dependencies, offer cascade option
+      if (data?.has_dependencies && !data?.has_paid) {
+        setActionLoading(false);
+        setActionTarget(null);
+        setDependencyBlocker({
+          client,
+          paymentCount: data.payment_count ?? 0,
+          contractCount: data.contract_count ?? 0,
+        });
+        return;
+      }
+
       toast({
         title: "Erro",
-        description: data?.has_dependencies
-          ? `Este cliente possui ${paymentCount} parcelas/cobranças vinculadas${contractCount ? ` e ${contractCount} contratos` : ""}. Acesse o histórico financeiro antes de excluir.`
+        description: data?.has_paid
+          ? `Este cliente possui ${data.paid_count} pagamentos confirmados e não pode ser excluído. Use desativar.`
           : error?.message || data?.error,
         variant: "destructive",
       });
