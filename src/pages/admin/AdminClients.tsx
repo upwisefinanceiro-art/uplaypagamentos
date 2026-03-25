@@ -496,12 +496,13 @@ const AdminClients = () => {
       ) : (
         <div className="space-y-3">
           {filtered.map((client) => {
-            const linkedPayments = getClientPayments(client.id);
-            const linkedContracts = getClientContracts(client.id);
+            const linkedPayments = getClientPayments(client);
+            const linkedContracts = getClientContracts(client);
             const isExpanded = expandedClientId === client.id;
+            const studentNames = getStudents(client.id, client.student_names);
 
             return (
-              <div key={client.id} className={`glass-card p-4 space-y-4 ${!client.active ? "opacity-60" : ""}`}>
+              <div key={`${client.source}-${client.id}-${client.contract_ids?.[0] || "base"}`} className={`glass-card p-4 space-y-4 ${!client.active ? "opacity-60" : ""}`}>
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-2 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -514,12 +515,17 @@ const AdminClients = () => {
                       <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                         {linkedPayments.length} parcelas
                       </Badge>
+                      {client.source === "contract_snapshot" && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                          Snapshot do contrato
+                        </Badge>
+                      )}
                     </div>
-                    <p className="text-xs text-muted-foreground">{client.cpf} • {unitMap[client.unit_id || ""] || "—"}</p>
+                    <p className="text-xs text-muted-foreground">{client.cpf || "CPF não informado"} • {unitMap[client.unit_id || ""] || "—"}</p>
                     {(client.phone || client.email) && (
                       <p className="text-xs text-muted-foreground">{[client.phone, client.email].filter(Boolean).join(" • ")}</p>
                     )}
-                    {getStudents(client.id) && <p className="text-xs text-muted-foreground">Aluno(s): {getStudents(client.id)}</p>}
+                    {studentNames && <p className="text-xs text-muted-foreground">Aluno(s): {studentNames}</p>}
                     <div className="flex flex-wrap gap-2 pt-1">
                       <Button variant="outline" size="sm" onClick={() => setExpandedClientId(isExpanded ? null : client.id)}>
                         {isExpanded ? <ChevronUp size={14} className="mr-1" /> : <ChevronDown size={14} className="mr-1" />}
@@ -533,13 +539,19 @@ const AdminClients = () => {
                       </Button>
                     </div>
                   </div>
-                  <UserActionButtons
-                    active={client.active}
-                    onEdit={() => setEditTarget(client)}
-                    onDeactivate={() => setActionTarget({ client, action: "deactivate" })}
-                    onReactivate={() => setActionTarget({ client, action: "reactivate" })}
-                    onPermanentDelete={() => handleDeleteRequest(client)}
-                  />
+                  {client.source === "profile" ? (
+                    <UserActionButtons
+                      active={client.active}
+                      onEdit={() => setEditTarget(client)}
+                      onDeactivate={() => setActionTarget({ client, action: "deactivate" })}
+                      onReactivate={() => setActionTarget({ client, action: "reactivate" })}
+                      onPermanentDelete={() => handleDeleteRequest(client)}
+                    />
+                  ) : (
+                    <div className="text-right text-xs text-muted-foreground">
+                      Cadastro disponível apenas no contrato.
+                    </div>
+                  )}
                 </div>
 
                 {isExpanded && (
