@@ -697,12 +697,18 @@ const AdminClients = () => {
               disabled={actionLoading}
               onClick={async () => {
                 if (!dependencyBlocker) return;
-                setActionTarget({ client: dependencyBlocker.client, action: "permanent_delete" });
+                setActionLoading(true);
+                const { data, error } = await supabase.functions.invoke("delete-user", {
+                  body: { user_id: dependencyBlocker.client.id, action: "permanent_delete", force_cascade: true },
+                });
+                if (error || data?.error) {
+                  toast({ title: "Erro", description: error?.message || data?.error, variant: "destructive" });
+                } else {
+                  toast({ title: "Cliente excluído permanentemente" });
+                }
+                setActionLoading(false);
                 setDependencyBlocker(null);
-                // Small delay to let state update
-                setTimeout(() => {
-                  handleAction(true);
-                }, 100);
+                await fetchData();
               }}
             >
               {actionLoading ? <Loader2 size={14} className="animate-spin mr-2" /> : null}
