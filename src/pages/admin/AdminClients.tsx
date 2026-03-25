@@ -291,12 +291,19 @@ const AdminClients = () => {
     if (!showInactive && !client.active) return false;
     if (!search) return true;
 
-    const q = search.toLowerCase();
+    const q = search.toLowerCase().trim();
+    const qDigits = q.replace(/\D/g, "");
     const studentNames = getStudents(client.id).toLowerCase();
+    const cpfDigits = (client.cpf || "").replace(/\D/g, "");
+    const phoneDigits = (client.phone || "").replace(/\D/g, "");
+
     return (
       client.full_name.toLowerCase().includes(q) ||
-      client.cpf.includes(q) ||
+      cpfDigits.includes(qDigits) ||
+      (client.cpf || "").includes(q) ||
       (client.email || "").toLowerCase().includes(q) ||
+      (client.phone || "").includes(q) ||
+      (qDigits.length >= 3 && phoneDigits.includes(qDigits)) ||
       studentNames.includes(q)
     );
   });

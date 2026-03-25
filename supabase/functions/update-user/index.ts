@@ -35,12 +35,11 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await callerClient.auth.getClaims(token);
-    const callerId = claimsData?.claims?.sub;
+    const { data: { user: callerUser }, error: userError } = await callerClient.auth.getUser();
+    const callerId = callerUser?.id;
 
-    if (claimsError || !callerId) {
-      return jsonResponse({ error: "Não autorizado" });
+    if (userError || !callerId) {
+      return jsonResponse({ error: "Não autorizado" }, 401);
     }
 
     const { data: callerRoles } = await supabaseAdmin
