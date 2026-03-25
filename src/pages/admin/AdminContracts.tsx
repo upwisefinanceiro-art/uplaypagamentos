@@ -1159,8 +1159,16 @@ const AdminContracts = () => {
                     variant="ghost"
                     size="sm"
                     className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-                    onClick={() => {
-                      const resp = responsibles.find(r => r.id === c.responsible_id);
+                    onClick={async () => {
+                      let resp = responsibles.find(r => r.id === c.responsible_id);
+                      if (!resp) {
+                        const { data } = await supabase
+                          .from("profiles")
+                          .select("id, full_name, cpf, phone, email, unit_id, address")
+                          .eq("id", c.responsible_id)
+                          .single();
+                        if (data) resp = data as any;
+                      }
                       if (resp) {
                         setEditResponsible({
                           id: resp.id,
