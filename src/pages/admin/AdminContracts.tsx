@@ -1155,6 +1155,28 @@ const AdminContracts = () => {
                     variant="ghost"
                     size="sm"
                     className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => {
+                      const resp = responsibles.find(r => r.id === c.responsible_id);
+                      if (resp) {
+                        setEditResponsible({
+                          id: resp.id,
+                          full_name: resp.full_name,
+                          cpf: resp.cpf,
+                          phone: resp.phone,
+                          unit_id: resp.unit_id,
+                          email: resp.email,
+                        });
+                      } else {
+                        toast({ title: "Responsável não encontrado na base", variant: "destructive" });
+                      }
+                    }}
+                  >
+                    <Pencil size={12} className="mr-1" /> Editar Responsável
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
                     onClick={() => navigate(`/admin/cobrancas?contract=${c.id}`)}
                   >
                     <ExternalLink size={12} className="mr-1" /> Parcelas
