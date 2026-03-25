@@ -33,6 +33,9 @@ interface ClientRow {
   active: boolean;
   email: string | null;
   address: string | null;
+  source: "profile" | "contract_snapshot";
+  contract_ids?: string[];
+  student_names?: string[];
 }
 
 interface StudentRow {
@@ -64,6 +67,13 @@ interface PaymentRow {
 interface ContractLinkRow {
   id: string;
   responsible_id: string;
+  responsible_name: string | null;
+  cpf: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  unit_id: string;
+  student_id: string | null;
   description: string;
   status: string;
 }
@@ -131,12 +141,59 @@ const AdminClients = () => {
         .from("payments")
         .select("id, responsible_id, contract_id, student_id, description, payment_type, installment_number, due_date, status, value, final_value, unit_id")
         .order("due_date", { ascending: false }),
-      supabase.from("contracts").select("id, responsible_id, description, status"),
+      supabase.from("contracts").select("id, responsible_id, responsible_name, cpf, email, phone, address, unit_id, student_id, description, status"),
     ]);
 
-    if (profilesRes.data && rolesRes.data) {
+    if (profilesRes.data && rolesRes.data && studentsRes.data && contractsRes.data) {
       const responsibleIds = new Set(rolesRes.data.map((row: { user_id: string }) => row.user_id));
-      setClients(profilesRes.data.filter((row) => responsibleIds.has(row.id)) as ClientRow[]);
+      const studentNamesByResponsible = new Map<string, string[]>();
+
+      (studentsRes.data as StudentRow[]).forEach((student) => {
+        const names = studentNamesByResponsible.get(student.responsible_id) || [];
+        names.push(student.full_name);
+        studentNamesByResponsible.set(student.responsible_id, names);
+      });
+
+      const profileClients = (profilesRes.data as ClientRow[])
+        .filter((row) => responsibleIds.has(row.id))
+        .map((row) => ({
+          ...row,
+          source: "profile" as const,
+          contract_ids: [],
+          student_names: studentNamesByResponsible.get(row.id) || [],
+        }));
+
+      const profileIds = new Set(profileClients.map((client) => client.id));
+      const snapshotClients = (contractsRes.data as ContractLinkRow[])
+        .filter((contract) => contract.responsible_id && !profileIds.has(contract.responsible_id))
+        .reduce<ClientRow[]>((acc, contract) => {
+          const existing = acc.find((client) => client.id === contract.responsible_id);
+          const studentName = (studentsRes.data as StudentRow[]).find((student) => student.id === contract.student_id)?.full_name;
+
+          if (existing) {
+            existing.contract_ids = [...new Set([...(existing.contract_ids || []), contract.id])];
+            existing.student_names = [...new Set([...(existing.student_names || []), ...(studentName ? [studentName] : [])])];
+            return acc;
+          }
+
+          acc.push({
+            id: contract.responsible_id,
+            full_name: contract.responsible_name || "Responsável sem nome",
+            cpf: contract.cpf || "",
+            phone: contract.phone,
+            unit_id: contract.unit_id,
+            active: true,
+            email: contract.email,
+            address: contract.address,
+            source: "contract_snapshot",
+            contract_ids: [contract.id],
+            student_names: studentName ? [studentName] : [],
+          });
+
+          return acc;
+        }, []);
+
+      setClients([...profileClients, ...snapshotClients].sort((a, b) => a.full_name.localeCompare(b.full_name, "pt-BR")));
     }
 
     if (studentsRes.data) setStudents(studentsRes.data as StudentRow[]);
@@ -278,33 +335,49 @@ const AdminClients = () => {
     await fetchData();
   };
 
-  const getStudents = (responsibleId: string) =>
-    students
+  const getStudents = (responsibleId: string, fallbackNames?: string[]) => {
+    const namesFromStudents = students
       .filter((student) => student.responsible_id === responsibleId)
-      .map((student) => student.full_name)
-      .join(", ");
+      .map((student) => student.full_name);
 
-  const getClientPayments = (responsibleId: string) => payments.filter((payment) => payment.responsible_id === responsibleId);
-  const getClientContracts = (responsibleId: string) => contracts.filter((contract) => contract.responsible_id === responsibleId);
+    const combined = [...new Set([...(fallbackNames || []), ...namesFromStudents])];
+    return combined.join(", ");
+  };
+
+  const getClientPayments = (client: ClientRow) => {
+    const contractIds = new Set(client.contract_ids || []);
+
+    return payments.filter((payment) => {
+      if (payment.responsible_id === client.id) return true;
+      if (payment.contract_id && contractIds.has(payment.contract_id)) return true;
+      return false;
+    });
+  };
+
+  const getClientContracts = (client: ClientRow) => {
+    const contractIds = new Set(client.contract_ids || []);
+    return contracts.filter((contract) => contract.responsible_id === client.id || contractIds.has(contract.id));
+  };
 
   const filtered = clients.filter((client) => {
     if (!showInactive && !client.active) return false;
-    if (!search) return true;
+    if (!search.trim()) return true;
 
     const q = search.toLowerCase().trim();
     const qDigits = q.replace(/\D/g, "");
-    const studentNames = getStudents(client.id).toLowerCase();
+    const studentNames = getStudents(client.id, client.student_names).toLowerCase();
     const cpfDigits = (client.cpf || "").replace(/\D/g, "");
     const phoneDigits = (client.phone || "").replace(/\D/g, "");
+    const normalizedEmail = (client.email || "").toLowerCase();
+    const normalizedPhone = (client.phone || "").toLowerCase();
 
     return (
       client.full_name.toLowerCase().includes(q) ||
-      cpfDigits.includes(qDigits) ||
-      (client.cpf || "").includes(q) ||
-      (client.email || "").toLowerCase().includes(q) ||
-      (client.phone || "").includes(q) ||
-      (qDigits.length >= 3 && phoneDigits.includes(qDigits)) ||
-      studentNames.includes(q)
+      normalizedEmail.includes(q) ||
+      studentNames.includes(q) ||
+      (qDigits.length > 0 && cpfDigits.includes(qDigits)) ||
+      (qDigits.length > 0 && phoneDigits.includes(qDigits)) ||
+      normalizedPhone.includes(q)
     );
   });
 
@@ -423,12 +496,13 @@ const AdminClients = () => {
       ) : (
         <div className="space-y-3">
           {filtered.map((client) => {
-            const linkedPayments = getClientPayments(client.id);
-            const linkedContracts = getClientContracts(client.id);
+            const linkedPayments = getClientPayments(client);
+            const linkedContracts = getClientContracts(client);
             const isExpanded = expandedClientId === client.id;
+            const studentNames = getStudents(client.id, client.student_names);
 
             return (
-              <div key={client.id} className={`glass-card p-4 space-y-4 ${!client.active ? "opacity-60" : ""}`}>
+              <div key={`${client.source}-${client.id}-${client.contract_ids?.[0] || "base"}`} className={`glass-card p-4 space-y-4 ${!client.active ? "opacity-60" : ""}`}>
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-2 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -441,12 +515,17 @@ const AdminClients = () => {
                       <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                         {linkedPayments.length} parcelas
                       </Badge>
+                      {client.source === "contract_snapshot" && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                          Snapshot do contrato
+                        </Badge>
+                      )}
                     </div>
-                    <p className="text-xs text-muted-foreground">{client.cpf} • {unitMap[client.unit_id || ""] || "—"}</p>
+                    <p className="text-xs text-muted-foreground">{client.cpf || "CPF não informado"} • {unitMap[client.unit_id || ""] || "—"}</p>
                     {(client.phone || client.email) && (
                       <p className="text-xs text-muted-foreground">{[client.phone, client.email].filter(Boolean).join(" • ")}</p>
                     )}
-                    {getStudents(client.id) && <p className="text-xs text-muted-foreground">Aluno(s): {getStudents(client.id)}</p>}
+                    {studentNames && <p className="text-xs text-muted-foreground">Aluno(s): {studentNames}</p>}
                     <div className="flex flex-wrap gap-2 pt-1">
                       <Button variant="outline" size="sm" onClick={() => setExpandedClientId(isExpanded ? null : client.id)}>
                         {isExpanded ? <ChevronUp size={14} className="mr-1" /> : <ChevronDown size={14} className="mr-1" />}
@@ -460,13 +539,19 @@ const AdminClients = () => {
                       </Button>
                     </div>
                   </div>
-                  <UserActionButtons
-                    active={client.active}
-                    onEdit={() => setEditTarget(client)}
-                    onDeactivate={() => setActionTarget({ client, action: "deactivate" })}
-                    onReactivate={() => setActionTarget({ client, action: "reactivate" })}
-                    onPermanentDelete={() => handleDeleteRequest(client)}
-                  />
+                  {client.source === "profile" ? (
+                    <UserActionButtons
+                      active={client.active}
+                      onEdit={() => setEditTarget(client)}
+                      onDeactivate={() => setActionTarget({ client, action: "deactivate" })}
+                      onReactivate={() => setActionTarget({ client, action: "reactivate" })}
+                      onPermanentDelete={() => handleDeleteRequest(client)}
+                    />
+                  ) : (
+                    <div className="text-right text-xs text-muted-foreground">
+                      Cadastro disponível apenas no contrato.
+                    </div>
+                  )}
                 </div>
 
                 {isExpanded && (
