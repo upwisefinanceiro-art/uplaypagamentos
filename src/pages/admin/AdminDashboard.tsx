@@ -326,7 +326,7 @@ const AdminDashboard = () => {
     let invoiceUrl = payment.invoice_url || payment.checkout_url || null;
 
     // Auto-sync with Asaas to get invoice_url if missing
-    if (!invoiceUrl && payment.payment_method !== "DINHEIRO") {
+    if (!invoiceUrl) {
       try {
         toast({ title: "Buscando link de pagamento no Asaas..." });
         const { data, error } = await supabase.functions.invoke("sync-asaas-payment", {
