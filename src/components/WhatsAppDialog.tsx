@@ -47,16 +47,17 @@ const buildDefaultMessage = ({
   const formatCurrency = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
   const formatDate = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("pt-BR");
 
-  let msg = `Olá, ${responsibleName}.\n\n`;
-  msg += `Aqui é do financeiro da EnsinUP.\n\n`;
-  if (studentName) msg += `Aluno: ${studentName}\n`;
-  msg += `Referência: ${description}\n`;
-  msg += `Valor: *${formatCurrency(value)}*\n`;
-  msg += `Vencimento: *${formatDate(dueDate)}*\n\n`;
+  let msg = `📚 *EnsinUP - Educação que transforma* 📚\n\n`;
+  msg += `Olá, ${responsibleName}! 👋\n\n`;
+  msg += `Aqui é do *financeiro da EnsinUP*.\n\n`;
+  if (studentName) msg += `👤 Aluno: ${studentName}\n`;
+  msg += `📋 Referência: ${description}\n`;
+  msg += `💰 Valor: *${formatCurrency(value)}*\n`;
+  msg += `📅 Vencimento: *${formatDate(dueDate)}*\n\n`;
   if (invoiceUrl) {
-    msg += `Você pode pagar pelo link abaixo:\n${invoiceUrl}\n\n`;
+    msg += `🔗 *Pague pelo link abaixo:*\n${invoiceUrl}\n\n`;
   }
-  msg += `Se tiver qualquer dúvida, estamos à disposição.`;
+  msg += `Se tiver qualquer dúvida, estamos à disposição. 😊`;
 
   return msg;
 };
