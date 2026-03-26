@@ -322,7 +322,24 @@ const AdminDashboard = () => {
     }
   };
 
-  const openWhatsApp = (payment: DashboardPayment) => {
+  const openWhatsApp = async (payment: DashboardPayment) => {
+    let invoiceUrl = payment.invoice_url || payment.checkout_url || null;
+
+    // Auto-sync with Asaas to get invoice_url if missing
+    if (!invoiceUrl) {
+      try {
+        toast({ title: "Buscando link de pagamento no Asaas..." });
+        const { data, error } = await supabase.functions.invoke("sync-asaas-payment", {
+          body: { payment_id: payment.id },
+        });
+        if (!error && data?.invoice_url) {
+          invoiceUrl = data.invoice_url;
+        }
+      } catch {
+        // proceed without link
+      }
+    }
+
     const student = getStudentByResponsible(payment.responsible_id);
     setWaDialog({
       open: true,
@@ -333,7 +350,7 @@ const AdminDashboard = () => {
       dueDate: payment.due_date,
       paymentId: payment.id,
       responsibleId: payment.responsible_id,
-      invoiceUrl: payment.invoice_url || payment.checkout_url || null,
+      invoiceUrl,
     });
   };
 

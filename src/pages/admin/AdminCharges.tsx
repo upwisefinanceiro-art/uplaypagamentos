@@ -531,7 +531,30 @@ const AdminCharges = () => {
   };
 
   const handleOpenWhatsApp = async (payment: PaymentRow) => {
-    setWaPayment(payment);
+    let updatedPayment = payment;
+
+    // Auto-sync with Asaas to get invoice_url if missing
+    if (!payment.invoice_url && !payment.checkout_url && payment.payment_method !== "DINHEIRO") {
+      try {
+        toast({ title: "Buscando link de pagamento no Asaas..." });
+        const { data, error } = await supabase.functions.invoke("sync-asaas-payment", {
+          body: { payment_id: payment.id },
+        });
+        if (!error && data?.invoice_url) {
+          updatedPayment = {
+            ...payment,
+            invoice_url: data.invoice_url,
+            boleto_url: data.boleto_url || payment.boleto_url,
+            checkout_url: data.invoice_url,
+            pix_copy_paste: data.pix_copy_paste || payment.pix_copy_paste,
+          };
+        }
+      } catch {
+        // proceed without link
+      }
+    }
+
+    setWaPayment(updatedPayment);
     const responsible = profiles[payment.responsible_id];
     setWaResponsible(responsible ? { full_name: responsible.full_name, phone: responsible.phone } : null);
     setWaStudent(payment.student_id ? studentMap[payment.student_id] : undefined);
