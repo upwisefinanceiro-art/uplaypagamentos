@@ -185,7 +185,7 @@ const AdminDashboard = () => {
 
     // Paid in period
     const paidInPeriod = fp.filter((p) => {
-      if (p.status !== "RECEIVED" && p.status !== "CONFIRMED") return false;
+      if (p.status !== "PAID" && p.status !== "RECEIVED" && p.status !== "CONFIRMED") return false;
       if (!p.paid_at) return false;
       const d = new Date(p.paid_at);
       return d >= dateStart && d <= dateEnd;
