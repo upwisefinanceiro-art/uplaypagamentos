@@ -55,6 +55,12 @@ export type Database = {
           apostilas_total_value: number | null
           asaas_customer_id: string | null
           birth_date: string | null
+          cancellation_base_value: number | null
+          cancellation_date: string | null
+          cancellation_installments_count: number | null
+          cancellation_penalty_percent: number | null
+          cancellation_penalty_value: number | null
+          cancelled_at: string | null
           city: string | null
           complement: string | null
           contract_number: string | null
@@ -97,6 +103,12 @@ export type Database = {
           apostilas_total_value?: number | null
           asaas_customer_id?: string | null
           birth_date?: string | null
+          cancellation_base_value?: number | null
+          cancellation_date?: string | null
+          cancellation_installments_count?: number | null
+          cancellation_penalty_percent?: number | null
+          cancellation_penalty_value?: number | null
+          cancelled_at?: string | null
           city?: string | null
           complement?: string | null
           contract_number?: string | null
@@ -139,6 +151,12 @@ export type Database = {
           apostilas_total_value?: number | null
           asaas_customer_id?: string | null
           birth_date?: string | null
+          cancellation_base_value?: number | null
+          cancellation_date?: string | null
+          cancellation_installments_count?: number | null
+          cancellation_penalty_percent?: number | null
+          cancellation_penalty_value?: number | null
+          cancelled_at?: string | null
           city?: string | null
           complement?: string | null
           contract_number?: string | null
