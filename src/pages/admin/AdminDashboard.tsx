@@ -57,6 +57,9 @@ export type DashboardPayment = {
   installment_number: number;
   contract_id: string | null;
   checkout_url: string | null;
+  invoice_url: string | null;
+  boleto_url: string | null;
+  payment_type: string;
 };
 
 export type DashboardUnit = {
