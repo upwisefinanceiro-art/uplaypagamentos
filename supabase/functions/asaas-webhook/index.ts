@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.98.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, asaas-access-token",
 };
 
 const statusMap: Record<string, string> = {
@@ -15,16 +15,47 @@ const statusMap: Record<string, string> = {
   RECEIVED_IN_CASH: "PAID",
 };
 
+async function logWebhook(
+  supabase: ReturnType<typeof createClient>,
+  data: {
+    event: string;
+    asaas_payment_id?: string;
+    local_payment_id?: string;
+    unit_id?: string;
+    old_status?: string;
+    new_status?: string;
+    payload?: unknown;
+    processed: boolean;
+    error_message?: string;
+  }
+) {
+  try {
+    await supabase.from("webhook_logs").insert({
+      event: data.event,
+      asaas_payment_id: data.asaas_payment_id || null,
+      local_payment_id: data.local_payment_id || null,
+      unit_id: data.unit_id || null,
+      old_status: data.old_status || null,
+      new_status: data.new_status || null,
+      payload: data.payload || null,
+      processed: data.processed,
+      error_message: data.error_message || null,
+    });
+  } catch (e) {
+    console.error("Failed to write webhook log:", e);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
 
+  try {
     const body = await req.json();
     console.log("Asaas webhook received:", JSON.stringify(body));
 
@@ -32,6 +63,12 @@ Deno.serve(async (req) => {
     const payment = body.payment;
 
     if (!event || !payment?.id) {
+      await logWebhook(supabase, {
+        event: event || "UNKNOWN",
+        payload: body,
+        processed: false,
+        error_message: "Missing event or payment.id",
+      });
       return new Response(JSON.stringify({ received: true, ignored: true }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -50,7 +87,13 @@ Deno.serve(async (req) => {
     ];
 
     if (!paymentEvents.includes(event)) {
-      console.log("Event ignored:", event);
+      await logWebhook(supabase, {
+        event,
+        asaas_payment_id: payment.id,
+        payload: body,
+        processed: false,
+        error_message: "Event type not handled",
+      });
       return new Response(JSON.stringify({ received: true, ignored: true }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -62,12 +105,18 @@ Deno.serve(async (req) => {
     // Find payment in our database
     const { data: localPayment, error: findErr } = await supabase
       .from("payments")
-      .select("id, unit_id, status, paid_at, pix_qr_code, pix_copy_paste")
+      .select("id, unit_id, status, paid_at, pix_qr_code, pix_copy_paste, payment_method")
       .eq("asaas_payment_id", asaasPaymentId)
       .maybeSingle();
 
     if (findErr || !localPayment) {
-      console.log("Payment not found locally for asaas_payment_id:", asaasPaymentId);
+      await logWebhook(supabase, {
+        event,
+        asaas_payment_id: asaasPaymentId,
+        payload: body,
+        processed: false,
+        error_message: findErr?.message || "Payment not found locally",
+      });
       return new Response(JSON.stringify({ received: true, found: false }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -84,7 +133,15 @@ Deno.serve(async (req) => {
         .single();
 
       if (unit?.asaas_webhook_token && unit.asaas_webhook_token !== webhookToken) {
-        console.error("Invalid webhook token");
+        await logWebhook(supabase, {
+          event,
+          asaas_payment_id: asaasPaymentId,
+          local_payment_id: localPayment.id,
+          unit_id: localPayment.unit_id,
+          payload: body,
+          processed: false,
+          error_message: "Invalid webhook token",
+        });
         return new Response(JSON.stringify({ error: "Invalid token" }), {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -93,6 +150,7 @@ Deno.serve(async (req) => {
     }
 
     // Map Asaas status
+    const oldStatus = localPayment.status;
     const newStatus = statusMap[payment.status] || localPayment.status;
 
     const updateData: Record<string, unknown> = {
@@ -104,6 +162,17 @@ Deno.serve(async (req) => {
     // Set paid_at if status changed to PAID
     if (newStatus === "PAID" && !localPayment.paid_at) {
       updateData.paid_at = payment.paymentDate || new Date().toISOString();
+    }
+
+    // Save billing type from Asaas if we don't have a payment_method yet
+    if (payment.billingType && !localPayment.payment_method) {
+      const billingTypeMap: Record<string, string> = {
+        PIX: "PIX",
+        BOLETO: "BOLETO",
+        CREDIT_CARD: "CARD",
+        UNDEFINED: "BOLETO",
+      };
+      updateData.payment_method = billingTypeMap[payment.billingType] || payment.billingType;
     }
 
     // Fetch PIX data if needed
@@ -141,9 +210,31 @@ Deno.serve(async (req) => {
 
     if (updateErr) {
       console.error("Error updating payment:", updateErr);
+      await logWebhook(supabase, {
+        event,
+        asaas_payment_id: asaasPaymentId,
+        local_payment_id: localPayment.id,
+        unit_id: localPayment.unit_id,
+        old_status: oldStatus,
+        new_status: newStatus,
+        payload: body,
+        processed: false,
+        error_message: updateErr.message,
+      });
+    } else {
+      await logWebhook(supabase, {
+        event,
+        asaas_payment_id: asaasPaymentId,
+        local_payment_id: localPayment.id,
+        unit_id: localPayment.unit_id,
+        old_status: oldStatus,
+        new_status: newStatus,
+        payload: body,
+        processed: true,
+      });
     }
 
-    console.log(`Payment ${localPayment.id} updated: ${localPayment.status} -> ${newStatus}`);
+    console.log(`Payment ${localPayment.id} updated: ${oldStatus} -> ${newStatus}`);
 
     return new Response(JSON.stringify({ received: true, updated: true, status: newStatus }), {
       status: 200,
@@ -151,6 +242,12 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error("Webhook error:", err);
+    await logWebhook(supabase, {
+      event: "ERROR",
+      payload: null,
+      processed: false,
+      error_message: err instanceof Error ? err.message : "Internal error",
+    });
     return new Response(JSON.stringify({ error: "Internal error" }), {
       status: 200, // Always 200 to avoid Asaas retries
       headers: { ...corsHeaders, "Content-Type": "application/json" },
