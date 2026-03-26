@@ -1,4 +1,5 @@
 import { Clock, MessageCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import type { DashboardPayment, DashboardStudent } from "@/pages/admin/AdminDashboard";
 
@@ -17,6 +18,7 @@ const DashboardDueTodayList = ({
   formatCurrency,
   onSendWhatsApp,
 }: Props) => {
+  const navigate = useNavigate();
   return (
     <div className="glass-card p-4">
       <div className="flex items-center gap-2 mb-4">
@@ -33,7 +35,7 @@ const DashboardDueTodayList = ({
           {dueTodayList.map((p) => {
             const student = getStudentByResponsible(p.responsible_id);
             return (
-              <div key={p.id} className="flex items-center justify-between py-2.5 px-2 rounded-md hover:bg-warning/5 border-b border-border/30 last:border-0 transition-colors">
+              <div key={p.id} className="flex items-center justify-between py-2.5 px-2 rounded-md hover:bg-warning/5 border-b border-border/30 last:border-0 transition-colors cursor-pointer" onClick={() => navigate('/admin/cobrancas')}>
                 <div className="flex-1 min-w-0 mr-2">
                   <p className="text-sm font-medium text-foreground truncate">
                     {getProfileName(p.responsible_id)}
