@@ -29,6 +29,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import UserEditDialog from "@/components/admin/UserEditDialog";
+import ContractCancellationDialog from "@/components/admin/ContractCancellationDialog";
 
 interface ContractRow {
   id: string;
