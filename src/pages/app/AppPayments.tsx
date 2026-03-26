@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight, Plus, Copy, QrCode, ExternalLink, Loader2, MessageCircle } from "lucide-react";
+import { ChevronRight, Plus, Copy, QrCode, ExternalLink, Loader2, MessageCircle, AlertTriangle } from "lucide-react";
+import { differenceInDays, startOfDay, isBefore } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
