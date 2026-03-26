@@ -130,7 +130,7 @@ export default function ContractCancellationDialog({
     }).length;
 
     const baseValue = futurePayments.reduce(
-      (sum, p) => sum + (p.final_value || p.value),
+      (sum, p) => sum + p.value,
       0
     );
     const percent = parseFloat(penaltyPercent) || 0;
@@ -440,7 +440,7 @@ export default function ContractCancellationDialog({
                             )}
                           </span>
                           <span className="text-right font-medium text-primary">
-                            {fmt(p.final_value || p.value)}
+                            {fmt(p.value)}
                           </span>
                         </div>
                       ))}
