@@ -1,0 +1,1 @@
+DELETE FROM webhook_logs WHERE event = 'TEST_MANUAL'
