@@ -248,8 +248,25 @@ const AppPaymentDetail = () => {
         </div>
       </div>
 
+      {/* ─── OVERDUE ALERT ─── */}
+      {(status === "OVERDUE" || (status === "PENDING" && diffDays < 0)) && (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 flex items-start gap-3 animate-pulse">
+          <AlertTriangle size={20} className="text-destructive flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-bold text-destructive">⚠️ Pagamento em atraso</p>
+            <p className="text-xs text-destructive/80 mt-0.5">
+              Esta cobrança está com {Math.abs(diffDays)} {Math.abs(diffDays) === 1 ? "dia" : "dias"} de atraso.
+              Valor: {formatCurrency(finalValue)} — Vencimento: {dueDateStr}
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Tipo: {chargeType.label}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ─── PAYMENT METHODS ─── */}
-      {status === "PENDING" && (payment.invoice_url || payment.pix_copy_paste || payment.pix_qr_code || payment.boleto_url || payment.checkout_url) && (
+      {(status === "PENDING" || status === "OVERDUE") && (payment.invoice_url || payment.pix_copy_paste || payment.pix_qr_code || payment.boleto_url || payment.checkout_url) && (
         <div className="glass-card p-4 space-y-4">
           <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
             <CreditCard size={16} className="text-primary" />
