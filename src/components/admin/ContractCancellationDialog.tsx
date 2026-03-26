@@ -440,7 +440,7 @@ export default function ContractCancellationDialog({
                             )}
                           </span>
                           <span className="text-right font-medium text-primary">
-                            {fmt(p.final_value || p.value)}
+                            {fmt(p.value)}
                           </span>
                         </div>
                       ))}
