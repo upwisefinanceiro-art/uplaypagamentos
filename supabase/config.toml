@@ -26,3 +26,9 @@ verify_jwt = false
 
 [functions.sync-asaas-payment]
 verify_jwt = false
+
+[functions.asaas-webhook]
+verify_jwt = false
+
+[functions.sync-all-payments]
+verify_jwt = false

@@ -178,6 +178,7 @@ const AdminCharges = () => {
   const [actionTarget, setActionTarget] = useState<{ payment: PaymentRow; action: ManagedPaymentAction } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [syncingPaymentId, setSyncingPaymentId] = useState<string | null>(null);
+  const [syncingAll, setSyncingAll] = useState(false);
 
   const [selectedResponsible, setSelectedResponsible] = useState("");
   const [selectedStudent, setSelectedStudent] = useState("NONE");
@@ -537,6 +538,35 @@ const AdminCharges = () => {
     setWaDialogOpen(true);
   };
 
+  const handleSyncAll = async () => {
+    setSyncingAll(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-all-payments", {
+        body: unitFilter !== "ALL" ? { unit_id: unitFilter } : {},
+      });
+
+      if (error) {
+        toast({ title: "Erro ao sincronizar", description: "Falha na comunicação", variant: "destructive" });
+        return;
+      }
+
+      if (data?.error) {
+        toast({ title: "Erro", description: data.error, variant: "destructive" });
+        return;
+      }
+
+      toast({
+        title: "Sincronização concluída",
+        description: data.message || `${data.synced} pagamento(s) sincronizado(s)`,
+      });
+      fetchData();
+    } catch (err: unknown) {
+      toast({ title: "Erro inesperado", description: err instanceof Error ? err.message : "Erro desconhecido", variant: "destructive" });
+    } finally {
+      setSyncingAll(false);
+    }
+  };
+
   const clearScopedFilters = () => {
     navigate("/admin/cobrancas");
   };
@@ -549,6 +579,15 @@ const AdminCharges = () => {
           <p className="text-sm text-muted-foreground">Edite, exclua, cancele e crie parcelas manuais ou cobranças online com dados reais.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            className="gap-1.5"
+            disabled={syncingAll}
+            onClick={handleSyncAll}
+          >
+            {syncingAll ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+            Sincronizar Todos
+          </Button>
           <Dialog
             open={manualDialogOpen}
             onOpenChange={(open) => {
