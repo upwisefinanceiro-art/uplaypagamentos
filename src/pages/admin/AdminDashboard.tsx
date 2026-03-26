@@ -467,7 +467,9 @@ const AdminDashboard = () => {
           dueTodayList={filtered.dueTodayList}
           getProfileName={getProfileName}
           getStudentByResponsible={getStudentByResponsible}
+          getUnitName={getUnitName}
           formatCurrency={formatCurrency}
+          showUnit={isMaster && unitFilter === "all"}
           onSendWhatsApp={openWhatsApp}
         />
       </div>
