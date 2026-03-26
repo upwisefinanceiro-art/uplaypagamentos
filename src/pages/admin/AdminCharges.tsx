@@ -911,28 +911,39 @@ const AdminCharges = () => {
             const paymentValue = Number(payment.final_value ?? payment.value);
             const paymentType = typeLabels[payment.payment_type as PaymentType] || payment.payment_type || "—";
             const status = (payment.status as PaymentStatus) || "PENDING";
+            const dueDate = startOfDay(new Date(payment.due_date + "T12:00:00"));
+            const today = startOfDay(new Date());
+            const isOverdue = (status === "OVERDUE") || (status === "PENDING" && isBefore(dueDate, today));
+            const daysOverdue = isOverdue ? differenceInDays(today, dueDate) : 0;
 
             return (
-              <div key={payment.id} className="glass-card p-4 space-y-4">
+              <div key={payment.id} className={`glass-card p-4 space-y-4 ${isOverdue ? "border-destructive/50 bg-destructive/5" : ""}`}>
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div className="space-y-2 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-sm font-semibold text-foreground truncate">{payment.description || `Parcela ${payment.installment_number}`}</h3>
+                      <h3 className={`text-sm font-semibold truncate ${isOverdue ? "text-destructive" : "text-foreground"}`}>{payment.description || `Parcela ${payment.installment_number}`}</h3>
                       <Badge variant="secondary">{paymentType}</Badge>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${statusClasses[status]}`}>{statusLabels[status]}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${isOverdue ? "status-overdue" : statusClasses[status]}`}>
+                        {isOverdue ? "Vencido" : statusLabels[status]}
+                      </span>
+                      {isOverdue && (
+                        <span className="text-[10px] font-bold text-destructive bg-destructive/10 px-1.5 py-0.5 rounded-full animate-pulse">
+                          ⚠️ {daysOverdue}d atraso
+                        </span>
+                      )}
                     </div>
                     <div className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2 xl:grid-cols-3">
                       <p><span className="font-medium text-foreground">Cliente:</span> {responsible}</p>
                       <p><span className="font-medium text-foreground">Aluno:</span> {student}</p>
                       <p><span className="font-medium text-foreground">Contrato:</span> {contract}</p>
                       <p><span className="font-medium text-foreground">Parcela:</span> #{payment.installment_number}</p>
-                      <p><span className="font-medium text-foreground">Vencimento:</span> {new Date(`${payment.due_date}T12:00:00`).toLocaleDateString("pt-BR")}</p>
+                      <p><span className={`font-medium ${isOverdue ? "text-destructive" : "text-foreground"}`}>Vencimento:</span> {new Date(`${payment.due_date}T12:00:00`).toLocaleDateString("pt-BR")}</p>
                       <p><span className="font-medium text-foreground">Unidade:</span> {unit}</p>
                     </div>
                   </div>
 
                   <div className="flex flex-col items-start gap-3 lg:items-end">
-                    <p className="text-lg font-bold text-foreground">R$ {paymentValue.toFixed(2).replace(".", ",")}</p>
+                    <p className={`text-lg font-bold ${isOverdue ? "text-destructive" : "text-foreground"}`}>R$ {paymentValue.toFixed(2).replace(".", ",")}</p>
 
                     {/* Action buttons row */}
                     <div className="flex flex-wrap items-center gap-1.5">
