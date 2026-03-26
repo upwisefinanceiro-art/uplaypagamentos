@@ -1182,7 +1182,7 @@ const AdminCharges = () => {
           description={waDescription}
           value={Number(waPayment.final_value ?? waPayment.value)}
           dueDate={waPayment.due_date}
-          invoiceUrl={waPayment.invoice_url}
+          invoiceUrl={waPayment.invoice_url || waPayment.checkout_url}
           paymentId={waPayment.id}
           responsibleId={waPayment.responsible_id}
         />
