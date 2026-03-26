@@ -138,6 +138,7 @@ const AdminContracts = () => {
   const [deleting, setDeleting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [editResponsible, setEditResponsible] = useState<{ id: string; full_name: string; cpf: string; phone: string | null; unit_id: string | null; email?: string | null; address?: string | null } | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<ContractRow | null>(null);
   const { toast } = useToast();
   const { profile, hasRole } = useAuth();
 
