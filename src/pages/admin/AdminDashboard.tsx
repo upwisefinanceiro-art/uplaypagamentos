@@ -57,6 +57,9 @@ export type DashboardPayment = {
   installment_number: number;
   contract_id: string | null;
   checkout_url: string | null;
+  invoice_url: string | null;
+  boleto_url: string | null;
+  payment_type: string;
 };
 
 export type DashboardUnit = {
@@ -126,7 +129,7 @@ const AdminDashboard = () => {
     const fetchData = async () => {
       setLoading(true);
       const [paymentsRes, unitsRes, profilesRes, studentsRes] = await Promise.all([
-        supabase.from("payments").select("id, status, value, final_value, due_date, paid_at, unit_id, responsible_id, installment_number, contract_id, checkout_url"),
+        supabase.from("payments").select("id, status, value, final_value, due_date, paid_at, unit_id, responsible_id, installment_number, contract_id, checkout_url, invoice_url, boleto_url, payment_type"),
         isMaster
           ? supabase.from("units").select("id, name").eq("active", true)
           : supabase.from("units").select("id, name").eq("id", userProfile?.unit_id ?? ""),
@@ -464,7 +467,9 @@ const AdminDashboard = () => {
           dueTodayList={filtered.dueTodayList}
           getProfileName={getProfileName}
           getStudentByResponsible={getStudentByResponsible}
+          getUnitName={getUnitName}
           formatCurrency={formatCurrency}
+          showUnit={isMaster && unitFilter === "all"}
           onSendWhatsApp={openWhatsApp}
         />
       </div>
