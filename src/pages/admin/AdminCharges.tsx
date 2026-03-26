@@ -538,6 +538,35 @@ const AdminCharges = () => {
     setWaDialogOpen(true);
   };
 
+  const handleSyncAll = async () => {
+    setSyncingAll(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-all-payments", {
+        body: unitFilter !== "ALL" ? { unit_id: unitFilter } : {},
+      });
+
+      if (error) {
+        toast({ title: "Erro ao sincronizar", description: "Falha na comunicação", variant: "destructive" });
+        return;
+      }
+
+      if (data?.error) {
+        toast({ title: "Erro", description: data.error, variant: "destructive" });
+        return;
+      }
+
+      toast({
+        title: "Sincronização concluída",
+        description: data.message || `${data.synced} pagamento(s) sincronizado(s)`,
+      });
+      fetchData();
+    } catch (err: unknown) {
+      toast({ title: "Erro inesperado", description: err instanceof Error ? err.message : "Erro desconhecido", variant: "destructive" });
+    } finally {
+      setSyncingAll(false);
+    }
+  };
+
   const clearScopedFilters = () => {
     navigate("/admin/cobrancas");
   };
