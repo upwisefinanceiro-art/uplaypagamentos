@@ -129,7 +129,7 @@ const AdminDashboard = () => {
     const fetchData = async () => {
       setLoading(true);
       const [paymentsRes, unitsRes, profilesRes, studentsRes] = await Promise.all([
-        supabase.from("payments").select("id, status, value, final_value, due_date, paid_at, unit_id, responsible_id, installment_number, contract_id, checkout_url"),
+        supabase.from("payments").select("id, status, value, final_value, due_date, paid_at, unit_id, responsible_id, installment_number, contract_id, checkout_url, invoice_url, boleto_url, payment_type"),
         isMaster
           ? supabase.from("units").select("id, name").eq("active", true)
           : supabase.from("units").select("id, name").eq("id", userProfile?.unit_id ?? ""),
