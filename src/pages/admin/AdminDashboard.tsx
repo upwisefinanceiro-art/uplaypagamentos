@@ -333,7 +333,7 @@ const AdminDashboard = () => {
       dueDate: payment.due_date,
       paymentId: payment.id,
       responsibleId: payment.responsible_id,
-      invoiceUrl: payment.checkout_url ?? null,
+      invoiceUrl: payment.invoice_url || payment.checkout_url || null,
     });
   };
 
