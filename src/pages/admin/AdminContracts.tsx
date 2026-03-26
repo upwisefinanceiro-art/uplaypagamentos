@@ -1253,6 +1253,13 @@ const AdminContracts = () => {
         onSaved={fetchData}
         showUnitSelector={hasRole("ADMIN_MASTER")}
       />
+
+      <ContractCancellationDialog
+        contract={cancelTarget}
+        open={!!cancelTarget}
+        onOpenChange={(open) => !open && setCancelTarget(null)}
+        onSuccess={fetchData}
+      />
     </div>
   );
 };
