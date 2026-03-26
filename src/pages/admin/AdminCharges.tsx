@@ -579,6 +579,15 @@ const AdminCharges = () => {
           <p className="text-sm text-muted-foreground">Edite, exclua, cancele e crie parcelas manuais ou cobranças online com dados reais.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            className="gap-1.5"
+            disabled={syncingAll}
+            onClick={handleSyncAll}
+          >
+            {syncingAll ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+            Sincronizar Todos
+          </Button>
           <Dialog
             open={manualDialogOpen}
             onOpenChange={(open) => {
