@@ -185,7 +185,7 @@ const AdminDashboard = () => {
 
     // Paid in period
     const paidInPeriod = fp.filter((p) => {
-      if (p.status !== "RECEIVED" && p.status !== "CONFIRMED") return false;
+      if (p.status !== "PAID" && p.status !== "RECEIVED" && p.status !== "CONFIRMED") return false;
       if (!p.paid_at) return false;
       const d = new Date(p.paid_at);
       return d >= dateStart && d <= dateEnd;
@@ -236,7 +236,7 @@ const AdminDashboard = () => {
     const perUnit = units.map((u) => {
       const unitPayments = fp.filter((p) => p.unit_id === u.id);
       const received = unitPayments
-        .filter((p) => (p.status === "RECEIVED" || p.status === "CONFIRMED") && p.paid_at)
+        .filter((p) => (p.status === "PAID" || p.status === "RECEIVED" || p.status === "CONFIRMED") && p.paid_at)
         .filter((p) => {
           const d = new Date(p.paid_at!);
           return d >= dateStart && d <= dateEnd;
