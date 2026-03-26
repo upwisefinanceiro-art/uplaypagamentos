@@ -485,6 +485,48 @@ export type Database = {
         }
         Relationships: []
       }
+      webhook_logs: {
+        Row: {
+          asaas_payment_id: string | null
+          created_at: string
+          error_message: string | null
+          event: string
+          id: string
+          local_payment_id: string | null
+          new_status: string | null
+          old_status: string | null
+          payload: Json | null
+          processed: boolean
+          unit_id: string | null
+        }
+        Insert: {
+          asaas_payment_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          event: string
+          id?: string
+          local_payment_id?: string | null
+          new_status?: string | null
+          old_status?: string | null
+          payload?: Json | null
+          processed?: boolean
+          unit_id?: string | null
+        }
+        Update: {
+          asaas_payment_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          event?: string
+          id?: string
+          local_payment_id?: string | null
+          new_status?: string | null
+          old_status?: string | null
+          payload?: Json | null
+          processed?: boolean
+          unit_id?: string | null
+        }
+        Relationships: []
+      }
       whatsapp_message_logs: {
         Row: {
           channel: string
