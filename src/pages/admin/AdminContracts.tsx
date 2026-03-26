@@ -1195,6 +1195,16 @@ const AdminContracts = () => {
                   >
                     <ExternalLink size={12} className="mr-1" /> Parcelas
                   </Button>
+                  {c.status === "ACTIVE" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                      onClick={() => setCancelTarget(c)}
+                    >
+                      <Ban size={12} className="mr-1" /> Cancelar Curso
+                    </Button>
+                  )}
                   {hasRole("ADMIN_MASTER") && (
                     <Button
                       variant="ghost"
