@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Eye, EyeOff, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -143,6 +143,10 @@ const Login = () => {
               </span>
             )}
           </Button>
+
+          <Link to="/forgot-password" className="block text-center text-sm text-primary hover:underline mt-2">
+            Esqueci minha senha
+          </Link>
         </form>
 
         <p className="text-center text-xs text-muted-foreground mt-8">© {new Date().getFullYear()} EnsinUP Educação</p>
