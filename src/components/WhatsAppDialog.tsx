@@ -74,7 +74,7 @@ const buildDefaultMessage = ({
 
   if (resolvedMethod === "BOLETO") {
     if (paymentLink) {
-      msg += `📄 *Boleto:*\n${link}\n\n`;
+      msg += `📄 *Boleto:*\n${paymentLink}\n\n`;
     }
   } else if (resolvedMethod === "PIX") {
     if (pixCopyPaste) {

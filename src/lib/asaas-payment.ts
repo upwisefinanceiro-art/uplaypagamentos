@@ -135,9 +135,10 @@ async function loadPaymentRecord(paymentId: string): Promise<SyncedPaymentRecord
     throw new Error("Cobrança não encontrada.");
   }
 
+  const basePayment = data as unknown as SyncedPaymentRecord;
   const payment = {
-    ...data,
-    payment_method: normalizeAsaasPaymentMethod(data as SyncedPaymentRecord),
+    ...basePayment,
+    payment_method: normalizeAsaasPaymentMethod(basePayment),
   } as SyncedPaymentRecord;
 
   console.info("[whatsapp-sync] cobrança carregada do banco", {

@@ -99,9 +99,9 @@ const AppPaymentDetail = () => {
       const resolved = await resolveWhatsAppChargeData(payment.id);
 
       setPayment((prev: any) => ({ ...prev, ...resolved.payment }));
-      setResponsible((prev: any) => ({ ...prev, ...resolved.responsible }));
+      setResponsible(resolved.responsible);
       if (resolved.studentName) {
-        setStudent((prev: any) => ({ ...prev, full_name: resolved.studentName }));
+        setStudent({ full_name: resolved.studentName });
       }
       setWaDialogOpen(true);
     } catch (err) {
