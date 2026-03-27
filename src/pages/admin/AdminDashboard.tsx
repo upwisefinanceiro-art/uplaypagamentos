@@ -233,7 +233,7 @@ const AdminDashboard = () => {
 
     // Due today list
     const dueTodayList = fp
-      .filter((p) => p.status === "PENDING" && isToday(new Date(p.due_date)))
+      .filter((p) => p.status === "PENDING" && isToday(parseLocalDate(p.due_date)))
       .sort((a, b) => (b.final_value ?? b.value) - (a.final_value ?? a.value));
 
     // Overdue list - all, sorted by most days overdue
