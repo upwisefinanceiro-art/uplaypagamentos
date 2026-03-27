@@ -19,6 +19,9 @@ interface WhatsAppDialogProps {
   value: number;
   dueDate: string;
   invoiceUrl?: string | null;
+  boletoUrl?: string | null;
+  pixCopyPaste?: string | null;
+  paymentMethod?: string | null;
   paymentId?: string;
   responsibleId?: string;
 }
