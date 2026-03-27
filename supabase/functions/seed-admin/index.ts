@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
-    const { secret, email, password, full_name } = await req.json();
+    const { secret, email, password, full_name, cpf, reset_all } = await req.json();
     if (secret !== "ensinup-seed-2024") {
       return new Response(JSON.stringify({ error: "Invalid secret" }), {
         status: 403,
@@ -23,43 +23,88 @@ Deno.serve(async (req) => {
       });
     }
 
-    const adminEmail = email || "00000000000@ensinup.app";
-    const adminPassword = password || "admin123";
+    const adminCpf = String(cpf || "00000000000").replace(/\D/g, "");
+    const adminEmail = email || "admin@ensinup.com";
+    const adminPassword = password || "12345678";
     const adminName = full_name || "Admin Master";
 
-    // Check if user with this email already exists
-    const { data: { users: existingUsers } } = await supabaseAdmin.auth.admin.listUsers();
-    const existingUser = existingUsers?.find((u: any) => u.email === adminEmail);
+    const allUsers: any[] = [];
+    let page = 1;
 
-    if (existingUser) {
-      return new Response(JSON.stringify({ message: "Usuário já existe", user_id: existingUser.id, email: adminEmail }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    while (true) {
+      const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 100 });
+      if (error) throw error;
+
+      const users = data?.users ?? [];
+      allUsers.push(...users);
+
+      if (users.length < 100) break;
+      page += 1;
     }
 
-    // Create admin user
-    const { data: newUser, error } = await supabaseAdmin.auth.admin.createUser({
+    if (reset_all) {
+      for (const user of allUsers) {
+        await supabaseAdmin.auth.admin.updateUserById(user.id, {
+          password: adminPassword,
+          email_confirm: true,
+        });
+      }
+    }
+
+    const existingUser = allUsers.find((u: any) => u.email === adminEmail);
+
+    let adminUserId = existingUser?.id as string | undefined;
+
+    if (existingUser) {
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
+        email: adminEmail,
+        password: adminPassword,
+        email_confirm: true,
+        user_metadata: { cpf: adminCpf, full_name: adminName },
+      });
+
+      if (updateError) throw updateError;
+    } else {
+      const { data: newUser, error } = await supabaseAdmin.auth.admin.createUser({
+        email: adminEmail,
+        password: adminPassword,
+        email_confirm: true,
+        user_metadata: { cpf: adminCpf, full_name: adminName },
+      });
+
+      if (error) throw error;
+      adminUserId = newUser.user.id;
+    }
+
+    if (!adminUserId) {
+      throw new Error("Falha ao preparar usuário administrador");
+    }
+
+    const { error: profileError } = await supabaseAdmin.from("profiles").upsert({
+      id: adminUserId,
+      cpf: adminCpf,
       email: adminEmail,
-      password: adminPassword,
-      email_confirm: true,
-      user_metadata: { full_name: adminName },
+      full_name: adminName,
+      active: true,
     });
 
-    if (error) throw error;
+    if (profileError) throw profileError;
 
-    // Assign ADMIN_MASTER role
-    await supabaseAdmin.from("user_roles").insert({
-      user_id: newUser.user.id,
+    const { error: roleError } = await supabaseAdmin.from("user_roles").upsert({
+      user_id: adminUserId,
       role: "ADMIN_MASTER",
+    }, {
+      onConflict: "user_id,role",
     });
+
+    if (roleError) throw roleError;
 
     return new Response(
-      JSON.stringify({ success: true, user_id: newUser.user.id, email: adminEmail }),
+      JSON.stringify({ success: true, user_id: adminUserId, email: adminEmail, cpf: adminCpf, reset_all: Boolean(reset_all) }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Erro interno" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
