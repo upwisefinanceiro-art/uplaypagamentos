@@ -30,6 +30,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import UserEditDialog from "@/components/admin/UserEditDialog";
 import ContractCancellationDialog from "@/components/admin/ContractCancellationDialog";
+import ClientAccessModal from "@/components/admin/ClientAccessModal";
 
 interface ContractRow {
   id: string;
