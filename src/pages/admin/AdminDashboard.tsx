@@ -332,19 +332,23 @@ const AdminDashboard = () => {
 
   const openWhatsApp = async (payment: DashboardPayment) => {
     let invoiceUrl = payment.invoice_url || payment.checkout_url || null;
+    let boletoUrl = payment.boleto_url || null;
+    let pixCopyPaste = payment.pix_copy_paste || null;
 
-    // Auto-sync with Asaas to get invoice_url if missing
-    if (!invoiceUrl) {
+    // Auto-sync with Asaas to get data if missing
+    if (!invoiceUrl || (!boletoUrl && !pixCopyPaste)) {
       try {
-        toast({ title: "Buscando link de pagamento no Asaas..." });
+        toast({ title: "Buscando dados da cobrança no Asaas..." });
         const { data, error } = await supabase.functions.invoke("sync-asaas-payment", {
           body: { payment_id: payment.id },
         });
-        if (!error && data?.invoice_url) {
-          invoiceUrl = data.invoice_url;
+        if (!error && data) {
+          invoiceUrl = data.invoice_url || invoiceUrl;
+          boletoUrl = data.boleto_url || boletoUrl;
+          pixCopyPaste = data.pix_copy_paste || pixCopyPaste;
         }
       } catch {
-        // proceed without link
+        // proceed with what we have
       }
     }
 
@@ -359,6 +363,9 @@ const AdminDashboard = () => {
       paymentId: payment.id,
       responsibleId: payment.responsible_id,
       invoiceUrl,
+      boletoUrl,
+      pixCopyPaste,
+      paymentMethod: payment.payment_method,
     });
   };
 
