@@ -533,6 +533,9 @@ const AdminDashboard = () => {
         value={waDialog.value}
         dueDate={waDialog.dueDate}
         invoiceUrl={waDialog.invoiceUrl}
+        boletoUrl={waDialog.boletoUrl}
+        pixCopyPaste={waDialog.pixCopyPaste}
+        paymentMethod={waDialog.paymentMethod}
         paymentId={waDialog.paymentId}
         responsibleId={waDialog.responsibleId}
       />
