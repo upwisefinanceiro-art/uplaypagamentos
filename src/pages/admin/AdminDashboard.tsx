@@ -212,7 +212,7 @@ const AdminDashboard = () => {
     // A receber: only FUTURE pending (due_date >= today, not overdue)
     const pendingFuture = fp.filter((p) => {
       if (p.status !== "PENDING") return false;
-      return !isBefore(new Date(p.due_date), today);
+      return !isBefore(parseLocalDate(p.due_date), today);
     });
     const totalToReceive = pendingFuture.reduce((sum, p) => sum + (p.final_value ?? p.value), 0);
 
