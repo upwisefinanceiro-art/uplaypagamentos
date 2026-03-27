@@ -30,6 +30,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import UserEditDialog from "@/components/admin/UserEditDialog";
 import ContractCancellationDialog from "@/components/admin/ContractCancellationDialog";
+import ClientAccessModal from "@/components/admin/ClientAccessModal";
 
 interface ContractRow {
   id: string;
@@ -140,6 +141,8 @@ const AdminContracts = () => {
   const [editResponsible, setEditResponsible] = useState<{ id: string; full_name: string; cpf: string; phone: string | null; unit_id: string | null; email?: string | null; address?: string | null } | null>(null);
   const [cancelTarget, setCancelTarget] = useState<ContractRow | null>(null);
   const [contractPayments, setContractPayments] = useState<{ id: string; contract_id: string | null; status: string; due_date: string }[]>([]);
+  const [accessModalOpen, setAccessModalOpen] = useState(false);
+  const [accessModalData, setAccessModalData] = useState<{ responsibleName: string; studentName: string; cpf: string; email?: string | null; phone?: string | null } | null>(null);
   const { toast } = useToast();
   const { profile, hasRole } = useAuth();
 
@@ -457,6 +460,19 @@ const AdminContracts = () => {
       const totalParcelas = payments.length;
       toast({ title: "Contrato criado!", description: `${totalParcelas} parcelas geradas com sucesso.` });
       setDialogOpen(false);
+
+      // Show access modal if user was created
+      if (responsibleMode === "new" && saveResponsibleToBase) {
+        setAccessModalData({
+          responsibleName,
+          studentName: newStudentName.trim(),
+          cpf: cpf.replace(/\D/g, ""),
+          email: email || null,
+          phone: phone || null,
+        });
+        setAccessModalOpen(true);
+      }
+
       resetForm();
       fetchData();
     } catch (err: any) {
@@ -1290,6 +1306,12 @@ const AdminContracts = () => {
         open={!!cancelTarget}
         onOpenChange={(open) => !open && setCancelTarget(null)}
         onSuccess={fetchData}
+      />
+
+      <ClientAccessModal
+        open={accessModalOpen}
+        onOpenChange={setAccessModalOpen}
+        data={accessModalData}
       />
     </div>
   );
