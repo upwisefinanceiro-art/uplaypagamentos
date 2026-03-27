@@ -626,6 +626,7 @@ export type Database = {
       }
     }
     Functions: {
+      get_email_by_cpf: { Args: { _cpf: string }; Returns: string }
       get_user_unit_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
