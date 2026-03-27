@@ -27,7 +27,10 @@ const AppLayout = () => {
           <span className="text-sm font-semibold text-foreground">EnsinUP</span>
         </div>
         <button
-          onClick={() => navigate("/login")}
+          onClick={async () => {
+            await signOut();
+            navigate("/login", { replace: true });
+          }}
           className="text-muted-foreground hover:text-foreground transition-colors p-2 -mr-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
           aria-label="Sair"
         >
