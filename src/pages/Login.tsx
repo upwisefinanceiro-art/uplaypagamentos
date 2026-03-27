@@ -69,16 +69,22 @@ const Login = () => {
       email = data as string;
     }
 
-    const { error } = await signIn(email, password);
+    try {
+      const { error } = await signIn(email, password);
 
-    if (error) {
-      toast({ title: "Erro ao entrar", description: "CPF/e-mail ou senha inválidos", variant: "destructive" });
+      if (error) {
+        toast({ title: "Erro ao entrar", description: "CPF/e-mail ou senha inválidos", variant: "destructive" });
+        setLoading(false);
+        return;
+      }
+
+      toast({ title: "Bem-vindo!" });
+    } catch (err) {
+      console.error("Login error:", err);
+      toast({ title: "Erro ao entrar", description: "Tente novamente.", variant: "destructive" });
+    } finally {
       setLoading(false);
-      return;
     }
-
-    toast({ title: "Bem-vindo!" });
-    setLoading(false);
   };
 
   return (
