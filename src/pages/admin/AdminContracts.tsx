@@ -1307,6 +1307,12 @@ const AdminContracts = () => {
         onOpenChange={(open) => !open && setCancelTarget(null)}
         onSuccess={fetchData}
       />
+
+      <ClientAccessModal
+        open={accessModalOpen}
+        onOpenChange={setAccessModalOpen}
+        data={accessModalData}
+      />
     </div>
   );
 };
