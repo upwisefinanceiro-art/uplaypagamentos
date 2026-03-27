@@ -18,7 +18,7 @@ const formatCpfInput = (value: string): string => {
 
 const isCpf = (value: string): boolean => {
   const digits = value.replace(/\D/g, "");
-  return digits.length === 11 && !/^[a-zA-Z@]/.test(value);
+  return digits.length === 11 && !value.includes("@");
 };
 
 const Login = () => {
@@ -54,34 +54,52 @@ const Login = () => {
       return;
     }
 
-    let email = credential.trim();
+    const typedCredential = credential.trim();
+    const loginMethod = typedCredential.includes("@") ? "email" : "cpf";
+    let email = typedCredential;
 
-    // If it looks like a CPF, look up the email
-    if (isCpf(credential)) {
-      const cpfDigits = credential.replace(/\D/g, "");
-      const { data, error: rpcError } = await supabase.rpc("get_email_by_cpf", { _cpf: cpfDigits });
+    if (loginMethod === "cpf") {
+      const cpfDigits = typedCredential.replace(/\D/g, "");
 
-      if (rpcError || !data) {
-        toast({ title: "CPF não encontrado", description: "Verifique o CPF digitado ou entre com o e-mail.", variant: "destructive" });
+      if (!isCpf(typedCredential)) {
+        console.warn("[auth] CPF inválido no login", { credential: typedCredential });
+        toast({ title: "CPF inválido", description: "Digite um CPF válido com 11 números ou use seu e-mail.", variant: "destructive" });
         setLoading(false);
         return;
       }
+
+      console.info("[auth] Tentando login por CPF", { cpf: cpfDigits });
+      const { data, error: rpcError } = await supabase.rpc("get_email_by_cpf", { _cpf: cpfDigits });
+
+      if (rpcError || !data) {
+        console.warn("[auth] CPF não encontrado", { cpf: cpfDigits, rpcError });
+        toast({ title: "Usuário ou senha inválidos", description: "Verifique seus dados e tente novamente.", variant: "destructive" });
+        setLoading(false);
+        return;
+      }
+
+      console.info("[auth] CPF localizado com sucesso", { cpf: cpfDigits });
       email = data as string;
+    } else {
+      console.info("[auth] Tentando login por e-mail", { email: typedCredential.toLowerCase() });
+      email = typedCredential.toLowerCase();
     }
 
     try {
       const { error } = await signIn(email, password);
 
       if (error) {
-        toast({ title: "Erro ao entrar", description: "CPF/e-mail ou senha inválidos", variant: "destructive" });
+        console.warn("[auth] Falha de autenticação", { loginMethod, email });
+        toast({ title: "Erro ao entrar", description: "Usuário ou senha inválidos", variant: "destructive" });
         setLoading(false);
         return;
       }
 
+      console.info("[auth] Login realizado com sucesso", { loginMethod, email });
       toast({ title: "Bem-vindo!" });
     } catch (err) {
-      console.error("Login error:", err);
-      toast({ title: "Erro ao entrar", description: "Tente novamente.", variant: "destructive" });
+      console.error("[auth] Login error:", err);
+      toast({ title: "Erro ao entrar", description: "Usuário ou senha inválidos", variant: "destructive" });
     } finally {
       setLoading(false);
     }

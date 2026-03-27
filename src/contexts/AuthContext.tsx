@@ -36,56 +36,99 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const clearUserData = () => {
+    setProfile(null);
+    setRoles([]);
+  };
+
   const fetchUserData = async (userId: string) => {
     try {
       const [profileRes, rolesRes] = await Promise.all([
-        supabase.from("profiles").select("*").eq("id", userId).single(),
+        supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", userId),
       ]);
 
-      if (profileRes.data) setProfile(profileRes.data as Profile);
-      if (rolesRes.data) setRoles(rolesRes.data.map((r: any) => r.role as AppRole));
+      if (profileRes.error) {
+        console.error("[auth] profile lookup error:", profileRes.error);
+      }
+
+      if (rolesRes.error) {
+        console.error("[auth] roles lookup error:", rolesRes.error);
+      }
+
+      setProfile((profileRes.data as Profile | null) ?? null);
+      setRoles((rolesRes.data ?? []).map((r: { role: string }) => r.role as AppRole));
     } catch (err) {
-      console.error("fetchUserData error:", err);
+      console.error("[auth] fetchUserData error:", err);
+      clearUserData();
     }
   };
 
   useEffect(() => {
-    let initialSessionHandled = false;
+    let mounted = true;
+
+    const applySession = async (nextSession: Session | null) => {
+      if (!mounted) return;
+
+      setSession(nextSession);
+      setUser(nextSession?.user ?? null);
+
+      if (!nextSession?.user) {
+        clearUserData();
+        setLoading(false);
+        return;
+      }
+
+      await fetchUserData(nextSession.user.id);
+
+      if (mounted) {
+        setLoading(false);
+      }
+    };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-
-        if (session?.user) {
-          await fetchUserData(session.user.id);
-        } else {
-          setProfile(null);
-          setRoles([]);
+        try {
+          await applySession(session);
+        } catch (err) {
+          console.error("[auth] onAuthStateChange error:", err);
+          if (mounted) {
+            clearUserData();
+            setLoading(false);
+          }
         }
-        initialSessionHandled = true;
-        setLoading(false);
       }
     );
 
-    // Fallback: if onAuthStateChange hasn't fired within 3s, force loading=false
-    const timeout = setTimeout(() => {
-      if (!initialSessionHandled) {
-        console.warn("Auth timeout - forcing loading=false");
-        setLoading(false);
+    void supabase.auth.getSession().then(async ({ data, error }) => {
+      if (error) {
+        console.error("[auth] getSession error:", error);
       }
-    }, 3000);
+
+      try {
+        await applySession(data.session);
+      } catch (err) {
+        console.error("[auth] initial session hydration error:", err);
+        if (mounted) {
+          clearUserData();
+          setLoading(false);
+        }
+      }
+    });
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
-      clearTimeout(timeout);
     };
   }, []);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { error: "E-mail ou senha inválidos" };
+    if (error) {
+      console.error("[auth] signInWithPassword error:", error);
+      return { error: "Usuário ou senha inválidos" };
+    }
+
     return { error: null };
   };
 
@@ -93,8 +136,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
-    setProfile(null);
-    setRoles([]);
+    clearUserData();
   };
 
   const hasRole = (role: AppRole) => roles.includes(role);
