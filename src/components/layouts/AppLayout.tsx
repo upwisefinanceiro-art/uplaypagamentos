@@ -1,9 +1,11 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Home, CreditCard, User, LogOut } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const AppLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { signOut } = useAuth();
 
   const tabs = [
     { path: "/app", icon: Home, label: "Início" },
@@ -25,7 +27,10 @@ const AppLayout = () => {
           <span className="text-sm font-semibold text-foreground">EnsinUP</span>
         </div>
         <button
-          onClick={() => navigate("/login")}
+          onClick={async () => {
+            await signOut();
+            navigate("/login", { replace: true });
+          }}
           className="text-muted-foreground hover:text-foreground transition-colors p-2 -mr-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
           aria-label="Sair"
         >
