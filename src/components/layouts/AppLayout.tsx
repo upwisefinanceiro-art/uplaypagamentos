@@ -1,9 +1,11 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Home, CreditCard, User, LogOut } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const AppLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { signOut } = useAuth();
 
   const tabs = [
     { path: "/app", icon: Home, label: "Início" },
