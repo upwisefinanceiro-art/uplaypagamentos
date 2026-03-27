@@ -59,6 +59,8 @@ export type DashboardPayment = {
   checkout_url: string | null;
   invoice_url: string | null;
   boleto_url: string | null;
+  pix_copy_paste: string | null;
+  payment_method: string | null;
   payment_type: string;
 };
 
