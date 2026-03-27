@@ -1144,8 +1144,11 @@ const AdminContracts = () => {
         <div className="text-center py-10 text-muted-foreground text-sm">Nenhum contrato encontrado.</div>
       ) : (
         <div className="space-y-3">
-          {filteredContracts.map((c) => (
-            <div key={c.id} className="glass-card p-4">
+          {filteredContracts.map((c) => {
+            const overdueInfo = contractOverdueMap[c.id];
+            const hasOverdue = !!overdueInfo && overdueInfo.overdueCount > 0;
+            return (
+            <div key={c.id} className={`glass-card p-4 ${hasOverdue ? "border-destructive/50 bg-destructive/5" : ""}`}>
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -1153,14 +1156,20 @@ const AdminContracts = () => {
                       <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded text-muted-foreground">#{c.contract_number}</span>
                     )}
                     <h3 className="text-sm font-semibold text-foreground">{c.description}</h3>
+                    {hasOverdue && (
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-destructive bg-destructive/10 px-1.5 py-0.5 rounded-full animate-pulse">
+                        <AlertTriangle size={10} />
+                        {overdueInfo.overdueCount} parcela{overdueInfo.overdueCount > 1 ? "s" : ""} vencida{overdueInfo.overdueCount > 1 ? "s" : ""} ({overdueInfo.maxDaysOverdue}d)
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
                     {c.responsible_name || "—"} • {(c.units as any)?.name || "—"} • Aluno: {(c.students as any)?.full_name || "—"}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${c.status === "ACTIVE" ? "status-paid" : "status-cancelled"}`}>
-                    {c.status === "ACTIVE" ? "Ativo" : c.status}
+                  <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${c.status === "ACTIVE" ? (hasOverdue ? "status-overdue" : "status-paid") : "status-cancelled"}`}>
+                    {c.status === "ACTIVE" ? (hasOverdue ? "Em atraso" : "Ativo") : c.status}
                   </span>
                 </div>
               </div>
