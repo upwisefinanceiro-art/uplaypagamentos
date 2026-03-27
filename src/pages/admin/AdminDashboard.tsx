@@ -113,6 +113,9 @@ const AdminDashboard = () => {
     paymentId: string;
     responsibleId: string;
     invoiceUrl: string | null;
+    boletoUrl: string | null;
+    pixCopyPaste: string | null;
+    paymentMethod: string | null;
   }>({
     open: false,
     phone: null,
@@ -123,6 +126,9 @@ const AdminDashboard = () => {
     paymentId: "",
     responsibleId: "",
     invoiceUrl: null,
+    boletoUrl: null,
+    pixCopyPaste: null,
+    paymentMethod: null,
   });
 
   useEffect(() => {
