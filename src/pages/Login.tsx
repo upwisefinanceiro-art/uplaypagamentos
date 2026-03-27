@@ -143,6 +143,10 @@ const Login = () => {
               </span>
             )}
           </Button>
+
+          <Link to="/forgot-password" className="block text-center text-sm text-primary hover:underline mt-2">
+            Esqueci minha senha
+          </Link>
         </form>
 
         <p className="text-center text-xs text-muted-foreground mt-8">© {new Date().getFullYear()} EnsinUP Educação</p>
