@@ -178,6 +178,9 @@ const AdminDashboard = () => {
     };
   }, []);
 
+  // Parse date-only string (YYYY-MM-DD) as local midnight to avoid UTC shift
+  const parseLocalDate = (dateStr: string) => new Date(dateStr + "T00:00:00");
+
   const filtered = useMemo(() => {
     const now = new Date();
     const today = startOfDay(now);
@@ -209,14 +212,14 @@ const AdminDashboard = () => {
     // A receber: only FUTURE pending (due_date >= today, not overdue)
     const pendingFuture = fp.filter((p) => {
       if (p.status !== "PENDING") return false;
-      return !isBefore(new Date(p.due_date), today);
+      return !isBefore(parseLocalDate(p.due_date), today);
     });
     const totalToReceive = pendingFuture.reduce((sum, p) => sum + (p.final_value ?? p.value), 0);
 
     // Em atraso: only past due
     const overdueAll = fp.filter((p) => {
       if (p.status !== "PENDING" && p.status !== "OVERDUE") return false;
-      return isBefore(new Date(p.due_date), today);
+      return isBefore(parseLocalDate(p.due_date), today);
     });
     const totalOverdue = overdueAll.reduce((sum, p) => sum + (p.final_value ?? p.value), 0);
 
@@ -230,14 +233,14 @@ const AdminDashboard = () => {
 
     // Due today list
     const dueTodayList = fp
-      .filter((p) => p.status === "PENDING" && isToday(new Date(p.due_date)))
+      .filter((p) => p.status === "PENDING" && isToday(parseLocalDate(p.due_date)))
       .sort((a, b) => (b.final_value ?? b.value) - (a.final_value ?? a.value));
 
     // Overdue list - all, sorted by most days overdue
     const overdueList = overdueAll
       .map((p) => ({
         ...p,
-        daysOverdue: differenceInDays(today, new Date(p.due_date)),
+        daysOverdue: differenceInDays(today, parseLocalDate(p.due_date)),
       }))
       .sort((a, b) => b.daysOverdue - a.daysOverdue);
 
@@ -257,10 +260,10 @@ const AdminDashboard = () => {
         })
         .reduce((s, p) => s + (p.final_value ?? p.value), 0);
       const overdue = unitPayments
-        .filter((p) => (p.status === "PENDING" || p.status === "OVERDUE") && isBefore(new Date(p.due_date), today))
+        .filter((p) => (p.status === "PENDING" || p.status === "OVERDUE") && isBefore(parseLocalDate(p.due_date), today))
         .reduce((s, p) => s + (p.final_value ?? p.value), 0);
       const toReceive = unitPayments
-        .filter((p) => p.status === "PENDING" && !isBefore(new Date(p.due_date), today))
+        .filter((p) => p.status === "PENDING" && !isBefore(parseLocalDate(p.due_date), today))
         .reduce((s, p) => s + (p.final_value ?? p.value), 0);
       return { id: u.id, name: u.name, received, overdue, toReceive };
     });
