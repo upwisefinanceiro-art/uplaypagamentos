@@ -219,7 +219,7 @@ const AdminDashboard = () => {
     // Em atraso: only past due
     const overdueAll = fp.filter((p) => {
       if (p.status !== "PENDING" && p.status !== "OVERDUE") return false;
-      return isBefore(new Date(p.due_date), today);
+      return isBefore(parseLocalDate(p.due_date), today);
     });
     const totalOverdue = overdueAll.reduce((sum, p) => sum + (p.final_value ?? p.value), 0);
 
