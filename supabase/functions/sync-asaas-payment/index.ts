@@ -329,11 +329,15 @@ Deno.serve(async (req) => {
     const billingType = billingTypeMap[payment.payment_method || "BOLETO"] || "BOLETO";
 
     // ── Create charge ──
+    // Asaas does not accept due dates in the past; use today as minimum
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const effectiveDueDate = payment.due_date < todayStr ? todayStr : payment.due_date;
+
     const chargePayload = {
       customer: asaasCustomerId,
       billingType,
       value: Number(payment.final_value ?? payment.value),
-      dueDate: payment.due_date,
+      dueDate: effectiveDueDate,
       description: payment.description || "Mensalidade EnsinUP",
     };
 

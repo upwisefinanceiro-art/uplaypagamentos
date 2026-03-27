@@ -178,6 +178,9 @@ const AdminDashboard = () => {
     };
   }, []);
 
+  // Parse date-only string (YYYY-MM-DD) as local midnight to avoid UTC shift
+  const parseLocalDate = (dateStr: string) => new Date(dateStr + "T00:00:00");
+
   const filtered = useMemo(() => {
     const now = new Date();
     const today = startOfDay(now);
