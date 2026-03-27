@@ -6,9 +6,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+
+const formatCpfInput = (value: string): string => {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+  if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+};
+
+const isCpf = (value: string): boolean => {
+  const digits = value.replace(/\D/g, "");
+  return digits.length === 11 && !/^[a-zA-Z@]/.test(value);
+};
 
 const Login = () => {
-  const [email, setEmail] = useState("");
+  const [credential, setCredential] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -23,20 +37,42 @@ const Login = () => {
     }
   }, [user, roles, authLoading, navigate]);
 
+  const handleCredentialChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    // If starts with digit and no @ sign, treat as CPF and format
+    const isTypingCpf = /^\d/.test(raw) && !raw.includes("@");
+    setCredential(isTypingCpf ? formatCpfInput(raw) : raw);
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    if (!email.trim()) {
-      toast({ title: "E-mail inválido", description: "Digite um e-mail válido", variant: "destructive" });
+    if (!credential.trim()) {
+      toast({ title: "Campo obrigatório", description: "Digite seu CPF ou e-mail", variant: "destructive" });
       setLoading(false);
       return;
+    }
+
+    let email = credential.trim();
+
+    // If it looks like a CPF, look up the email
+    if (isCpf(credential)) {
+      const cpfDigits = credential.replace(/\D/g, "");
+      const { data, error: rpcError } = await supabase.rpc("get_email_by_cpf", { _cpf: cpfDigits });
+
+      if (rpcError || !data) {
+        toast({ title: "CPF não encontrado", description: "Verifique o CPF digitado ou entre com o e-mail.", variant: "destructive" });
+        setLoading(false);
+        return;
+      }
+      email = data as string;
     }
 
     const { error } = await signIn(email, password);
 
     if (error) {
-      toast({ title: "Erro ao entrar", description: error, variant: "destructive" });
+      toast({ title: "Erro ao entrar", description: "CPF/e-mail ou senha inválidos", variant: "destructive" });
       setLoading(false);
       return;
     }
