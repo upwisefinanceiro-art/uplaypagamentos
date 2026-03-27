@@ -101,6 +101,9 @@ const WhatsAppDialog = ({
   value,
   dueDate,
   invoiceUrl,
+  boletoUrl,
+  pixCopyPaste,
+  paymentMethod,
   paymentId,
   responsibleId,
 }: WhatsAppDialogProps) => {
@@ -117,10 +120,10 @@ const WhatsAppDialog = ({
     if (open) {
       setManualPhone(phone && isValidPhone(phone) ? "" : "");
       setMessage(
-        buildDefaultMessage({ responsibleName, studentName, description, value, dueDate, invoiceUrl })
+        buildDefaultMessage({ responsibleName, studentName, description, value, dueDate, invoiceUrl, boletoUrl, pixCopyPaste, paymentMethod })
       );
     }
-  }, [open, responsibleName, studentName, description, value, dueDate, invoiceUrl, phone]);
+  }, [open, responsibleName, studentName, description, value, dueDate, invoiceUrl, boletoUrl, pixCopyPaste, paymentMethod, phone]);
 
   const [copied, setCopied] = useState(false);
 
