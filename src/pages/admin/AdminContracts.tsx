@@ -460,6 +460,19 @@ const AdminContracts = () => {
       const totalParcelas = payments.length;
       toast({ title: "Contrato criado!", description: `${totalParcelas} parcelas geradas com sucesso.` });
       setDialogOpen(false);
+
+      // Show access modal if user was created
+      if (responsibleMode === "new" && saveResponsibleToBase) {
+        setAccessModalData({
+          responsibleName,
+          studentName: newStudentName.trim(),
+          cpf: cpf.replace(/\D/g, ""),
+          email: email || null,
+          phone: phone || null,
+        });
+        setAccessModalOpen(true);
+      }
+
       resetForm();
       fetchData();
     } catch (err: any) {
