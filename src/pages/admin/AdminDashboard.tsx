@@ -260,10 +260,10 @@ const AdminDashboard = () => {
         })
         .reduce((s, p) => s + (p.final_value ?? p.value), 0);
       const overdue = unitPayments
-        .filter((p) => (p.status === "PENDING" || p.status === "OVERDUE") && isBefore(new Date(p.due_date), today))
+        .filter((p) => (p.status === "PENDING" || p.status === "OVERDUE") && isBefore(parseLocalDate(p.due_date), today))
         .reduce((s, p) => s + (p.final_value ?? p.value), 0);
       const toReceive = unitPayments
-        .filter((p) => p.status === "PENDING" && !isBefore(new Date(p.due_date), today))
+        .filter((p) => p.status === "PENDING" && !isBefore(parseLocalDate(p.due_date), today))
         .reduce((s, p) => s + (p.final_value ?? p.value), 0);
       return { id: u.id, name: u.name, received, overdue, toReceive };
     });
