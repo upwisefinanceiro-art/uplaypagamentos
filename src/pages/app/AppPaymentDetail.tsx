@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import WhatsAppDialog from "@/components/WhatsAppDialog";
+import { resolveWhatsAppChargeData } from "@/lib/asaas-payment";
 
 type PaymentStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELLED";
 
@@ -88,6 +89,28 @@ const AppPaymentDetail = () => {
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast({ title: `${label} copiado!` });
+  };
+
+  const handleOpenWhatsApp = async () => {
+    if (!payment?.id) return;
+
+    try {
+      toast({ title: "Sincronizando cobrança no Asaas antes do envio..." });
+      const resolved = await resolveWhatsAppChargeData(payment.id);
+
+      setPayment((prev: any) => ({ ...prev, ...resolved.payment }));
+      setResponsible(resolved.responsible);
+      if (resolved.studentName) {
+        setStudent({ full_name: resolved.studentName });
+      }
+      setWaDialogOpen(true);
+    } catch (err) {
+      toast({
+        title: "Envio bloqueado",
+        description: err instanceof Error ? err.message : "Não foi possível obter os dados completos da cobrança no Asaas.",
+        variant: "destructive",
+      });
+    }
   };
 
   const formatCurrency = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
@@ -387,7 +410,7 @@ const AppPaymentDetail = () => {
               variant="outline"
               size="sm"
               className="gap-2 text-xs border-success/30 text-success hover:bg-success/10 hover:text-success"
-              onClick={() => setWaDialogOpen(true)}
+              onClick={handleOpenWhatsApp}
             >
               <MessageCircle size={14} /> WhatsApp
             </Button>
@@ -512,7 +535,10 @@ const AppPaymentDetail = () => {
           description={description}
           value={finalValue}
           dueDate={payment.due_date}
-          invoiceUrl={payment.invoice_url}
+          invoiceUrl={payment.invoice_url || payment.checkout_url}
+          boletoUrl={payment.boleto_url}
+          pixCopyPaste={payment.pix_copy_paste}
+          paymentMethod={payment.payment_method}
           paymentId={payment.id}
           responsibleId={payment.responsible_id}
         />
