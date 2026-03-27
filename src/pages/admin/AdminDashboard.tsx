@@ -240,7 +240,7 @@ const AdminDashboard = () => {
     const overdueList = overdueAll
       .map((p) => ({
         ...p,
-        daysOverdue: differenceInDays(today, new Date(p.due_date)),
+        daysOverdue: differenceInDays(today, parseLocalDate(p.due_date)),
       }))
       .sort((a, b) => b.daysOverdue - a.daysOverdue);
 
