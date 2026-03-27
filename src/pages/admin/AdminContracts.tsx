@@ -217,12 +217,13 @@ const AdminContracts = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const [contractsRes, studentsRes, responsiblesRes, unitsRes, adminRolesRes] = await Promise.all([
+    const [contractsRes, studentsRes, responsiblesRes, unitsRes, adminRolesRes, paymentsRes] = await Promise.all([
       supabase.from("contracts").select("*, units(name), students(full_name)").order("created_at", { ascending: false }),
       supabase.from("students").select("id, full_name, responsible_id, unit_id").eq("active", true),
       supabase.from("profiles").select("id, full_name, cpf, phone, email, unit_id, asaas_customer_id").eq("active", true),
       supabase.from("units").select("id, name").eq("active", true),
       supabase.from("user_roles").select("user_id").in("role", ["ADMIN_MASTER", "ADMIN_UNIDADE"]),
+      supabase.from("payments").select("id, contract_id, status, due_date").not("contract_id", "is", null),
     ]);
     if (contractsRes.data) setContracts(contractsRes.data as any);
     if (studentsRes.data) setStudents(studentsRes.data);
@@ -231,6 +232,7 @@ const AdminContracts = () => {
       setResponsibles((responsiblesRes.data as any).filter((p: any) => !adminIds.has(p.id)));
     }
     if (unitsRes.data) setUnits(unitsRes.data);
+    if (paymentsRes.data) setContractPayments(paymentsRes.data as any);
     setLoading(false);
   };
 
