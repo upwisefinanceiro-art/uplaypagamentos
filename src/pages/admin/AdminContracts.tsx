@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Loader2, UserPlus, UserCheck, Save, Trash2, ExternalLink, Search, CalendarIcon, Pencil, Ban } from "lucide-react";
-import { format, addMonths, lastDayOfMonth, setDate as setDateFns } from "date-fns";
+import { Plus, Loader2, UserPlus, UserCheck, Save, Trash2, ExternalLink, Search, CalendarIcon, Pencil, Ban, AlertTriangle } from "lucide-react";
+import { format, addMonths, lastDayOfMonth, setDate as setDateFns, startOfDay, isBefore, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -139,6 +139,7 @@ const AdminContracts = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [editResponsible, setEditResponsible] = useState<{ id: string; full_name: string; cpf: string; phone: string | null; unit_id: string | null; email?: string | null; address?: string | null } | null>(null);
   const [cancelTarget, setCancelTarget] = useState<ContractRow | null>(null);
+  const [contractPayments, setContractPayments] = useState<{ id: string; contract_id: string | null; status: string; due_date: string }[]>([]);
   const { toast } = useToast();
   const { profile, hasRole } = useAuth();
 
@@ -216,12 +217,13 @@ const AdminContracts = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const [contractsRes, studentsRes, responsiblesRes, unitsRes, adminRolesRes] = await Promise.all([
+    const [contractsRes, studentsRes, responsiblesRes, unitsRes, adminRolesRes, paymentsRes] = await Promise.all([
       supabase.from("contracts").select("*, units(name), students(full_name)").order("created_at", { ascending: false }),
       supabase.from("students").select("id, full_name, responsible_id, unit_id").eq("active", true),
       supabase.from("profiles").select("id, full_name, cpf, phone, email, unit_id, asaas_customer_id").eq("active", true),
       supabase.from("units").select("id, name").eq("active", true),
       supabase.from("user_roles").select("user_id").in("role", ["ADMIN_MASTER", "ADMIN_UNIDADE"]),
+      supabase.from("payments").select("id, contract_id, status, due_date").not("contract_id", "is", null),
     ]);
     if (contractsRes.data) setContracts(contractsRes.data as any);
     if (studentsRes.data) setStudents(studentsRes.data);
@@ -230,6 +232,7 @@ const AdminContracts = () => {
       setResponsibles((responsiblesRes.data as any).filter((p: any) => !adminIds.has(p.id)));
     }
     if (unitsRes.data) setUnits(unitsRes.data);
+    if (paymentsRes.data) setContractPayments(paymentsRes.data as any);
     setLoading(false);
   };
 
@@ -958,6 +961,24 @@ const AdminContracts = () => {
     });
   }, [contracts, searchTerm]);
 
+  // Compute overdue stats per contract
+  const contractOverdueMap = useMemo(() => {
+    const today = startOfDay(new Date());
+    const map: Record<string, { overdueCount: number; maxDaysOverdue: number }> = {};
+    for (const p of contractPayments) {
+      if (!p.contract_id) continue;
+      const dueDate = startOfDay(new Date(p.due_date + "T00:00:00"));
+      const isOverdue = (p.status === "OVERDUE") || (p.status === "PENDING" && isBefore(dueDate, today));
+      if (isOverdue) {
+        if (!map[p.contract_id]) map[p.contract_id] = { overdueCount: 0, maxDaysOverdue: 0 };
+        map[p.contract_id].overdueCount++;
+        const days = differenceInDays(today, dueDate);
+        if (days > map[p.contract_id].maxDaysOverdue) map[p.contract_id].maxDaysOverdue = days;
+      }
+    }
+    return map;
+  }, [contractPayments]);
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -1123,8 +1144,11 @@ const AdminContracts = () => {
         <div className="text-center py-10 text-muted-foreground text-sm">Nenhum contrato encontrado.</div>
       ) : (
         <div className="space-y-3">
-          {filteredContracts.map((c) => (
-            <div key={c.id} className="glass-card p-4">
+          {filteredContracts.map((c) => {
+            const overdueInfo = contractOverdueMap[c.id];
+            const hasOverdue = !!overdueInfo && overdueInfo.overdueCount > 0;
+            return (
+            <div key={c.id} className={`glass-card p-4 ${hasOverdue ? "border-destructive/50 bg-destructive/5" : ""}`}>
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -1132,14 +1156,20 @@ const AdminContracts = () => {
                       <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded text-muted-foreground">#{c.contract_number}</span>
                     )}
                     <h3 className="text-sm font-semibold text-foreground">{c.description}</h3>
+                    {hasOverdue && (
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-destructive bg-destructive/10 px-1.5 py-0.5 rounded-full animate-pulse">
+                        <AlertTriangle size={10} />
+                        {overdueInfo.overdueCount} parcela{overdueInfo.overdueCount > 1 ? "s" : ""} vencida{overdueInfo.overdueCount > 1 ? "s" : ""} ({overdueInfo.maxDaysOverdue}d)
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
                     {c.responsible_name || "—"} • {(c.units as any)?.name || "—"} • Aluno: {(c.students as any)?.full_name || "—"}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${c.status === "ACTIVE" ? "status-paid" : "status-cancelled"}`}>
-                    {c.status === "ACTIVE" ? "Ativo" : c.status}
+                  <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${c.status === "ACTIVE" ? (hasOverdue ? "status-overdue" : "status-paid") : "status-cancelled"}`}>
+                    {c.status === "ACTIVE" ? (hasOverdue ? "Em atraso" : "Ativo") : c.status}
                   </span>
                 </div>
               </div>
@@ -1218,7 +1248,8 @@ const AdminContracts = () => {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

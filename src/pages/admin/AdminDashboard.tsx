@@ -231,9 +231,9 @@ const AdminDashboard = () => {
     const totalAReceber = totalToReceive + totalOverdue;
     const inadimplencia = totalAReceber > 0 ? (totalOverdue / totalAReceber) * 100 : 0;
 
-    // Due today list
+    // Due today list - include PENDING due today AND OVERDUE due today
     const dueTodayList = fp
-      .filter((p) => p.status === "PENDING" && isToday(parseLocalDate(p.due_date)))
+      .filter((p) => (p.status === "PENDING" || p.status === "OVERDUE") && isToday(parseLocalDate(p.due_date)))
       .sort((a, b) => (b.final_value ?? b.value) - (a.final_value ?? a.value));
 
     // Overdue list - all, sorted by most days overdue
