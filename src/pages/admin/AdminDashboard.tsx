@@ -59,6 +59,8 @@ export type DashboardPayment = {
   checkout_url: string | null;
   invoice_url: string | null;
   boleto_url: string | null;
+  pix_copy_paste: string | null;
+  payment_method: string | null;
   payment_type: string;
 };
 
@@ -113,6 +115,9 @@ const AdminDashboard = () => {
     paymentId: string;
     responsibleId: string;
     invoiceUrl: string | null;
+    boletoUrl: string | null;
+    pixCopyPaste: string | null;
+    paymentMethod: string | null;
   }>({
     open: false,
     phone: null,
@@ -123,13 +128,16 @@ const AdminDashboard = () => {
     paymentId: "",
     responsibleId: "",
     invoiceUrl: null,
+    boletoUrl: null,
+    pixCopyPaste: null,
+    paymentMethod: null,
   });
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       const [paymentsRes, unitsRes, profilesRes, studentsRes] = await Promise.all([
-        supabase.from("payments").select("id, status, value, final_value, due_date, paid_at, unit_id, responsible_id, installment_number, contract_id, checkout_url, invoice_url, boleto_url, payment_type"),
+        supabase.from("payments").select("id, status, value, final_value, due_date, paid_at, unit_id, responsible_id, installment_number, contract_id, checkout_url, invoice_url, boleto_url, pix_copy_paste, payment_method, payment_type"),
         isMaster
           ? supabase.from("units").select("id, name").eq("active", true)
           : supabase.from("units").select("id, name").eq("id", userProfile?.unit_id ?? ""),
@@ -324,19 +332,23 @@ const AdminDashboard = () => {
 
   const openWhatsApp = async (payment: DashboardPayment) => {
     let invoiceUrl = payment.invoice_url || payment.checkout_url || null;
+    let boletoUrl = payment.boleto_url || null;
+    let pixCopyPaste = payment.pix_copy_paste || null;
 
-    // Auto-sync with Asaas to get invoice_url if missing
-    if (!invoiceUrl) {
+    // Auto-sync with Asaas to get data if missing
+    if (!invoiceUrl || (!boletoUrl && !pixCopyPaste)) {
       try {
-        toast({ title: "Buscando link de pagamento no Asaas..." });
+        toast({ title: "Buscando dados da cobrança no Asaas..." });
         const { data, error } = await supabase.functions.invoke("sync-asaas-payment", {
           body: { payment_id: payment.id },
         });
-        if (!error && data?.invoice_url) {
-          invoiceUrl = data.invoice_url;
+        if (!error && data) {
+          invoiceUrl = data.invoice_url || invoiceUrl;
+          boletoUrl = data.boleto_url || boletoUrl;
+          pixCopyPaste = data.pix_copy_paste || pixCopyPaste;
         }
       } catch {
-        // proceed without link
+        // proceed with what we have
       }
     }
 
@@ -351,6 +363,9 @@ const AdminDashboard = () => {
       paymentId: payment.id,
       responsibleId: payment.responsible_id,
       invoiceUrl,
+      boletoUrl,
+      pixCopyPaste,
+      paymentMethod: payment.payment_method,
     });
   };
 
@@ -518,6 +533,9 @@ const AdminDashboard = () => {
         value={waDialog.value}
         dueDate={waDialog.dueDate}
         invoiceUrl={waDialog.invoiceUrl}
+        boletoUrl={waDialog.boletoUrl}
+        pixCopyPaste={waDialog.pixCopyPaste}
+        paymentMethod={waDialog.paymentMethod}
         paymentId={waDialog.paymentId}
         responsibleId={waDialog.responsibleId}
       />

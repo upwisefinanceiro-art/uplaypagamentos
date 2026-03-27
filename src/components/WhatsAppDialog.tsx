@@ -19,6 +19,9 @@ interface WhatsAppDialogProps {
   value: number;
   dueDate: string;
   invoiceUrl?: string | null;
+  boletoUrl?: string | null;
+  pixCopyPaste?: string | null;
+  paymentMethod?: string | null;
   paymentId?: string;
   responsibleId?: string;
 }
@@ -43,6 +46,9 @@ const buildDefaultMessage = ({
   value,
   dueDate,
   invoiceUrl,
+  boletoUrl,
+  pixCopyPaste,
+  paymentMethod,
 }: Omit<WhatsAppDialogProps, "open" | "onOpenChange" | "phone">): string => {
   const formatCurrency = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
   const formatDate = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("pt-BR");
@@ -54,9 +60,32 @@ const buildDefaultMessage = ({
   msg += `📋 Referência: ${description}\n`;
   msg += `💰 Valor: *${formatCurrency(value)}*\n`;
   msg += `📅 Vencimento: *${formatDate(dueDate)}*\n\n`;
-  if (invoiceUrl) {
-    msg += `🔗 *Pague pelo link abaixo:*\n${invoiceUrl}\n\n`;
+
+  const method = (paymentMethod || "").toUpperCase();
+
+  if (method === "BOLETO" || method === "ASAAS") {
+    const link = boletoUrl || invoiceUrl;
+    if (link) {
+      msg += `📄 *Boleto:*\n${link}\n\n`;
+    }
+  } else if (method === "PIX") {
+    if (pixCopyPaste) {
+      msg += `💳 *PIX (copia e cola):*\n${pixCopyPaste}\n\n`;
+    }
+    if (invoiceUrl) {
+      msg += `🔗 *Link para pagamento:*\n${invoiceUrl}\n\n`;
+    }
+  } else if (method === "CARD") {
+    if (invoiceUrl) {
+      msg += `🔗 *Link para pagamento:*\n${invoiceUrl}\n\n`;
+    }
+  } else {
+    // Fallback: show any available link
+    if (invoiceUrl) {
+      msg += `🔗 *Link para pagamento:*\n${invoiceUrl}\n\n`;
+    }
   }
+
   msg += `Se tiver qualquer dúvida, estamos à disposição. 😊`;
 
   return msg;
@@ -72,6 +101,9 @@ const WhatsAppDialog = ({
   value,
   dueDate,
   invoiceUrl,
+  boletoUrl,
+  pixCopyPaste,
+  paymentMethod,
   paymentId,
   responsibleId,
 }: WhatsAppDialogProps) => {
@@ -88,10 +120,10 @@ const WhatsAppDialog = ({
     if (open) {
       setManualPhone(phone && isValidPhone(phone) ? "" : "");
       setMessage(
-        buildDefaultMessage({ responsibleName, studentName, description, value, dueDate, invoiceUrl })
+        buildDefaultMessage({ responsibleName, studentName, description, value, dueDate, invoiceUrl, boletoUrl, pixCopyPaste, paymentMethod })
       );
     }
-  }, [open, responsibleName, studentName, description, value, dueDate, invoiceUrl, phone]);
+  }, [open, responsibleName, studentName, description, value, dueDate, invoiceUrl, boletoUrl, pixCopyPaste, paymentMethod, phone]);
 
   const [copied, setCopied] = useState(false);
 

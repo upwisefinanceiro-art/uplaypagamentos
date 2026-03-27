@@ -434,7 +434,10 @@ const AppPayments = () => {
           description={waDescription}
           value={waPayment.final_value ?? waPayment.value}
           dueDate={waPayment.due_date}
-          invoiceUrl={waPayment.invoice_url}
+          invoiceUrl={waPayment.invoice_url || waPayment.checkout_url}
+          boletoUrl={waPayment.boleto_url}
+          pixCopyPaste={waPayment.pix_copy_paste}
+          paymentMethod={waPayment.payment_method}
           paymentId={waPayment.id}
           responsibleId={waPayment.responsible_id}
         />
