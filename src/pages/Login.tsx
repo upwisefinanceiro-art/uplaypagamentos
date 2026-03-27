@@ -95,13 +95,14 @@ const Login = () => {
 
         <form onSubmit={handleLogin} className="space-y-5">
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-sm font-medium text-foreground">E-mail</Label>
+            <Label htmlFor="credential" className="text-sm font-medium text-foreground">CPF ou E-mail</Label>
             <Input
-              id="email"
-              type="email"
-              placeholder="seu@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              id="credential"
+              type="text"
+              inputMode="text"
+              placeholder="000.000.000-00 ou seu@email.com"
+              value={credential}
+              onChange={handleCredentialChange}
               className="h-11 bg-input border-border text-foreground placeholder:text-muted-foreground focus:ring-primary focus:border-primary"
               required
             />
