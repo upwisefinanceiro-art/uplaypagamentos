@@ -961,6 +961,24 @@ const AdminContracts = () => {
     });
   }, [contracts, searchTerm]);
 
+  // Compute overdue stats per contract
+  const contractOverdueMap = useMemo(() => {
+    const today = startOfDay(new Date());
+    const map: Record<string, { overdueCount: number; maxDaysOverdue: number }> = {};
+    for (const p of contractPayments) {
+      if (!p.contract_id) continue;
+      const dueDate = startOfDay(new Date(p.due_date + "T00:00:00"));
+      const isOverdue = (p.status === "OVERDUE") || (p.status === "PENDING" && isBefore(dueDate, today));
+      if (isOverdue) {
+        if (!map[p.contract_id]) map[p.contract_id] = { overdueCount: 0, maxDaysOverdue: 0 };
+        map[p.contract_id].overdueCount++;
+        const days = differenceInDays(today, dueDate);
+        if (days > map[p.contract_id].maxDaysOverdue) map[p.contract_id].maxDaysOverdue = days;
+      }
+    }
+    return map;
+  }, [contractPayments]);
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
