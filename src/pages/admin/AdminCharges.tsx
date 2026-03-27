@@ -31,6 +31,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import WhatsAppDialog from "@/components/WhatsAppDialog";
+import { resolveWhatsAppChargeData } from "@/lib/asaas-payment";
 
 type PaymentStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELLED";
 type BillingType = "PIX" | "BOLETO" | "CARD";
@@ -531,35 +532,22 @@ const AdminCharges = () => {
   };
 
   const handleOpenWhatsApp = async (payment: PaymentRow) => {
-    let updatedPayment = payment;
+    try {
+      toast({ title: "Sincronizando cobrança no Asaas antes do envio..." });
+      const resolved = await resolveWhatsAppChargeData(payment.id);
 
-    // Auto-sync with Asaas to get invoice_url if missing
-    if (!payment.invoice_url && !payment.checkout_url && payment.payment_method !== "DINHEIRO") {
-      try {
-        toast({ title: "Buscando link de pagamento no Asaas..." });
-        const { data, error } = await supabase.functions.invoke("sync-asaas-payment", {
-          body: { payment_id: payment.id },
-        });
-        if (!error && data?.invoice_url) {
-          updatedPayment = {
-            ...payment,
-            invoice_url: data.invoice_url,
-            boleto_url: data.boleto_url || payment.boleto_url,
-            checkout_url: data.invoice_url,
-            pix_copy_paste: data.pix_copy_paste || payment.pix_copy_paste,
-          };
-        }
-      } catch {
-        // proceed without link
-      }
+      setWaPayment(resolved.payment as PaymentRow);
+      setWaResponsible(resolved.responsible);
+      setWaStudent(resolved.studentName);
+      setWaDescription(resolved.description);
+      setWaDialogOpen(true);
+    } catch (err) {
+      toast({
+        title: "Envio bloqueado",
+        description: err instanceof Error ? err.message : "Não foi possível obter os dados completos da cobrança no Asaas.",
+        variant: "destructive",
+      });
     }
-
-    setWaPayment(updatedPayment);
-    const responsible = profiles[payment.responsible_id];
-    setWaResponsible(responsible ? { full_name: responsible.full_name, phone: responsible.phone } : null);
-    setWaStudent(payment.student_id ? studentMap[payment.student_id] : undefined);
-    setWaDescription(payment.description || `Parcela ${payment.installment_number}`);
-    setWaDialogOpen(true);
   };
 
   const handleSyncAll = async () => {

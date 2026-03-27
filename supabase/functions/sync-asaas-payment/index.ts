@@ -19,6 +19,54 @@ function validateCpf(cpf: string): boolean {
   return true;
 }
 
+function mapAsaasStatus(status?: string | null): string | null {
+  const statusMap: Record<string, string> = {
+    PENDING: "PENDING",
+    RECEIVED: "PAID",
+    CONFIRMED: "PAID",
+    OVERDUE: "OVERDUE",
+    REFUNDED: "CANCELLED",
+    DELETED: "CANCELLED",
+    RECEIVED_IN_CASH: "PAID",
+  };
+
+  if (!status) return null;
+  return statusMap[status] || null;
+}
+
+function mapBillingTypeToPaymentMethod(billingType?: string | null): string | null {
+  const billingTypeMap: Record<string, string> = {
+    PIX: "PIX",
+    BOLETO: "BOLETO",
+    CREDIT_CARD: "CARD",
+  };
+
+  if (!billingType) return null;
+  return billingTypeMap[billingType] || null;
+}
+
+async function fetchPixData(baseUrl: string, asaasPaymentId: string, apiKey: string) {
+  try {
+    const pixRes = await fetch(`${baseUrl}/payments/${asaasPaymentId}/pixQrCode`, {
+      headers: { access_token: apiKey },
+    });
+
+    if (!pixRes.ok) {
+      console.warn("[sync-asaas-payment] não foi possível buscar PIX", JSON.stringify({ asaasPaymentId, status: pixRes.status }));
+      return { encodedImage: null, payload: null };
+    }
+
+    const pixData = await pixRes.json();
+    return {
+      encodedImage: pixData.encodedImage || null,
+      payload: pixData.payload || null,
+    };
+  } catch (error) {
+    console.warn("[sync-asaas-payment] erro ao buscar PIX", JSON.stringify({ asaasPaymentId, error: error instanceof Error ? error.message : String(error) }));
+    return { encodedImage: null, payload: null };
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -65,6 +113,17 @@ Deno.serve(async (req) => {
 
     if (payErr || !payment) return respond({ error: "Pagamento não encontrado" }, 404);
 
+    console.log("[sync-asaas-payment] cobrança carregada do banco", JSON.stringify({
+      payment_id,
+      asaas_payment_id: payment.asaas_payment_id,
+      payment_method: payment.payment_method,
+      status: payment.status,
+      due_date: payment.due_date,
+      invoice_url: Boolean(payment.invoice_url),
+      boleto_url: Boolean(payment.boleto_url),
+      pix_copy_paste: Boolean(payment.pix_copy_paste),
+    }));
+
     // Get unit with Asaas credentials
     const { data: unit, error: unitErr } = await supabaseAdmin
       .from("units")
@@ -80,6 +139,7 @@ Deno.serve(async (req) => {
 
     // ── REFRESH: payment already has asaas_payment_id ──
     if (payment.asaas_payment_id) {
+      console.log("[sync-asaas-payment] chamada ao Asaas iniciada", JSON.stringify({ payment_id, asaas_payment_id: payment.asaas_payment_id, mode: "refresh" }));
       const asaasRes = await fetch(`${baseUrl}/payments/${payment.asaas_payment_id}`, {
         headers: { access_token: unit.asaas_api_key },
       });
@@ -93,57 +153,75 @@ Deno.serve(async (req) => {
       }
 
       const asaasData = await asaasRes.json();
+      console.log("[sync-asaas-payment] resposta da API recebida", JSON.stringify({
+        payment_id,
+        asaas_payment_id: payment.asaas_payment_id,
+        billingType: asaasData.billingType,
+        status: asaasData.status,
+        invoiceUrl: Boolean(asaasData.invoiceUrl),
+        bankSlipUrl: Boolean(asaasData.bankSlipUrl),
+      }));
 
       // Fetch PIX data if applicable
       let pixQrCode: string | null = payment.pix_qr_code;
       let pixCopyPaste: string | null = payment.pix_copy_paste;
 
       if (asaasData.billingType === "PIX" && (!pixQrCode || !pixCopyPaste)) {
-        try {
-          const pixRes = await fetch(`${baseUrl}/payments/${payment.asaas_payment_id}/pixQrCode`, {
-            headers: { access_token: unit.asaas_api_key },
-          });
-          if (pixRes.ok) {
-            const pixData = await pixRes.json();
-            pixQrCode = pixData.encodedImage || null;
-            pixCopyPaste = pixData.payload || null;
-          }
-        } catch { /* non-critical */ }
+        const pixData = await fetchPixData(baseUrl, payment.asaas_payment_id, unit.asaas_api_key);
+        pixQrCode = pixData.encodedImage || null;
+        pixCopyPaste = pixData.payload || null;
       }
 
-      const statusMap: Record<string, string> = {
-        PENDING: "PENDING",
-        RECEIVED: "PAID",
-        CONFIRMED: "PAID",
-        OVERDUE: "OVERDUE",
-        REFUNDED: "CANCELLED",
-        DELETED: "CANCELLED",
-        RECEIVED_IN_CASH: "PAID",
-      };
+      const resolvedStatus = mapAsaasStatus(asaasData.status) || payment.status;
+      const resolvedMethod = mapBillingTypeToPaymentMethod(asaasData.billingType) || payment.payment_method || null;
 
       const updateData: Record<string, unknown> = {
         invoice_url: asaasData.invoiceUrl || payment.invoice_url,
         boleto_url: asaasData.bankSlipUrl || payment.boleto_url,
+        boleto_barcode: asaasData.identificationField || payment.boleto_barcode,
         pix_qr_code: pixQrCode,
         pix_copy_paste: pixCopyPaste,
         checkout_url: asaasData.invoiceUrl || payment.checkout_url,
-        status: statusMap[asaasData.status] || payment.status,
+        status: resolvedStatus,
+        payment_method: resolvedMethod,
+        due_date: asaasData.dueDate || payment.due_date,
         raw_response: asaasData,
       };
 
-      if (statusMap[asaasData.status] === "PAID" && !payment.paid_at) {
+      if (resolvedStatus === "PAID" && !payment.paid_at) {
         updateData.paid_at = asaasData.paymentDate || new Date().toISOString();
       }
 
-      await supabaseAdmin.from("payments").update(updateData).eq("id", payment_id);
+      const { error: updateErr } = await supabaseAdmin.from("payments").update(updateData).eq("id", payment_id);
+      if (updateErr) {
+        console.error("[sync-asaas-payment] erro ao salvar campos no banco", JSON.stringify({ payment_id, error: updateErr.message }));
+        return respond({ error: "Não foi possível salvar os dados sincronizados da cobrança" }, 500);
+      }
+
+      console.log("[sync-asaas-payment] campos salvos no banco", JSON.stringify({
+        payment_id,
+        payment_method: resolvedMethod,
+        status: resolvedStatus,
+        due_date: updateData.due_date,
+        invoice_url: Boolean(updateData.invoice_url),
+        boleto_url: Boolean(updateData.boleto_url),
+        pix_copy_paste: Boolean(updateData.pix_copy_paste),
+      }));
 
       return respond({
         success: true,
         action: "refreshed",
         invoice_url: updateData.invoice_url,
         boleto_url: updateData.boleto_url,
+        checkout_url: updateData.checkout_url,
         pix_copy_paste: updateData.pix_copy_paste,
+        pix_qr_code: updateData.pix_qr_code,
         status: updateData.status,
+        due_date: updateData.due_date,
+        payment_method: updateData.payment_method,
+        billing_type: asaasData.billingType || null,
+        customer: asaasData.customer || null,
+        value: asaasData.value ?? payment.final_value ?? payment.value,
       });
     }
 
@@ -260,6 +338,7 @@ Deno.serve(async (req) => {
     };
 
     console.log("Criando cobrança no Asaas:", JSON.stringify(chargePayload));
+    console.log("[sync-asaas-payment] chamada ao Asaas iniciada", JSON.stringify({ payment_id, mode: "create", billingType, dueDate: payment.due_date }));
 
     const chargeRes = await fetch(`${baseUrl}/payments`, {
       method: "POST",
@@ -271,6 +350,14 @@ Deno.serve(async (req) => {
     });
 
     const chargeData = await chargeRes.json();
+    console.log("[sync-asaas-payment] resposta da API recebida", JSON.stringify({
+      payment_id,
+      asaas_payment_id: chargeData?.id || null,
+      billingType: chargeData?.billingType || billingType,
+      status: chargeData?.status || null,
+      invoiceUrl: Boolean(chargeData?.invoiceUrl),
+      bankSlipUrl: Boolean(chargeData?.bankSlipUrl),
+    }));
 
     if (!chargeRes.ok) {
       const detail = chargeData?.errors?.[0]?.description
@@ -290,33 +377,45 @@ Deno.serve(async (req) => {
     let pixCopyPaste: string | null = null;
 
     if (billingType === "PIX" && chargeData.id) {
-      try {
-        const pixRes = await fetch(`${baseUrl}/payments/${chargeData.id}/pixQrCode`, {
-          headers: { access_token: unit.asaas_api_key },
-        });
-        if (pixRes.ok) {
-          const pixData = await pixRes.json();
-          pixQrCode = pixData.encodedImage || null;
-          pixCopyPaste = pixData.payload || null;
-        }
-      } catch { /* non-critical */ }
+      const pixData = await fetchPixData(baseUrl, chargeData.id, unit.asaas_api_key);
+      pixQrCode = pixData.encodedImage || null;
+      pixCopyPaste = pixData.payload || null;
     }
 
     // ── Update payment record ──
     const resolvedMethod = payment.payment_method === "ASAAS" ? "BOLETO" : payment.payment_method;
+    const resolvedStatus = mapAsaasStatus(chargeData.status) || payment.status;
 
     const updateData = {
       asaas_payment_id: chargeData.id,
       invoice_url: chargeData.invoiceUrl || null,
       boleto_url: chargeData.bankSlipUrl || null,
+      boleto_barcode: chargeData.identificationField || null,
       checkout_url: chargeData.invoiceUrl || null,
       pix_qr_code: pixQrCode,
       pix_copy_paste: pixCopyPaste,
       raw_response: chargeData,
-      payment_method: resolvedMethod,
+      payment_method: mapBillingTypeToPaymentMethod(chargeData.billingType) || resolvedMethod,
+      status: resolvedStatus,
+      due_date: chargeData.dueDate || payment.due_date,
     };
 
-    await supabaseAdmin.from("payments").update(updateData).eq("id", payment_id);
+    const { error: updateErr } = await supabaseAdmin.from("payments").update(updateData).eq("id", payment_id);
+    if (updateErr) {
+      console.error("[sync-asaas-payment] erro ao salvar campos no banco", JSON.stringify({ payment_id, error: updateErr.message }));
+      return respond({ error: "Não foi possível salvar os dados sincronizados da cobrança" }, 500);
+    }
+
+    console.log("[sync-asaas-payment] campos salvos no banco", JSON.stringify({
+      payment_id,
+      asaas_payment_id: chargeData.id,
+      payment_method: updateData.payment_method,
+      status: updateData.status,
+      due_date: updateData.due_date,
+      invoice_url: Boolean(updateData.invoice_url),
+      boleto_url: Boolean(updateData.boleto_url),
+      pix_copy_paste: Boolean(updateData.pix_copy_paste),
+    }));
 
     return respond({
       success: true,
@@ -324,7 +423,15 @@ Deno.serve(async (req) => {
       asaas_payment_id: chargeData.id,
       invoice_url: updateData.invoice_url,
       boleto_url: updateData.boleto_url,
+      checkout_url: updateData.checkout_url,
       pix_copy_paste: pixCopyPaste,
+      pix_qr_code: pixQrCode,
+      status: updateData.status,
+      due_date: updateData.due_date,
+      payment_method: updateData.payment_method,
+      billing_type: chargeData.billingType || billingType,
+      customer: asaasCustomerId,
+      value: chargeData.value ?? Number(payment.final_value ?? payment.value),
     });
   } catch (err) {
     console.error("sync-asaas-payment error:", err);

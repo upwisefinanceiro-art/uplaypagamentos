@@ -52,6 +52,17 @@ const buildDefaultMessage = ({
 }: Omit<WhatsAppDialogProps, "open" | "onOpenChange" | "phone">): string => {
   const formatCurrency = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
   const formatDate = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("pt-BR");
+  const paymentLink = invoiceUrl || boletoUrl || null;
+
+  const resolvedMethod = (() => {
+    const method = (paymentMethod || "").toUpperCase();
+    if (method === "ASAAS") return "BOLETO";
+    if (method === "PIX" || method === "BOLETO" || method === "CARD") return method;
+    if (pixCopyPaste) return "PIX";
+    if (boletoUrl) return "BOLETO";
+    if (paymentLink) return "BOLETO";
+    return "BOLETO";
+  })();
 
   let msg = `📚 *EnsinUP - Educação que transforma* 📚\n\n`;
   msg += `Olá, ${responsibleName}! 👋\n\n`;
@@ -61,28 +72,24 @@ const buildDefaultMessage = ({
   msg += `💰 Valor: *${formatCurrency(value)}*\n`;
   msg += `📅 Vencimento: *${formatDate(dueDate)}*\n\n`;
 
-  const method = (paymentMethod || "").toUpperCase();
-
-  if (method === "BOLETO" || method === "ASAAS") {
-    const link = boletoUrl || invoiceUrl;
-    if (link) {
+  if (resolvedMethod === "BOLETO") {
+    if (paymentLink) {
       msg += `📄 *Boleto:*\n${link}\n\n`;
     }
-  } else if (method === "PIX") {
+  } else if (resolvedMethod === "PIX") {
     if (pixCopyPaste) {
       msg += `💳 *PIX (copia e cola):*\n${pixCopyPaste}\n\n`;
     }
-    if (invoiceUrl) {
-      msg += `🔗 *Link para pagamento:*\n${invoiceUrl}\n\n`;
+    if (paymentLink) {
+      msg += `🔗 *Link para pagamento:*\n${paymentLink}\n\n`;
     }
-  } else if (method === "CARD") {
-    if (invoiceUrl) {
-      msg += `🔗 *Link para pagamento:*\n${invoiceUrl}\n\n`;
+  } else if (resolvedMethod === "CARD") {
+    if (paymentLink) {
+      msg += `🔗 *Link para pagamento:*\n${paymentLink}\n\n`;
     }
   } else {
-    // Fallback: show any available link
-    if (invoiceUrl) {
-      msg += `🔗 *Link para pagamento:*\n${invoiceUrl}\n\n`;
+    if (paymentLink) {
+      msg += `🔗 *Link para pagamento:*\n${paymentLink}\n\n`;
     }
   }
 
@@ -119,9 +126,17 @@ const WhatsAppDialog = ({
   useEffect(() => {
     if (open) {
       setManualPhone(phone && isValidPhone(phone) ? "" : "");
-      setMessage(
-        buildDefaultMessage({ responsibleName, studentName, description, value, dueDate, invoiceUrl, boletoUrl, pixCopyPaste, paymentMethod })
-      );
+      const nextMessage = buildDefaultMessage({ responsibleName, studentName, description, value, dueDate, invoiceUrl, boletoUrl, pixCopyPaste, paymentMethod, paymentId, responsibleId });
+      setMessage(nextMessage);
+      console.info("[whatsapp-sync] mensagem pronta para envio", {
+        paymentId,
+        responsibleId,
+        paymentMethod,
+        hasInvoiceUrl: Boolean(invoiceUrl),
+        hasBoletoUrl: Boolean(boletoUrl),
+        hasPixCopyPaste: Boolean(pixCopyPaste),
+        messageLength: nextMessage.length,
+      });
     }
   }, [open, responsibleName, studentName, description, value, dueDate, invoiceUrl, boletoUrl, pixCopyPaste, paymentMethod, phone]);
 

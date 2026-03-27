@@ -42,6 +42,7 @@ import DashboardRecentPaid from "@/components/dashboard/DashboardRecentPaid";
 import DashboardUnitSummary from "@/components/dashboard/DashboardUnitSummary";
 import DashboardBirthdays, { type BirthdayPerson } from "@/components/dashboard/DashboardBirthdays";
 import { useToast } from "@/hooks/use-toast";
+import { resolveWhatsAppChargeData } from "@/lib/asaas-payment";
 
 
 
@@ -114,6 +115,7 @@ const AdminDashboard = () => {
     dueDate: string;
     paymentId: string;
     responsibleId: string;
+    description: string;
     invoiceUrl: string | null;
     boletoUrl: string | null;
     pixCopyPaste: string | null;
@@ -127,6 +129,7 @@ const AdminDashboard = () => {
     dueDate: "",
     paymentId: "",
     responsibleId: "",
+    description: "",
     invoiceUrl: null,
     boletoUrl: null,
     pixCopyPaste: null,
@@ -331,42 +334,32 @@ const AdminDashboard = () => {
   };
 
   const openWhatsApp = async (payment: DashboardPayment) => {
-    let invoiceUrl = payment.invoice_url || payment.checkout_url || null;
-    let boletoUrl = payment.boleto_url || null;
-    let pixCopyPaste = payment.pix_copy_paste || null;
+    try {
+      toast({ title: "Sincronizando cobrança no Asaas antes do envio..." });
+      const resolved = await resolveWhatsAppChargeData(payment.id);
 
-    // Auto-sync with Asaas to get data if missing
-    if (!invoiceUrl || (!boletoUrl && !pixCopyPaste)) {
-      try {
-        toast({ title: "Buscando dados da cobrança no Asaas..." });
-        const { data, error } = await supabase.functions.invoke("sync-asaas-payment", {
-          body: { payment_id: payment.id },
-        });
-        if (!error && data) {
-          invoiceUrl = data.invoice_url || invoiceUrl;
-          boletoUrl = data.boleto_url || boletoUrl;
-          pixCopyPaste = data.pix_copy_paste || pixCopyPaste;
-        }
-      } catch {
-        // proceed with what we have
-      }
+      setWaDialog({
+        open: true,
+        phone: resolved.responsible.phone,
+        responsibleName: resolved.responsible.full_name,
+        studentName: resolved.studentName ?? "",
+        value: resolved.payment.final_value ?? resolved.payment.value,
+        dueDate: resolved.payment.due_date,
+        paymentId: resolved.payment.id,
+        responsibleId: resolved.payment.responsible_id,
+        description: resolved.description,
+        invoiceUrl: resolved.payment.invoice_url || resolved.payment.checkout_url,
+        boletoUrl: resolved.payment.boleto_url,
+        pixCopyPaste: resolved.payment.pix_copy_paste,
+        paymentMethod: resolved.payment.payment_method,
+      });
+    } catch (err) {
+      toast({
+        title: "Envio bloqueado",
+        description: err instanceof Error ? err.message : "Não foi possível obter os dados completos da cobrança no Asaas.",
+        variant: "destructive",
+      });
     }
-
-    const student = getStudentByResponsible(payment.responsible_id);
-    setWaDialog({
-      open: true,
-      phone: getProfilePhone(payment.responsible_id),
-      responsibleName: getProfileName(payment.responsible_id),
-      studentName: student?.full_name ?? "",
-      value: payment.final_value ?? payment.value,
-      dueDate: payment.due_date,
-      paymentId: payment.id,
-      responsibleId: payment.responsible_id,
-      invoiceUrl,
-      boletoUrl,
-      pixCopyPaste,
-      paymentMethod: payment.payment_method,
-    });
   };
 
   const handleCleanupPreview = async () => {
@@ -529,7 +522,7 @@ const AdminDashboard = () => {
         phone={waDialog.phone}
         responsibleName={waDialog.responsibleName}
         studentName={waDialog.studentName}
-        description={`Parcela`}
+        description={waDialog.description}
         value={waDialog.value}
         dueDate={waDialog.dueDate}
         invoiceUrl={waDialog.invoiceUrl}
