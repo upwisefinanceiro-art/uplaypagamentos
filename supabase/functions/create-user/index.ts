@@ -57,9 +57,11 @@ Deno.serve(async (req) => {
 
     const { cpf, full_name, phone, password, role, unit_id } = await req.json();
 
+    const finalPassword = password || "12345678";
+
     const normalizedRole = role === "RESPONSAVEL" || role === "ADMIN_UNIDADE" ? role : null;
-    if (!cpf || !full_name || !password || !normalizedRole) {
-      return jsonResponse({ error: "Campos obrigatórios: cpf, full_name, password e role válido" });
+    if (!cpf || !full_name || !normalizedRole) {
+      return jsonResponse({ error: "Campos obrigatórios: cpf, full_name e role válido" });
     }
 
     if (normalizedRole === "ADMIN_UNIDADE" && !isAdminMaster) {
