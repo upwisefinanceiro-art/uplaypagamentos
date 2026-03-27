@@ -1248,7 +1248,8 @@ const AdminContracts = () => {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
