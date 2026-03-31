@@ -43,7 +43,18 @@ Deno.serve(async (req) => {
     }
 
     if (reset_all) {
+      // Get admin user IDs to skip them during mass reset
+      const { data: adminRoles } = await supabaseAdmin
+        .from("user_roles")
+        .select("user_id")
+        .in("role", ["ADMIN_MASTER", "ADMIN_UNIDADE"]);
+
+      const adminUserIds = new Set((adminRoles || []).map((r: any) => r.user_id));
+
       for (const user of allUsers) {
+        // NEVER reset admin passwords
+        if (adminUserIds.has(user.id)) continue;
+
         await supabaseAdmin.auth.admin.updateUserById(user.id, {
           password: adminPassword,
           email_confirm: true,
