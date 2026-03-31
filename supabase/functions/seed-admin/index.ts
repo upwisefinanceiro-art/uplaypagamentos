@@ -62,7 +62,21 @@ Deno.serve(async (req) => {
       }
     }
 
-    const existingUser = allUsers.find((u: any) => u.email === adminEmail);
+    const { data: existingProfileByCpf, error: existingProfileError } = await supabaseAdmin
+      .from("profiles")
+      .select("id, email")
+      .eq("cpf", adminCpf)
+      .maybeSingle();
+
+    if (existingProfileError) throw existingProfileError;
+
+    const existingUser =
+      allUsers.find((u: any) => u.email === adminEmail) ??
+      allUsers.find((u: any) => u.id === existingProfileByCpf?.id) ??
+      allUsers.find((u: any) => {
+        const metadataCpf = String(u.user_metadata?.cpf ?? u.raw_user_meta_data?.cpf ?? "").replace(/\D/g, "");
+        return metadataCpf === adminCpf;
+      });
 
     let adminUserId = existingUser?.id as string | undefined;
 
