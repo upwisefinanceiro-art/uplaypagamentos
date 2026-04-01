@@ -477,9 +477,8 @@ const ManualChargeDialog = ({
               <div className="space-y-1.5">
                 <Label>Valor Real por Mensalidade *</Label>
                 <Input
-                  type="number"
-                  min="0.01"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={realValue}
                   onChange={(e) => setRealValue(e.target.value)}
                   placeholder="219,90"
@@ -488,9 +487,8 @@ const ManualChargeDialog = ({
               <div className="space-y-1.5">
                 <Label>Desc. Pontualidade</Label>
                 <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={discount}
                   onChange={(e) => setDiscount(e.target.value)}
                   placeholder="30,00"
