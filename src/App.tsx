@@ -26,6 +26,8 @@ import SuperAdminLayout from "./components/layouts/SuperAdminLayout";
 import SuperDashboard from "./pages/super/SuperDashboard";
 import SuperCompanies from "./pages/super/SuperCompanies";
 import SuperSettings from "./pages/super/SuperSettings";
+import SuperBilling from "./pages/super/SuperBilling";
+import { CompanyBrandingProvider } from "./contexts/CompanyBrandingContext";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -37,6 +39,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <CompanyBrandingProvider>
           <Routes>
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/login" element={<Login />} />
@@ -79,11 +82,13 @@ const App = () => (
             }>
               <Route index element={<SuperDashboard />} />
               <Route path="empresas" element={<SuperCompanies />} />
+              <Route path="cobrancas" element={<SuperBilling />} />
               <Route path="configuracoes" element={<SuperSettings />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </CompanyBrandingProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

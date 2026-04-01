@@ -4,9 +4,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Building2 } from "lucide-react";
 import type { Company } from "@/pages/super/SuperCompanies";
+
+interface UnitOption {
+  id: string;
+  name: string;
+  company_id: string | null;
+}
 
 interface Props {
   open: boolean;
@@ -18,6 +26,8 @@ interface Props {
 const CompanyDialog = ({ open, onOpenChange, company, onSaved }: Props) => {
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
+  const [units, setUnits] = useState<UnitOption[]>([]);
+  const [selectedUnitIds, setSelectedUnitIds] = useState<string[]>([]);
 
   const [name, setName] = useState("");
   const [systemName, setSystemName] = useState("");
@@ -31,6 +41,14 @@ const CompanyDialog = ({ open, onOpenChange, company, onSaved }: Props) => {
   const [maxUsers, setMaxUsers] = useState("10");
 
   useEffect(() => {
+    if (!open) return;
+    // Fetch all units
+    supabase.from("units").select("id, name, company_id").eq("active", true).then(({ data }) => {
+      setUnits((data as UnitOption[]) ?? []);
+    });
+  }, [open]);
+
+  useEffect(() => {
     if (company) {
       setName(company.name);
       setSystemName(company.system_name);
@@ -42,6 +60,8 @@ const CompanyDialog = ({ open, onOpenChange, company, onSaved }: Props) => {
       setStatus(company.status);
       setMaxUnits(String(company.max_units));
       setMaxUsers(String(company.max_users));
+      // Set selected units for this company
+      setSelectedUnitIds(units.filter(u => u.company_id === company.id).map(u => u.id));
     } else {
       setName("");
       setSystemName("");
@@ -53,8 +73,15 @@ const CompanyDialog = ({ open, onOpenChange, company, onSaved }: Props) => {
       setStatus("ATIVO");
       setMaxUnits("1");
       setMaxUsers("10");
+      setSelectedUnitIds([]);
     }
-  }, [company, open]);
+  }, [company, open, units]);
+
+  const toggleUnit = (unitId: string) => {
+    setSelectedUnitIds(prev =>
+      prev.includes(unitId) ? prev.filter(id => id !== unitId) : [...prev, unitId]
+    );
+  };
 
   const handleSave = async () => {
     if (!name.trim() || !systemName.trim()) {
@@ -77,23 +104,46 @@ const CompanyDialog = ({ open, onOpenChange, company, onSaved }: Props) => {
       max_users: parseInt(maxUsers) || 10,
     };
 
+    let companyId = company?.id;
     let error;
+
     if (company) {
       ({ error } = await supabase.from("companies").update(payload).eq("id", company.id));
     } else {
-      ({ error } = await supabase.from("companies").insert(payload));
+      const res = await supabase.from("companies").insert(payload).select("id").single();
+      error = res.error;
+      companyId = res.data?.id;
     }
 
-    setSaving(false);
-
     if (error) {
+      setSaving(false);
       toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
       return;
     }
 
+    // Update unit linkages
+    if (companyId) {
+      // Unlink units previously linked to this company but now deselected
+      const previouslyLinked = units.filter(u => u.company_id === companyId).map(u => u.id);
+      const toUnlink = previouslyLinked.filter(id => !selectedUnitIds.includes(id));
+      const toLink = selectedUnitIds.filter(id => !previouslyLinked.includes(id));
+
+      if (toUnlink.length > 0) {
+        await supabase.from("units").update({ company_id: null }).in("id", toUnlink);
+      }
+      if (toLink.length > 0) {
+        await supabase.from("units").update({ company_id: companyId }).in("id", toLink);
+      }
+    }
+
+    setSaving(false);
     toast({ title: company ? "Empresa atualizada!" : "Empresa criada!" });
     onSaved();
   };
+
+  // Units available: not linked to another company, or linked to this company
+  const availableUnits = units.filter(u => !u.company_id || u.company_id === company?.id);
+  const linkedElsewhere = units.filter(u => u.company_id && u.company_id !== company?.id);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -178,17 +228,52 @@ const CompanyDialog = ({ open, onOpenChange, company, onSaved }: Props) => {
             </div>
           </div>
 
+          {/* Unit Linking */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <Building2 size={14} />
+              Unidades Vinculadas
+            </Label>
+            {availableUnits.length === 0 && linkedElsewhere.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Nenhuma unidade cadastrada.</p>
+            ) : (
+              <div className="space-y-2 p-3 rounded-lg border border-border bg-muted/20">
+                {availableUnits.map(unit => (
+                  <label key={unit.id} className="flex items-center gap-2 cursor-pointer text-sm">
+                    <Checkbox
+                      checked={selectedUnitIds.includes(unit.id)}
+                      onCheckedChange={() => toggleUnit(unit.id)}
+                    />
+                    <span className="text-foreground">{unit.name}</span>
+                  </label>
+                ))}
+                {linkedElsewhere.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-border">
+                    <p className="text-[10px] text-muted-foreground mb-1">Vinculadas a outra empresa:</p>
+                    {linkedElsewhere.map(unit => (
+                      <p key={unit.id} className="text-xs text-muted-foreground pl-6">• {unit.name}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Preview */}
           {name && (
             <div className="p-3 rounded-lg border border-border bg-muted/30">
-              <p className="text-xs text-muted-foreground mb-2">Preview</p>
+              <p className="text-xs text-muted-foreground mb-2">Preview da Marca</p>
               <div className="flex items-center gap-3">
-                <div
-                  className="h-10 w-10 rounded-lg flex items-center justify-center text-white font-bold"
-                  style={{ backgroundColor: primaryColor }}
-                >
-                  {name.charAt(0).toUpperCase()}
-                </div>
+                {logoUrl ? (
+                  <img src={logoUrl} alt={name} className="h-10 w-10 rounded-lg object-cover" />
+                ) : (
+                  <div
+                    className="h-10 w-10 rounded-lg flex items-center justify-center text-white font-bold"
+                    style={{ backgroundColor: primaryColor }}
+                  >
+                    {name.charAt(0).toUpperCase()}
+                  </div>
+                )}
                 <div>
                   <p className="font-semibold text-sm" style={{ color: primaryColor }}>{name}</p>
                   <p className="text-xs text-muted-foreground">{systemName}</p>

@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Home, CreditCard, User, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useCompanyBranding } from "@/contexts/CompanyBrandingContext";
 import InstallPrompt from "@/components/InstallPrompt";
 import WhatsAppFinanceiroFab from "@/components/app/WhatsAppFinanceiroFab";
 
@@ -10,6 +11,7 @@ const AppLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut, user, profile } = useAuth();
+  const branding = useCompanyBranding();
   const [unitName, setUnitName] = useState("");
   const [studentName, setStudentName] = useState("");
 
@@ -42,8 +44,8 @@ const AppLayout = () => {
       {/* Header */}
       <header className="sticky top-0 z-30 bg-card/95 backdrop-blur-sm border-b border-border px-4 py-3 flex items-center justify-between" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
         <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="EnsinUP" className="h-8 w-auto" />
-          <span className="text-sm font-semibold text-foreground">EnsinUP</span>
+          <img src={branding.logoUrl || "/logo.png"} alt={branding.name} className="h-8 w-auto" />
+          <span className="text-sm font-semibold text-foreground">{branding.systemName || "EnsinUP"}</span>
         </div>
         <button
           onClick={async () => {

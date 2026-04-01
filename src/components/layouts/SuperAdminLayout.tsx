@@ -7,6 +7,7 @@ import {
   X,
   Settings,
   Crown,
+  CreditCard,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,6 +15,7 @@ import { useAuth } from "@/contexts/AuthContext";
 const menuItems = [
   { path: "/super", icon: LayoutDashboard, label: "Dashboard" },
   { path: "/super/empresas", icon: Building2, label: "Empresas" },
+  { path: "/super/cobrancas", icon: CreditCard, label: "Cobranças SaaS" },
   { path: "/super/configuracoes", icon: Settings, label: "Configurações" },
 ];
 
