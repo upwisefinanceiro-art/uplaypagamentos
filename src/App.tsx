@@ -26,6 +26,8 @@ import SuperAdminLayout from "./components/layouts/SuperAdminLayout";
 import SuperDashboard from "./pages/super/SuperDashboard";
 import SuperCompanies from "./pages/super/SuperCompanies";
 import SuperSettings from "./pages/super/SuperSettings";
+import SuperBilling from "./pages/super/SuperBilling";
+import { CompanyBrandingProvider } from "./contexts/CompanyBrandingContext";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
