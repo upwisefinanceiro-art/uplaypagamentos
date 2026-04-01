@@ -456,10 +456,18 @@ const AppPaymentDetail = () => {
             </Button>
           )}
 
-          {payment.invoice_url && status === "PENDING" && (
+          {payment.invoice_url && (status === "PENDING" || status === "OVERDUE") && (
             <Button variant="outline" size="sm" className="gap-2 text-xs" asChild>
               <a href={payment.invoice_url} target="_blank" rel="noopener noreferrer">
                 <Link2 size={14} /> Abrir Fatura
+              </a>
+            </Button>
+          )}
+
+          {payment.boleto_url && (status === "PENDING" || status === "OVERDUE") && (
+            <Button variant="outline" size="sm" className="gap-2 text-xs" asChild>
+              <a href={payment.boleto_url} target="_blank" rel="noopener noreferrer">
+                <FileText size={14} /> Abrir Boleto
               </a>
             </Button>
           )}
