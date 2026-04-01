@@ -290,6 +290,7 @@ const ManualChargeDialog = ({
           description: `${description.trim()} - Parcela ${i + 1}/${dueDates.length}`,
           value: finalValue,
           due_date: dueDates[i],
+          payment_method: paymentMethod,
         },
       });
       if (error || data?.error) {
