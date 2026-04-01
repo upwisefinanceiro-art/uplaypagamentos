@@ -318,6 +318,7 @@ const ManualChargeDialog = ({
             description: apostilaName,
             value: apostilaUnitValue,
             due_date: apostilaDates[i],
+            payment_method: paymentMethod,
           },
         });
         if (error || data?.error) {
