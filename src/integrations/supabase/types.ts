@@ -44,6 +44,54 @@ export type Database = {
         }
         Relationships: []
       }
+      companies: {
+        Row: {
+          created_at: string
+          id: string
+          logo_url: string | null
+          max_units: number
+          max_users: number
+          name: string
+          plan: string
+          primary_color: string | null
+          secondary_color: string | null
+          status: string
+          system_name: string
+          updated_at: string
+          whatsapp_financeiro: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          max_units?: number
+          max_users?: number
+          name: string
+          plan?: string
+          primary_color?: string | null
+          secondary_color?: string | null
+          status?: string
+          system_name?: string
+          updated_at?: string
+          whatsapp_financeiro?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          max_units?: number
+          max_users?: number
+          name?: string
+          plan?: string
+          primary_color?: string | null
+          secondary_color?: string | null
+          status?: string
+          system_name?: string
+          updated_at?: string
+          whatsapp_financeiro?: string | null
+        }
+        Relationships: []
+      }
       contracts: {
         Row: {
           address: string | null
@@ -445,6 +493,7 @@ export type Database = {
           asaas_base_url: string | null
           asaas_webhook_token: string | null
           cnpj: string | null
+          company_id: string | null
           created_at: string
           id: string
           name: string
@@ -460,6 +509,7 @@ export type Database = {
           asaas_base_url?: string | null
           asaas_webhook_token?: string | null
           cnpj?: string | null
+          company_id?: string | null
           created_at?: string
           id?: string
           name: string
@@ -475,6 +525,7 @@ export type Database = {
           asaas_base_url?: string | null
           asaas_webhook_token?: string | null
           cnpj?: string | null
+          company_id?: string | null
           created_at?: string
           id?: string
           name?: string
@@ -483,7 +534,15 @@ export type Database = {
           usar_whatsapp_padrao?: boolean
           whatsapp_financeiro?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "units_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
