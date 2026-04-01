@@ -33,8 +33,9 @@ const Login = () => {
   useEffect(() => {
     if (!user || authLoading) return;
     if (roles.length > 0) {
+      const isSuperAdmin = roles.includes("SUPER_ADMIN");
       const isAdmin = roles.includes("ADMIN_MASTER") || roles.includes("ADMIN_UNIDADE");
-      const target = isAdmin ? "/admin" : "/app";
+      const target = isSuperAdmin ? "/super" : isAdmin ? "/admin" : "/app";
       console.info("[auth] Login redirect", { roles, target });
       navigate(target, { replace: true });
     } else {

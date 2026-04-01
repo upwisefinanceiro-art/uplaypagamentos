@@ -71,6 +71,17 @@ const App = () => (
               <Route path="cobrancas" element={<AdminCharges />} />
             </Route>
 
+            {/* Painel Super Admin */}
+            <Route path="/super" element={
+              <ProtectedRoute requiredRoles={["SUPER_ADMIN"]}>
+                <SuperAdminLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<SuperDashboard />} />
+              <Route path="empresas" element={<SuperCompanies />} />
+              <Route path="configuracoes" element={<SuperSettings />} />
+            </Route>
+
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
