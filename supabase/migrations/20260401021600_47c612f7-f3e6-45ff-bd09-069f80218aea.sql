@@ -1,0 +1,1 @@
+UPDATE public.user_roles SET role = 'RESPONSAVEL' WHERE user_id = '41ce548c-981f-49e0-a588-be1d53537fc3' AND role = 'ADMIN_MASTER';
