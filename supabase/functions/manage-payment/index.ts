@@ -284,6 +284,7 @@ Deno.serve(async (req) => {
           punctuality_discount: 0,
           status: "PENDING",
           payment_type: payload.payment_type,
+          payment_method: payload.payment_method || null,
           description: payload.description.trim(),
           updated_at: now,
         })
