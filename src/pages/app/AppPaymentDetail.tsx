@@ -95,23 +95,46 @@ const AppPaymentDetail = () => {
   const handleOpenWhatsApp = async () => {
     if (!payment?.id) return;
 
-    try {
-      toast({ title: "Sincronizando cobrança no Asaas antes do envio..." });
-      const resolved = await resolveWhatsAppChargeData(payment.id);
-
-      setPayment((prev: any) => ({ ...prev, ...resolved.payment }));
-      setResponsible(resolved.responsible);
-      if (resolved.studentName) {
-        setStudent({ full_name: resolved.studentName });
+    // For admin: sync with Asaas and open billing WhatsApp dialog
+    if (isAdmin) {
+      try {
+        toast({ title: "Sincronizando cobrança no Asaas antes do envio..." });
+        const resolved = await resolveWhatsAppChargeData(payment.id);
+        setPayment((prev: any) => ({ ...prev, ...resolved.payment }));
+        setResponsible(resolved.responsible);
+        if (resolved.studentName) setStudent({ full_name: resolved.studentName });
+        setWaDialogOpen(true);
+      } catch (err) {
+        toast({
+          title: "Envio bloqueado",
+          description: err instanceof Error ? err.message : "Não foi possível obter os dados completos.",
+          variant: "destructive",
+        });
       }
-      setWaDialogOpen(true);
-    } catch (err) {
-      toast({
-        title: "Envio bloqueado",
-        description: err instanceof Error ? err.message : "Não foi possível obter os dados completos da cobrança no Asaas.",
-        variant: "destructive",
-      });
+      return;
     }
+
+    // For client: open WhatsApp to contact financeiro
+    const whatsappNumber = payment.unit_id
+      ? await getUnitWhatsAppNumber(payment.unit_id)
+      : DEFAULT_WHATSAPP_FINANCEIRO;
+
+    const responsibleName = responsible?.full_name || "Responsável";
+    const studentFullName = student?.full_name || "";
+    const unitFullName = unit?.name || "";
+    const desc = contract?.description || payment.description || `Parcela ${payment.installment_number}`;
+    const val = payment.final_value ?? payment.value;
+
+    let msg = `Olá, aqui é ${responsibleName}.\n\n`;
+    msg += `Preciso de ajuda com minha cobrança:\n\n`;
+    msg += `📋 ${desc}\n`;
+    msg += `💰 R$ ${Number(val).toFixed(2).replace(".", ",")}\n`;
+    msg += `📅 Venc: ${new Date(payment.due_date + "T12:00:00").toLocaleDateString("pt-BR")}\n`;
+    if (studentFullName) msg += `👤 Aluno: ${studentFullName}\n`;
+    if (unitFullName) msg += `🏫 Unidade: ${unitFullName}\n`;
+
+    const url = `https://wa.me/55${whatsappNumber}?text=${encodeURIComponent(msg)}`;
+    window.open(url, "_blank");
   };
 
   const formatCurrency = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
