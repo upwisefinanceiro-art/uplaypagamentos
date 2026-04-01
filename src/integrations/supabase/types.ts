@@ -434,6 +434,104 @@ export type Database = {
           },
         ]
       }
+      saas_invoices: {
+        Row: {
+          company_id: string
+          created_at: string
+          description: string | null
+          due_date: string
+          id: string
+          paid_at: string | null
+          status: string
+          subscription_id: string | null
+          value: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          description?: string | null
+          due_date: string
+          id?: string
+          paid_at?: string | null
+          status?: string
+          subscription_id?: string | null
+          value: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          due_date?: string
+          id?: string
+          paid_at?: string | null
+          status?: string
+          subscription_id?: string | null
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saas_invoices_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saas_invoices_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "saas_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saas_subscriptions: {
+        Row: {
+          company_id: string
+          created_at: string
+          ends_at: string | null
+          id: string
+          monthly_value: number
+          next_billing_date: string | null
+          plan: string
+          started_at: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          monthly_value?: number
+          next_billing_date?: string | null
+          plan?: string
+          started_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          monthly_value?: number
+          next_billing_date?: string | null
+          plan?: string
+          started_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saas_subscriptions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       students: {
         Row: {
           active: boolean
