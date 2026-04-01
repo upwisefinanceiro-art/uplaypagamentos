@@ -326,95 +326,117 @@ const AppPaymentDetail = () => {
       )}
 
       {/* ─── PAYMENT METHODS ─── */}
-      {(status === "PENDING" || status === "OVERDUE") && (payment.invoice_url || payment.pix_copy_paste || payment.pix_qr_code || payment.boleto_url || payment.checkout_url) && (
+      {(status === "PENDING" || status === "OVERDUE") && (
         <div className="glass-card p-4 space-y-4">
           <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
             <CreditCard size={16} className="text-primary" />
             Meios de Pagamento
           </h3>
 
-          {/* Invoice link */}
-          {payment.invoice_url && (
-            <Button className="w-full gap-2" asChild>
-              <a href={payment.invoice_url} target="_blank" rel="noopener noreferrer">
-                <ExternalLink size={16} /> Abrir Fatura / Pagar Online
-              </a>
-            </Button>
-          )}
-
-          {/* PIX QR Code */}
-          {method === "PIX" && payment.pix_qr_code && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <QrCode size={14} />
-                <span className="font-medium">QR Code PIX</span>
-              </div>
-              <div className="flex justify-center p-4 bg-background rounded-lg border border-border">
-                <img
-                  src={`data:image/png;base64,${payment.pix_qr_code}`}
-                  alt="QR Code PIX"
-                  className="w-48 h-48"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* PIX Copy & Paste */}
-          {method === "PIX" && payment.pix_copy_paste && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Copy size={14} />
-                <span className="font-medium">PIX Copia e Cola</span>
-              </div>
-              <div className="bg-secondary rounded-lg p-3 flex items-center gap-2 border border-border">
-                <code className="text-xs text-foreground flex-1 break-all leading-relaxed">{payment.pix_copy_paste}</code>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="flex-shrink-0 h-8 w-8"
-                  onClick={() => copyToClipboard(payment.pix_copy_paste, "Código PIX")}
-                >
-                  <Copy size={14} />
+          {(payment.invoice_url || payment.checkout_url) ? (
+            <>
+              {/* Invoice / Checkout link */}
+              {payment.invoice_url && (
+                <Button className="w-full gap-2" asChild>
+                  <a href={payment.invoice_url} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink size={16} /> Abrir Fatura / Pagar Online
+                  </a>
                 </Button>
-              </div>
-            </div>
-          )}
+              )}
 
-          {/* Boleto */}
-          {method === "BOLETO" && payment.boleto_url && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <FileText size={14} />
-                <span className="font-medium">Boleto Bancário</span>
-              </div>
-              <Button variant="outline" className="w-full gap-2" asChild>
-                <a href={payment.boleto_url} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink size={16} /> Abrir Boleto
-                </a>
-              </Button>
-              {payment.boleto_barcode && (
-                <div className="bg-secondary rounded-lg p-3 flex items-center gap-2 border border-border">
-                  <code className="text-xs text-foreground flex-1 break-all">{payment.boleto_barcode}</code>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="flex-shrink-0 h-8 w-8"
-                    onClick={() => copyToClipboard(payment.boleto_barcode, "Linha digitável")}
-                  >
-                    <Copy size={14} />
+              {/* Boleto */}
+              {payment.boleto_url && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <FileText size={14} />
+                    <span className="font-medium">Boleto Bancário</span>
+                  </div>
+                  <Button variant="outline" className="w-full gap-2" asChild>
+                    <a href={payment.boleto_url} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink size={16} /> Abrir Boleto
+                    </a>
                   </Button>
+                  {payment.boleto_barcode && (
+                    <div className="bg-secondary rounded-lg p-3 flex items-center gap-2 border border-border">
+                      <code className="text-xs text-foreground flex-1 break-all">{payment.boleto_barcode}</code>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="flex-shrink-0 h-8 w-8"
+                        onClick={() => copyToClipboard(payment.boleto_barcode, "Linha digitável")}
+                      >
+                        <Copy size={14} />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
-          )}
 
-          {/* Card */}
-          {method === "CARD" && payment.checkout_url && (
-            <Button variant="outline" className="w-full gap-2" asChild>
-              <a href={payment.checkout_url} target="_blank" rel="noopener noreferrer">
-                <CreditCard size={16} /> Pagar com Cartão
-              </a>
-            </Button>
+              {/* PIX QR Code */}
+              {payment.pix_qr_code && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <QrCode size={14} />
+                    <span className="font-medium">QR Code PIX</span>
+                  </div>
+                  <div className="flex justify-center p-4 bg-background rounded-lg border border-border">
+                    <img
+                      src={`data:image/png;base64,${payment.pix_qr_code}`}
+                      alt="QR Code PIX"
+                      className="w-48 h-48"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* PIX Copy & Paste */}
+              {payment.pix_copy_paste && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Copy size={14} />
+                    <span className="font-medium">PIX Copia e Cola</span>
+                  </div>
+                  <div className="bg-secondary rounded-lg p-3 flex items-center gap-2 border border-border">
+                    <code className="text-xs text-foreground flex-1 break-all leading-relaxed">{payment.pix_copy_paste}</code>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="flex-shrink-0 h-8 w-8"
+                      onClick={() => copyToClipboard(payment.pix_copy_paste, "Código PIX")}
+                    >
+                      <Copy size={14} />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Checkout (card) */}
+              {payment.checkout_url && !payment.invoice_url && (
+                <Button variant="outline" className="w-full gap-2" asChild>
+                  <a href={payment.checkout_url} target="_blank" rel="noopener noreferrer">
+                    <CreditCard size={16} /> Pagar com Cartão
+                  </a>
+                </Button>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-4 space-y-2">
+              <AlertTriangle size={20} className="text-warning mx-auto" />
+              <p className="text-sm text-muted-foreground">
+                Esta cobrança ainda não possui link de pagamento.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Entre em contato com o financeiro pelo WhatsApp para solicitar o boleto ou link de pagamento.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 text-xs border-success/30 text-success hover:bg-success/10 hover:text-success mt-2"
+                onClick={handleOpenWhatsApp}
+              >
+                <MessageCircle size={14} /> Solicitar link de pagamento
+              </Button>
+            </div>
           )}
         </div>
       )}
@@ -434,10 +456,18 @@ const AppPaymentDetail = () => {
             </Button>
           )}
 
-          {payment.invoice_url && status === "PENDING" && (
+          {payment.invoice_url && (status === "PENDING" || status === "OVERDUE") && (
             <Button variant="outline" size="sm" className="gap-2 text-xs" asChild>
               <a href={payment.invoice_url} target="_blank" rel="noopener noreferrer">
                 <Link2 size={14} /> Abrir Fatura
+              </a>
+            </Button>
+          )}
+
+          {payment.boleto_url && (status === "PENDING" || status === "OVERDUE") && (
+            <Button variant="outline" size="sm" className="gap-2 text-xs" asChild>
+              <a href={payment.boleto_url} target="_blank" rel="noopener noreferrer">
+                <FileText size={14} /> Abrir Boleto
               </a>
             </Button>
           )}
