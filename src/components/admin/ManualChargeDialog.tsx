@@ -170,12 +170,12 @@ const ManualChargeDialog = ({
 
   // Derived
   const numInstallments = Math.max(1, parseInt(installments) || 1);
-  const numRealValue = parseFloat(realValue) || 0;
-  const numDiscount = parseFloat(discount) || 0;
+  const numRealValue = parseBRL(realValue);
+  const numDiscount = parseBRL(discount);
   const finalValue = Math.max(0, numRealValue - numDiscount);
 
   const numApostilasQty = Math.max(1, parseInt(apostilasQty) || 1);
-  const numApostilasTotalValue = parseFloat(apostilasTotalValue) || 0;
+  const numApostilasTotalValue = parseBRL(apostilasTotalValue);
   const apostilaUnitValue = numApostilasQty > 0 ? numApostilasTotalValue / numApostilasQty : 0;
   const numApostilasInterval = Math.max(1, parseInt(apostilasInterval) || 3);
 
