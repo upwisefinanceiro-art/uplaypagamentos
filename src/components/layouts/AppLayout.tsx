@@ -11,6 +11,7 @@ const AppLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut, user, profile } = useAuth();
+  const branding = useCompanyBranding();
   const [unitName, setUnitName] = useState("");
   const [studentName, setStudentName] = useState("");
 
