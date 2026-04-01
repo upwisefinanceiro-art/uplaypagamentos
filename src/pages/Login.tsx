@@ -31,7 +31,7 @@ const Login = () => {
   const { signIn, user, roles, loading: authLoading } = useAuth();
 
   useEffect(() => {
-    if (user && !authLoading) {
+    if (user && !authLoading && roles.length > 0) {
       const isAdmin = roles.includes("ADMIN_MASTER") || roles.includes("ADMIN_UNIDADE");
       navigate(isAdmin ? "/admin" : "/app", { replace: true });
     }
