@@ -82,11 +82,18 @@ const AppPaymentDetail = () => {
             }
           }
         }
+        // Pre-load WhatsApp number for the unit (uses profile's unit_id for RLS compatibility)
+        try {
+          const whatsNum = await getUnitWhatsAppNumber(profile?.unit_id || data.unit_id);
+          setUnitWhatsAppNumber(whatsNum);
+        } catch {
+          // fallback already set
+        }
       }
       setLoading(false);
     };
     fetchPayment();
-  }, [id]);
+  }, [id, profile?.unit_id]);
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
