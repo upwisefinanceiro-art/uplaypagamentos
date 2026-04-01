@@ -44,6 +44,7 @@ const AppPaymentDetail = () => {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [waDialogOpen, setWaDialogOpen] = useState(false);
+  const [unitWhatsAppNumber, setUnitWhatsAppNumber] = useState(DEFAULT_WHATSAPP_FINANCEIRO);
 
   const isAdmin = hasRole("ADMIN_MASTER");
 
