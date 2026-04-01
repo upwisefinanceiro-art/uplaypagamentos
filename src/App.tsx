@@ -82,6 +82,7 @@ const App = () => (
             }>
               <Route index element={<SuperDashboard />} />
               <Route path="empresas" element={<SuperCompanies />} />
+              <Route path="cobrancas" element={<SuperBilling />} />
               <Route path="configuracoes" element={<SuperSettings />} />
             </Route>
 
