@@ -35,7 +35,7 @@ const AppPaymentDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { hasRole } = useAuth();
+  const { hasRole, profile } = useAuth();
   const [payment, setPayment] = useState<any>(null);
   const [responsible, setResponsible] = useState<any>(null);
   const [unit, setUnit] = useState<any>(null);
