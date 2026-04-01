@@ -124,14 +124,22 @@ const AppPaymentDetail = () => {
     const unitFullName = unit?.name || "";
     const desc = contract?.description || payment.description || `Parcela ${payment.installment_number}`;
     const val = payment.final_value ?? payment.value;
+    const parcela = payment.installment_number || 1;
+    const tipo = chargeType.label; // Mensalidade, Apostila ou Avulsa
+    const statusLabel = cfg.label;
 
-    let msg = `Olá, aqui é ${responsibleName}.\n\n`;
-    msg += `Preciso de ajuda com minha cobrança:\n\n`;
-    msg += `📋 ${desc}\n`;
-    msg += `💰 R$ ${Number(val).toFixed(2).replace(".", ",")}\n`;
-    msg += `📅 Venc: ${new Date(payment.due_date + "T12:00:00").toLocaleDateString("pt-BR")}\n`;
+    let msg = `📚 *EnsinUP - Área do Cliente* 📚\n\n`;
+    msg += `Olá, aqui é *${responsibleName}*.\n\n`;
+    msg += `Estou entrando em contato sobre uma cobrança:\n\n`;
+    msg += `📋 *${desc}*\n`;
+    msg += `🏷️ Tipo: ${tipo} — Parcela ${parcela}\n`;
+    msg += `💰 Valor: *R$ ${Number(val).toFixed(2).replace(".", ",")}*\n`;
+    msg += `📅 Vencimento: *${new Date(payment.due_date + "T12:00:00").toLocaleDateString("pt-BR")}*\n`;
+    msg += `📊 Status: ${statusLabel}\n`;
     if (studentFullName) msg += `👤 Aluno: ${studentFullName}\n`;
     if (unitFullName) msg += `🏫 Unidade: ${unitFullName}\n`;
+    if (payment.asaas_payment_id) msg += `🔖 ID: ${payment.asaas_payment_id}\n`;
+    msg += `\nPreciso de ajuda com essa cobrança. Podem me orientar? 🙏`;
 
     const url = `https://wa.me/55${whatsappNumber}?text=${encodeURIComponent(msg)}`;
     window.open(url, "_blank");
@@ -429,7 +437,7 @@ const AppPaymentDetail = () => {
             </Button>
           )}
 
-          {status === "PENDING" && (
+          {(status === "PENDING" || status === "OVERDUE") && (
             <Button
               variant="outline"
               size="sm"
