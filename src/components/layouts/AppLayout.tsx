@@ -44,6 +44,9 @@ const AppLayout = () => {
         <Outlet />
       </main>
 
+      {/* Install Prompt */}
+      <InstallPrompt />
+
       {/* Bottom Nav */}
       <nav
         className="fixed bottom-0 left-0 right-0 z-30 bg-card/95 backdrop-blur-sm border-t border-border"
