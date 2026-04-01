@@ -153,6 +153,7 @@ const ManualChargeDialog = ({
   const [studentId, setStudentId] = useState("NONE");
   const [paymentType, setPaymentType] = useState<PaymentType>("AVULSA");
   const [description, setDescription] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("BOLETO");
 
   // Financial
   const [installments, setInstallments] = useState("1");
@@ -250,6 +251,7 @@ const ManualChargeDialog = ({
     setStudentId("NONE");
     setPaymentType("AVULSA");
     setDescription("");
+    setPaymentMethod("BOLETO");
     setInstallments("1");
     setFirstDueDate("");
     setRealValue("");
@@ -288,6 +290,7 @@ const ManualChargeDialog = ({
           description: `${description.trim()} - Parcela ${i + 1}/${dueDates.length}`,
           value: finalValue,
           due_date: dueDates[i],
+          payment_method: paymentMethod,
         },
       });
       if (error || data?.error) {
@@ -315,6 +318,7 @@ const ManualChargeDialog = ({
             description: apostilaName,
             value: apostilaUnitValue,
             due_date: apostilaDates[i],
+            payment_method: paymentMethod,
           },
         });
         if (error || data?.error) {
@@ -445,6 +449,20 @@ const ManualChargeDialog = ({
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Ex: Mensalidade EnsinUP 2025"
             />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Método de Pagamento *</Label>
+            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="BOLETO">Boleto</SelectItem>
+                <SelectItem value="PIX">Pix</SelectItem>
+                <SelectItem value="CREDIT_CARD">Cartão de Crédito</SelectItem>
+                <SelectItem value="DINHEIRO">Dinheiro</SelectItem>
+                <SelectItem value="ASAAS">Asaas (Gerar cobrança online)</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <Separator />
