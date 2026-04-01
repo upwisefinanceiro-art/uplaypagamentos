@@ -437,7 +437,7 @@ const AppPaymentDetail = () => {
             </Button>
           )}
 
-          {status === "PENDING" && (
+          {(status === "PENDING" || status === "OVERDUE") && (
             <Button
               variant="outline"
               size="sm"
