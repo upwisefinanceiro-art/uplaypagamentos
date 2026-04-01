@@ -35,7 +35,7 @@ const AppPaymentDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { hasRole } = useAuth();
+  const { hasRole, profile } = useAuth();
   const [payment, setPayment] = useState<any>(null);
   const [responsible, setResponsible] = useState<any>(null);
   const [unit, setUnit] = useState<any>(null);
@@ -44,6 +44,7 @@ const AppPaymentDetail = () => {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [waDialogOpen, setWaDialogOpen] = useState(false);
+  const [unitWhatsAppNumber, setUnitWhatsAppNumber] = useState(DEFAULT_WHATSAPP_FINANCEIRO);
 
   const isAdmin = hasRole("ADMIN_MASTER");
 
@@ -81,11 +82,18 @@ const AppPaymentDetail = () => {
             }
           }
         }
+        // Pre-load WhatsApp number for the unit (uses profile's unit_id for RLS compatibility)
+        try {
+          const whatsNum = await getUnitWhatsAppNumber(profile?.unit_id || data.unit_id);
+          setUnitWhatsAppNumber(whatsNum);
+        } catch {
+          // fallback already set
+        }
       }
       setLoading(false);
     };
     fetchPayment();
-  }, [id]);
+  }, [id, profile?.unit_id]);
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -114,19 +122,16 @@ const AppPaymentDetail = () => {
       return;
     }
 
-    // For client: open WhatsApp to contact financeiro
-    const whatsappNumber = payment.unit_id
-      ? await getUnitWhatsAppNumber(payment.unit_id)
-      : DEFAULT_WHATSAPP_FINANCEIRO;
-
+    // For client: open WhatsApp to contact financeiro (synchronous - no await to avoid popup blocker)
     const responsibleName = responsible?.full_name || "Responsável";
     const studentFullName = student?.full_name || "";
     const unitFullName = unit?.name || "";
     const desc = contract?.description || payment.description || `Parcela ${payment.installment_number}`;
     const val = payment.final_value ?? payment.value;
     const parcela = payment.installment_number || 1;
-    const tipo = chargeType.label; // Mensalidade, Apostila ou Avulsa
-    const statusLabel = cfg.label;
+    const tipo = payment.payment_type === "APOSTILA" ? "Apostila" : payment.payment_type === "MENSALIDADE" ? "Mensalidade" : "Avulsa";
+    const currentStatus = payment.status as PaymentStatus;
+    const statusLabel = (statusConfig[currentStatus] || statusConfig.PENDING).label;
 
     let msg = `📚 *EnsinUP - Área do Cliente* 📚\n\n`;
     msg += `Olá, aqui é *${responsibleName}*.\n\n`;
@@ -141,7 +146,7 @@ const AppPaymentDetail = () => {
     if (payment.asaas_payment_id) msg += `🔖 ID: ${payment.asaas_payment_id}\n`;
     msg += `\nPreciso de ajuda com essa cobrança. Podem me orientar? 🙏`;
 
-    const url = `https://wa.me/55${whatsappNumber}?text=${encodeURIComponent(msg)}`;
+    const url = `https://wa.me/55${unitWhatsAppNumber}?text=${encodeURIComponent(msg)}`;
     window.open(url, "_blank");
   };
 
