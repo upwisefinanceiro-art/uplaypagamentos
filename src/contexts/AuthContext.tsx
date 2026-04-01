@@ -4,7 +4,7 @@ import type { User, Session } from "@supabase/supabase-js";
 
 const AUTH_TIMEOUT_MS = 5000;
 
-type AppRole = "ADMIN_MASTER" | "ADMIN_UNIDADE" | "RESPONSAVEL";
+type AppRole = "ADMIN_MASTER" | "ADMIN_UNIDADE" | "RESPONSAVEL" | "SUPER_ADMIN";
 
 interface Profile {
   id: string;
