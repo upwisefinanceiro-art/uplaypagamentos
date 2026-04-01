@@ -28,6 +28,7 @@ interface ManagePaymentPayload {
   value?: number;
   due_date?: string;
   status?: PaymentStatus;
+  payment_method?: string;
 }
 
 Deno.serve(async (req) => {
