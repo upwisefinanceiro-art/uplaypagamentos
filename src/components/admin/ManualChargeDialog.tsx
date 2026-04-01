@@ -525,9 +525,8 @@ const ManualChargeDialog = ({
                   <div className="space-y-1.5">
                     <Label>Valor Total das Apostilas</Label>
                     <Input
-                      type="number"
-                      min="0.01"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={apostilasTotalValue}
                       onChange={(e) => setApostilasTotalValue(e.target.value)}
                       placeholder="450,00"
