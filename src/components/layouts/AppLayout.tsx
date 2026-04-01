@@ -9,7 +9,22 @@ import WhatsAppFinanceiroFab from "@/components/app/WhatsAppFinanceiroFab";
 const AppLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { signOut, user, profile } = useAuth();
+  const [unitName, setUnitName] = useState("");
+  const [studentName, setStudentName] = useState("");
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchContext = async () => {
+      if (profile?.unit_id) {
+        const { data } = await supabase.from("units").select("name").eq("id", profile.unit_id).single();
+        if (data) setUnitName(data.name);
+      }
+      const { data: students } = await supabase.from("students").select("full_name").eq("responsible_id", user.id).eq("active", true).limit(1);
+      if (students?.[0]) setStudentName(students[0].full_name);
+    };
+    fetchContext();
+  }, [user, profile]);
 
   const tabs = [
     { path: "/app", icon: Home, label: "Início" },
