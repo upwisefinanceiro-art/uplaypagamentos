@@ -210,8 +210,31 @@ const ManualChargeDialog = ({
     }
   }, [dialogOpen, prefill]);
 
-  // Sync apostila items count with qty
+  // Auto-detect course type and pre-fill apostilas
   useEffect(() => {
+    const desc = description.toLowerCase().trim();
+    const isInformatica = desc.includes("informática") || desc.includes("informatica");
+    const isInglesKids = desc.includes("inglês kids") || desc.includes("ingles kids");
+
+    if (isInformatica) {
+      setApostilasEnabled(true);
+      setApostilasQty(String(APOSTILAS_INFORMATICA.length));
+      setApostilaItems(APOSTILAS_INFORMATICA.map((name) => ({ name })));
+    } else if (isInglesKids) {
+      setApostilasEnabled(true);
+      setApostilasQty(String(APOSTILAS_INGLES_KIDS.length));
+      setApostilaItems(APOSTILAS_INGLES_KIDS.map((name) => ({ name })));
+    }
+  }, [description]);
+
+  // Sync apostila items count with qty (only when not auto-filled by course detection)
+  useEffect(() => {
+    const desc = description.toLowerCase().trim();
+    const isInformatica = desc.includes("informática") || desc.includes("informatica");
+    const isInglesKids = desc.includes("inglês kids") || desc.includes("ingles kids");
+    // Skip sync if course type auto-fills
+    if (isInformatica || isInglesKids) return;
+
     setApostilaItems((prev) => {
       if (prev.length === numApostilasQty) return prev;
       if (prev.length < numApostilasQty) {
@@ -219,7 +242,7 @@ const ManualChargeDialog = ({
       }
       return prev.slice(0, numApostilasQty);
     });
-  }, [numApostilasQty]);
+  }, [numApostilasQty, description]);
 
   const resetForm = () => {
     setResponsibleId("");
