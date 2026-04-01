@@ -251,6 +251,7 @@ const ManualChargeDialog = ({
     setStudentId("NONE");
     setPaymentType("AVULSA");
     setDescription("");
+    setPaymentMethod("BOLETO");
     setInstallments("1");
     setFirstDueDate("");
     setRealValue("");
