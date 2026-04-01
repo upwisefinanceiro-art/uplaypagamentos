@@ -437,32 +437,23 @@ const ManualChargeDialog = ({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Unidade</Label>
-              <Input value={currentUnit} readOnly className="bg-muted/40" />
+              <Label>Forma de Pagamento *</Label>
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PIX">Pix</SelectItem>
+                  <SelectItem value="BOLETO">Boleto</SelectItem>
+                  <SelectItem value="CREDIT_CARD">Cartão</SelectItem>
+                  <SelectItem value="DINHEIRO">Dinheiro</SelectItem>
+                  <SelectItem value="ASAAS">Asaas (Online)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label>Descrição *</Label>
-            <Input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Ex: Mensalidade EnsinUP 2025"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Método de Pagamento *</Label>
-            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="BOLETO">Boleto</SelectItem>
-                <SelectItem value="PIX">Pix</SelectItem>
-                <SelectItem value="CREDIT_CARD">Cartão de Crédito</SelectItem>
-                <SelectItem value="DINHEIRO">Dinheiro</SelectItem>
-                <SelectItem value="ASAAS">Asaas (Gerar cobrança online)</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label>Unidade</Label>
+            <Input value={currentUnit} readOnly className="bg-muted/40" />
           </div>
 
           <Separator />
