@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRoles?: Array<"ADMIN_MASTER" | "ADMIN_UNIDADE" | "RESPONSAVEL">;
+  requiredRoles?: Array<"ADMIN_MASTER" | "ADMIN_UNIDADE" | "RESPONSAVEL" | "SUPER_ADMIN">;
 }
 
 const ProtectedRoute = ({ children, requiredRoles }: ProtectedRouteProps) => {
@@ -20,9 +20,9 @@ const ProtectedRoute = ({ children, requiredRoles }: ProtectedRouteProps) => {
   if (!user) return <Navigate to="/login" replace />;
 
   if (requiredRoles && !requiredRoles.some((r) => roles.includes(r))) {
-    // Redirect to correct area instead of login
+    const isSuperAdmin = roles.includes("SUPER_ADMIN");
     const isAdmin = roles.includes("ADMIN_MASTER") || roles.includes("ADMIN_UNIDADE");
-    const redirectTo = isAdmin ? "/admin" : "/app";
+    const redirectTo = isSuperAdmin ? "/super" : isAdmin ? "/admin" : "/app";
     console.warn("[auth] ProtectedRoute: role mismatch", { roles, requiredRoles, redirectTo });
     return <Navigate to={redirectTo} replace />;
   }

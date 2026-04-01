@@ -22,6 +22,10 @@ import AdminUsers from "./pages/admin/AdminUsers";
 import AdminClients from "./pages/admin/AdminClients";
 import AdminContracts from "./pages/admin/AdminContracts";
 import AdminCharges from "./pages/admin/AdminCharges";
+import SuperAdminLayout from "./components/layouts/SuperAdminLayout";
+import SuperDashboard from "./pages/super/SuperDashboard";
+import SuperCompanies from "./pages/super/SuperCompanies";
+import SuperSettings from "./pages/super/SuperSettings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -65,6 +69,17 @@ const App = () => (
               <Route path="clientes" element={<AdminClients />} />
               <Route path="contratos" element={<AdminContracts />} />
               <Route path="cobrancas" element={<AdminCharges />} />
+            </Route>
+
+            {/* Painel Super Admin */}
+            <Route path="/super" element={
+              <ProtectedRoute requiredRoles={["SUPER_ADMIN"]}>
+                <SuperAdminLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<SuperDashboard />} />
+              <Route path="empresas" element={<SuperCompanies />} />
+              <Route path="configuracoes" element={<SuperSettings />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
