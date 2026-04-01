@@ -153,6 +153,7 @@ const ManualChargeDialog = ({
   const [studentId, setStudentId] = useState("NONE");
   const [paymentType, setPaymentType] = useState<PaymentType>("AVULSA");
   const [description, setDescription] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("BOLETO");
 
   // Financial
   const [installments, setInstallments] = useState("1");
