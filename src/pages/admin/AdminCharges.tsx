@@ -32,6 +32,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import WhatsAppDialog from "@/components/WhatsAppDialog";
 import { resolveWhatsAppChargeData } from "@/lib/asaas-payment";
+import ManualChargeDialog from "@/components/admin/ManualChargeDialog";
 
 type PaymentStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELLED";
 type BillingType = "PIX" | "BOLETO" | "CARD";
@@ -600,122 +601,29 @@ const AdminCharges = () => {
             {syncingAll ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
             Sincronizar Todos
           </Button>
-          <Dialog
-            open={manualDialogOpen}
-            onOpenChange={(open) => {
+          <ManualChargeDialog
+            responsibles={responsibles}
+            students={students}
+            contracts={contracts}
+            units={units}
+            profiles={profiles}
+            onSuccess={fetchData}
+            externalOpen={manualDialogOpen}
+            onExternalOpenChange={(open) => {
               setManualDialogOpen(open);
               if (!open) resetManualForm();
             }}
-          >
-            <DialogTrigger asChild>
-              <Button variant="outline" className="gap-1.5">
-                <Plus size={16} /> Adicionar Parcela Manual
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Nova Parcela Manual</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-2">
-                <div className="space-y-1.5">
-                  <Label>Responsável *</Label>
-                  <Select
-                    value={manualForm.responsibleId}
-                    onValueChange={(value) => setManualForm((current) => ({
-                      ...current,
-                      responsibleId: value,
-                      studentId: "NONE",
-                      contractId: "NONE",
-                    }))}
-                  >
-                    <SelectTrigger><SelectValue placeholder="Selecione o responsável" /></SelectTrigger>
-                    <SelectContent>
-                      {responsibles.map((responsible) => (
-                        <SelectItem key={responsible.id} value={responsible.id}>{responsible.full_name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label>Contrato vinculado</Label>
-                    <Select
-                      value={manualForm.contractId}
-                      onValueChange={(value) => {
-                        const contract = contracts.find((item) => item.id === value);
-                        setManualForm((current) => ({
-                          ...current,
-                          contractId: value,
-                          studentId: contract?.student_id || current.studentId,
-                          paymentType: contract?.description?.toLowerCase().includes("apostila") ? "APOSTILA" : value !== "NONE" ? "MENSALIDADE" : current.paymentType,
-                          description: contract?.description || current.description,
-                        }));
-                      }}
-                    >
-                      <SelectTrigger><SelectValue placeholder="Sem contrato" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="NONE">Sem contrato</SelectItem>
-                        {manualContracts.map((contract) => (
-                          <SelectItem key={contract.id} value={contract.id}>{contract.description}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Aluno</Label>
-                    <Select value={manualForm.studentId} onValueChange={(value) => setManualForm((current) => ({ ...current, studentId: value }))}>
-                      <SelectTrigger><SelectValue placeholder="Sem aluno" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="NONE">Sem aluno</SelectItem>
-                        {manualStudents.map((student) => (
-                          <SelectItem key={student.id} value={student.id}>{student.full_name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label>Tipo *</Label>
-                    <Select value={manualForm.paymentType} onValueChange={(value) => setManualForm((current) => ({ ...current, paymentType: value as PaymentType }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="MENSALIDADE">Mensalidade</SelectItem>
-                        <SelectItem value="APOSTILA">Apostila</SelectItem>
-                        <SelectItem value="AVULSA">Avulsa</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Unidade</Label>
-                    <Input value={currentManualUnit} readOnly />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label>Descrição *</Label>
-                  <Input value={manualForm.description} onChange={(event) => setManualForm((current) => ({ ...current, description: event.target.value }))} placeholder="Ex: Parcela de reforço" />
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label>Valor *</Label>
-                    <Input type="number" min="0.01" step="0.01" value={manualForm.value} onChange={(event) => setManualForm((current) => ({ ...current, value: event.target.value }))} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Vencimento *</Label>
-                    <Input type="date" value={manualForm.dueDate} onChange={(event) => setManualForm((current) => ({ ...current, dueDate: event.target.value }))} />
-                  </div>
-                </div>
-
-                <Button className="w-full" onClick={handleCreateManual} disabled={creatingManual}>
-                  {creatingManual ? <><Loader2 size={16} className="animate-spin mr-2" /> Salvando...</> : "Salvar Parcela Manual"}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+            prefill={{
+              responsibleId: manualForm.responsibleId || undefined,
+              contractId: manualForm.contractId !== "NONE" ? manualForm.contractId : undefined,
+              studentId: manualForm.studentId !== "NONE" ? manualForm.studentId : undefined,
+              paymentType: manualForm.paymentType,
+              description: manualForm.description || undefined,
+            }}
+          />
+          <Button variant="outline" className="gap-1.5" onClick={() => setManualDialogOpen(true)}>
+            <Plus size={16} /> Adicionar Parcela Manual
+          </Button>
 
           <Dialog
             open={chargeDialogOpen}

@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import WhatsAppDialog from "@/components/WhatsAppDialog";
 import { resolveWhatsAppChargeData } from "@/lib/asaas-payment";
+import { getUnitWhatsAppNumber, DEFAULT_WHATSAPP_FINANCEIRO } from "@/lib/whatsapp-utils";
 
 type PaymentStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELLED";
 
@@ -113,21 +114,45 @@ const AppPayments = () => {
 
   const handleOpenWhatsApp = async (payment: any, e: React.MouseEvent) => {
     e.stopPropagation();
-    try {
-      toast({ title: "Sincronizando cobrança no Asaas antes do envio..." });
-      const resolved = await resolveWhatsAppChargeData(payment.id);
 
-      setWaPayment(resolved.payment);
-      setWaResponsible(resolved.responsible);
-      setWaDescription(resolved.description);
-      setWaStudent(resolved.studentName);
-      setWaDialogOpen(true);
-    } catch (err) {
-      toast({
-        title: "Envio bloqueado",
-        description: err instanceof Error ? err.message : "Não foi possível obter os dados completos da cobrança no Asaas.",
-        variant: "destructive",
-      });
+    // Admin: sync and open billing dialog
+    if (canCreateCharge) {
+      try {
+        toast({ title: "Sincronizando cobrança no Asaas antes do envio..." });
+        const resolved = await resolveWhatsAppChargeData(payment.id);
+        setWaPayment(resolved.payment);
+        setWaResponsible(resolved.responsible);
+        setWaDescription(resolved.description);
+        setWaStudent(resolved.studentName);
+        setWaDialogOpen(true);
+      } catch (err) {
+        toast({
+          title: "Envio bloqueado",
+          description: err instanceof Error ? err.message : "Não foi possível obter os dados completos.",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
+
+    // Client: contact financeiro directly
+    try {
+      const { data: profileData } = await supabase.from("profiles").select("full_name, unit_id").eq("id", payment.responsible_id).single();
+      const unitId = profileData?.unit_id;
+      const whatsappNumber = unitId ? await getUnitWhatsAppNumber(unitId) : DEFAULT_WHATSAPP_FINANCEIRO;
+      const responsibleName = profileData?.full_name || "Responsável";
+
+      let msg = `Olá, aqui é ${responsibleName}.\n\n`;
+      msg += `Preciso de ajuda com minha cobrança:\n`;
+      msg += `💰 R$ ${Number(payment.final_value ?? payment.value).toFixed(2).replace(".", ",")}\n`;
+      msg += `📅 Venc: ${new Date(payment.due_date + "T12:00:00").toLocaleDateString("pt-BR")}\n`;
+
+      const url = `https://wa.me/55${whatsappNumber}?text=${encodeURIComponent(msg)}`;
+      window.open(url, "_blank");
+    } catch {
+      // Fallback with default number
+      const url = `https://wa.me/55${DEFAULT_WHATSAPP_FINANCEIRO}`;
+      window.open(url, "_blank");
     }
   };
 
