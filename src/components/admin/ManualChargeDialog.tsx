@@ -104,6 +104,25 @@ const generateApostilaDates = (startDate: string, count: number, intervalMonths:
 const formatCurrency = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
 const formatDate = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("pt-BR");
 
+const parseBRL = (v: string): number => {
+  if (!v) return 0;
+  // Remove dots used as thousands separator, replace comma with dot
+  const cleaned = v.replace(/\./g, "").replace(",", ".");
+  return parseFloat(cleaned) || 0;
+};
+
+const APOSTILAS_INFORMATICA = [
+  "Apostila de Windows 11",
+  "Apostila de Word",
+  "Apostila de Excel",
+  "Apostila de PowerPoint",
+  "Apostila de Access",
+];
+
+const APOSTILAS_INGLES_KIDS = [
+  "Apostila de Inglês Kids",
+];
+
 const ManualChargeDialog = ({
   responsibles,
   students,
@@ -151,12 +170,12 @@ const ManualChargeDialog = ({
 
   // Derived
   const numInstallments = Math.max(1, parseInt(installments) || 1);
-  const numRealValue = parseFloat(realValue) || 0;
-  const numDiscount = parseFloat(discount) || 0;
+  const numRealValue = parseBRL(realValue);
+  const numDiscount = parseBRL(discount);
   const finalValue = Math.max(0, numRealValue - numDiscount);
 
   const numApostilasQty = Math.max(1, parseInt(apostilasQty) || 1);
-  const numApostilasTotalValue = parseFloat(apostilasTotalValue) || 0;
+  const numApostilasTotalValue = parseBRL(apostilasTotalValue);
   const apostilaUnitValue = numApostilasQty > 0 ? numApostilasTotalValue / numApostilasQty : 0;
   const numApostilasInterval = Math.max(1, parseInt(apostilasInterval) || 3);
 
@@ -191,8 +210,31 @@ const ManualChargeDialog = ({
     }
   }, [dialogOpen, prefill]);
 
-  // Sync apostila items count with qty
+  // Auto-detect course type and pre-fill apostilas
   useEffect(() => {
+    const desc = description.toLowerCase().trim();
+    const isInformatica = desc.includes("informática") || desc.includes("informatica");
+    const isInglesKids = desc.includes("inglês kids") || desc.includes("ingles kids");
+
+    if (isInformatica) {
+      setApostilasEnabled(true);
+      setApostilasQty(String(APOSTILAS_INFORMATICA.length));
+      setApostilaItems(APOSTILAS_INFORMATICA.map((name) => ({ name })));
+    } else if (isInglesKids) {
+      setApostilasEnabled(true);
+      setApostilasQty(String(APOSTILAS_INGLES_KIDS.length));
+      setApostilaItems(APOSTILAS_INGLES_KIDS.map((name) => ({ name })));
+    }
+  }, [description]);
+
+  // Sync apostila items count with qty (only when not auto-filled by course detection)
+  useEffect(() => {
+    const desc = description.toLowerCase().trim();
+    const isInformatica = desc.includes("informática") || desc.includes("informatica");
+    const isInglesKids = desc.includes("inglês kids") || desc.includes("ingles kids");
+    // Skip sync if course type auto-fills
+    if (isInformatica || isInglesKids) return;
+
     setApostilaItems((prev) => {
       if (prev.length === numApostilasQty) return prev;
       if (prev.length < numApostilasQty) {
@@ -200,7 +242,7 @@ const ManualChargeDialog = ({
       }
       return prev.slice(0, numApostilasQty);
     });
-  }, [numApostilasQty]);
+  }, [numApostilasQty, description]);
 
   const resetForm = () => {
     setResponsibleId("");
@@ -435,9 +477,8 @@ const ManualChargeDialog = ({
               <div className="space-y-1.5">
                 <Label>Valor Real por Mensalidade *</Label>
                 <Input
-                  type="number"
-                  min="0.01"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={realValue}
                   onChange={(e) => setRealValue(e.target.value)}
                   placeholder="219,90"
@@ -446,9 +487,8 @@ const ManualChargeDialog = ({
               <div className="space-y-1.5">
                 <Label>Desc. Pontualidade</Label>
                 <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={discount}
                   onChange={(e) => setDiscount(e.target.value)}
                   placeholder="30,00"
@@ -485,9 +525,8 @@ const ManualChargeDialog = ({
                   <div className="space-y-1.5">
                     <Label>Valor Total das Apostilas</Label>
                     <Input
-                      type="number"
-                      min="0.01"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={apostilasTotalValue}
                       onChange={(e) => setApostilasTotalValue(e.target.value)}
                       placeholder="450,00"
