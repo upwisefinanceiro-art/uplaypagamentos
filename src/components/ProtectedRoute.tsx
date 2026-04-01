@@ -20,7 +20,11 @@ const ProtectedRoute = ({ children, requiredRoles }: ProtectedRouteProps) => {
   if (!user) return <Navigate to="/login" replace />;
 
   if (requiredRoles && !requiredRoles.some((r) => roles.includes(r))) {
-    return <Navigate to="/login" replace />;
+    // Redirect to correct area instead of login
+    const isAdmin = roles.includes("ADMIN_MASTER") || roles.includes("ADMIN_UNIDADE");
+    const redirectTo = isAdmin ? "/admin" : "/app";
+    console.warn("[auth] ProtectedRoute: role mismatch", { roles, requiredRoles, redirectTo });
+    return <Navigate to={redirectTo} replace />;
   }
 
   return <>{children}</>;
