@@ -1,7 +1,10 @@
+import { useState, useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Home, CreditCard, User, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import InstallPrompt from "@/components/InstallPrompt";
+import WhatsAppFinanceiroFab from "@/components/app/WhatsAppFinanceiroFab";
 
 const AppLayout = () => {
   const location = useLocation();
