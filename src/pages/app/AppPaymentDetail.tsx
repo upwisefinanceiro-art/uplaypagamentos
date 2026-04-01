@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import WhatsAppDialog from "@/components/WhatsAppDialog";
 import { resolveWhatsAppChargeData } from "@/lib/asaas-payment";
+import { getUnitWhatsAppNumber, DEFAULT_WHATSAPP_FINANCEIRO } from "@/lib/whatsapp-utils";
 
 type PaymentStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELLED";
 
