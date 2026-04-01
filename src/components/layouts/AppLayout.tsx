@@ -1,6 +1,7 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Home, CreditCard, User, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import InstallPrompt from "@/components/InstallPrompt";
 
 const AppLayout = () => {
   const location = useLocation();
@@ -42,6 +43,9 @@ const AppLayout = () => {
       <main className="flex-1 pb-24 overflow-y-auto">
         <Outlet />
       </main>
+
+      {/* Install Prompt */}
+      <InstallPrompt />
 
       {/* Bottom Nav */}
       <nav

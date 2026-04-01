@@ -23,10 +23,10 @@ export default defineConfig(({ mode }) => ({
         name: "EnsinUP Payments",
         short_name: "EnsinUP",
         description: "Sistema de gestão de cobranças para escolas profissionalizantes",
-        start_url: "/",
+        start_url: "/app",
         display: "standalone",
-        background_color: "#161a24",
-        theme_color: "#161a24",
+        background_color: "#000000",
+        theme_color: "#ff0000",
         orientation: "portrait-primary",
         categories: ["finance", "education"],
         icons: [

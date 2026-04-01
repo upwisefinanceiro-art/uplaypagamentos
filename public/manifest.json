@@ -1,24 +1,36 @@
 {
-  "name": "EnsinUP Pagamentos",
+  "name": "EnsinUP Payments",
   "short_name": "EnsinUP",
   "description": "Sistema de gestão de cobranças para escolas profissionalizantes",
-  "start_url": "/",
+  "start_url": "/app",
   "display": "standalone",
-  "background_color": "#161a24",
-  "theme_color": "#161a24",
+  "background_color": "#000000",
+  "theme_color": "#ff0000",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/logo.png",
+      "src": "/icons/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "/logo.png",
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
