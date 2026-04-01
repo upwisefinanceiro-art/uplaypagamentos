@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 
+const AUTH_TIMEOUT_MS = 5000;
+
 type AppRole = "ADMIN_MASTER" | "ADMIN_UNIDADE" | "RESPONSAVEL";
 
 interface Profile {
@@ -43,21 +45,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchUserData = async (userId: string) => {
     try {
+      console.info("[auth] fetchUserData started", { userId });
       const [profileRes, rolesRes] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", userId),
       ]);
 
-      if (profileRes.error) {
-        console.error("[auth] profile lookup error:", profileRes.error);
-      }
-
-      if (rolesRes.error) {
-        console.error("[auth] roles lookup error:", rolesRes.error);
-      }
+      if (profileRes.error) console.error("[auth] profile lookup error:", profileRes.error);
+      if (rolesRes.error) console.error("[auth] roles lookup error:", rolesRes.error);
 
       setProfile((profileRes.data as Profile | null) ?? null);
-      setRoles((rolesRes.data ?? []).map((r: { role: string }) => r.role as AppRole));
+      const fetchedRoles = (rolesRes.data ?? []).map((r: { role: string }) => r.role as AppRole);
+      setRoles(fetchedRoles);
+      console.info("[auth] fetchUserData completed", { userId, roles: fetchedRoles, hasProfile: !!profileRes.data });
     } catch (err) {
       console.error("[auth] fetchUserData error:", err);
       clearUserData();
@@ -67,7 +67,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     let mounted = true;
 
-    const applySession = async (nextSession: Session | null) => {
+    const timeout = setTimeout(() => {
+      if (mounted && loading) {
+        console.warn("[auth] Loading timeout reached, forcing loading=false");
+        setLoading(false);
+      }
+    }, AUTH_TIMEOUT_MS);
+
+    const handleSession = (nextSession: Session | null) => {
       if (!mounted) return;
 
       setSession(nextSession);
@@ -79,45 +86,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
-      await fetchUserData(nextSession.user.id);
-
-      if (mounted) {
-        setLoading(false);
-      }
+      fetchUserData(nextSession.user.id).finally(() => {
+        if (mounted) setLoading(false);
+      });
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        try {
-          await applySession(session);
-        } catch (err) {
-          console.error("[auth] onAuthStateChange error:", err);
-          if (mounted) {
-            clearUserData();
-            setLoading(false);
-          }
-        }
+      (_event, session) => {
+        console.info("[auth] onAuthStateChange", { event: _event, hasSession: !!session });
+        handleSession(session);
       }
     );
 
-    void supabase.auth.getSession().then(async ({ data, error }) => {
-      if (error) {
-        console.error("[auth] getSession error:", error);
-      }
-
-      try {
-        await applySession(data.session);
-      } catch (err) {
-        console.error("[auth] initial session hydration error:", err);
-        if (mounted) {
-          clearUserData();
-          setLoading(false);
-        }
-      }
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (error) console.error("[auth] getSession error:", error);
+      if (mounted && loading) handleSession(data.session);
     });
 
     return () => {
       mounted = false;
+      clearTimeout(timeout);
       subscription.unsubscribe();
     };
   }, []);

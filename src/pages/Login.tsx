@@ -31,9 +31,20 @@ const Login = () => {
   const { signIn, user, roles, loading: authLoading } = useAuth();
 
   useEffect(() => {
-    if (user && !authLoading && roles.length > 0) {
+    if (!user || authLoading) return;
+    if (roles.length > 0) {
       const isAdmin = roles.includes("ADMIN_MASTER") || roles.includes("ADMIN_UNIDADE");
-      navigate(isAdmin ? "/admin" : "/app", { replace: true });
+      const target = isAdmin ? "/admin" : "/app";
+      console.info("[auth] Login redirect", { roles, target });
+      navigate(target, { replace: true });
+    } else {
+      const fallback = setTimeout(() => {
+        if (user && roles.length === 0) {
+          console.warn("[auth] No roles after timeout, defaulting to /app");
+          navigate("/app", { replace: true });
+        }
+      }, 3000);
+      return () => clearTimeout(fallback);
     }
   }, [user, roles, authLoading, navigate]);
 
