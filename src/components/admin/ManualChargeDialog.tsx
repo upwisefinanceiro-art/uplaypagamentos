@@ -449,6 +449,20 @@ const ManualChargeDialog = ({
             />
           </div>
 
+          <div className="space-y-1.5">
+            <Label>Método de Pagamento *</Label>
+            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="BOLETO">Boleto</SelectItem>
+                <SelectItem value="PIX">Pix</SelectItem>
+                <SelectItem value="CREDIT_CARD">Cartão de Crédito</SelectItem>
+                <SelectItem value="DINHEIRO">Dinheiro</SelectItem>
+                <SelectItem value="ASAAS">Asaas (Gerar cobrança online)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <Separator />
 
           {/* ── PARCELAMENTO ── */}
