@@ -104,6 +104,25 @@ const generateApostilaDates = (startDate: string, count: number, intervalMonths:
 const formatCurrency = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
 const formatDate = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("pt-BR");
 
+const parseBRL = (v: string): number => {
+  if (!v) return 0;
+  // Remove dots used as thousands separator, replace comma with dot
+  const cleaned = v.replace(/\./g, "").replace(",", ".");
+  return parseFloat(cleaned) || 0;
+};
+
+const APOSTILAS_INFORMATICA = [
+  "Apostila de Windows 11",
+  "Apostila de Word",
+  "Apostila de Excel",
+  "Apostila de PowerPoint",
+  "Apostila de Access",
+];
+
+const APOSTILAS_INGLES_KIDS = [
+  "Apostila de Inglês Kids",
+];
+
 const ManualChargeDialog = ({
   responsibles,
   students,
