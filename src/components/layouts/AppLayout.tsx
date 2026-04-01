@@ -62,6 +62,9 @@ const AppLayout = () => {
         <Outlet />
       </main>
 
+      {/* WhatsApp FAB */}
+      <WhatsAppFinanceiroFab studentName={studentName} unitName={unitName} />
+
       {/* Install Prompt */}
       <InstallPrompt />
 

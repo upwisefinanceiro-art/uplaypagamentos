@@ -32,6 +32,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import WhatsAppDialog from "@/components/WhatsAppDialog";
 import { resolveWhatsAppChargeData } from "@/lib/asaas-payment";
+import ManualChargeDialog from "@/components/admin/ManualChargeDialog";
 
 type PaymentStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELLED";
 type BillingType = "PIX" | "BOLETO" | "CARD";
