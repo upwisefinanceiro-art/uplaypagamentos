@@ -16,6 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const menuItems = [
   { path: "/admin", icon: LayoutDashboard, label: "Dashboard", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
+  { path: "/admin/empresa", icon: Building2, label: "Minha Empresa", roles: ["ADMIN_MASTER"] },
   { path: "/admin/administradores", icon: ShieldCheck, label: "Administradores", roles: ["ADMIN_MASTER"] },
   { path: "/admin/unidades", icon: Building2, label: "Unidades", roles: ["ADMIN_MASTER"] },
   { path: "/admin/usuarios", icon: Users, label: "Colaboradores", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
