@@ -185,6 +185,13 @@ const CompanyDialog = ({ open, onOpenChange, company, onSaved }: Props) => {
       } else {
         toast({ title: "Empresa e administrador criados!", description: "Senha padrão: 12345678" });
         setSaving(false);
+        setCreatedAdminInfo({
+          companyName: name.trim(),
+          adminName: adminName.trim(),
+          adminEmail: adminEmail.trim(),
+          companyPhone: phone.trim() || null,
+        });
+        setAccessModalOpen(true);
         onSaved();
         return;
       }
