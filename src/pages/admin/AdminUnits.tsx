@@ -211,6 +211,7 @@ const AdminUnits = () => {
             password: "12345678",
             role: "ADMIN_UNIDADE",
             email_override: form.email_acesso.trim(),
+            unit_id: newUnitId,
           },
         });
 
