@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Building2 } from "lucide-react";
+import { Building2, UserPlus } from "lucide-react";
 import type { Company } from "@/pages/super/SuperCompanies";
 
 interface UnitOption {
@@ -29,8 +29,12 @@ const CompanyDialog = ({ open, onOpenChange, company, onSaved }: Props) => {
   const [units, setUnits] = useState<UnitOption[]>([]);
   const [selectedUnitIds, setSelectedUnitIds] = useState<string[]>([]);
 
+  // Company fields
   const [name, setName] = useState("");
   const [systemName, setSystemName] = useState("");
+  const [cnpj, setCnpj] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
   const [primaryColor, setPrimaryColor] = useState("#3B82F6");
   const [secondaryColor, setSecondaryColor] = useState("#1E40AF");
@@ -40,9 +44,15 @@ const CompanyDialog = ({ open, onOpenChange, company, onSaved }: Props) => {
   const [maxUnits, setMaxUnits] = useState("1");
   const [maxUsers, setMaxUsers] = useState("10");
 
+  // Auto-create admin
+  const [createAdmin, setCreateAdmin] = useState(false);
+  const [adminName, setAdminName] = useState("");
+  const [adminEmail, setAdminEmail] = useState("");
+
+  const isEditing = !!company;
+
   useEffect(() => {
     if (!open) return;
-    // Fetch all units
     supabase.from("units").select("id, name, company_id").eq("active", true).then(({ data }) => {
       setUnits((data as UnitOption[]) ?? []);
     });
@@ -52,6 +62,9 @@ const CompanyDialog = ({ open, onOpenChange, company, onSaved }: Props) => {
     if (company) {
       setName(company.name);
       setSystemName(company.system_name);
+      setCnpj((company as any).cnpj ?? "");
+      setEmail((company as any).email ?? "");
+      setPhone((company as any).phone ?? "");
       setLogoUrl(company.logo_url ?? "");
       setPrimaryColor(company.primary_color);
       setSecondaryColor(company.secondary_color);
@@ -60,20 +73,16 @@ const CompanyDialog = ({ open, onOpenChange, company, onSaved }: Props) => {
       setStatus(company.status);
       setMaxUnits(String(company.max_units));
       setMaxUsers(String(company.max_users));
-      // Set selected units for this company
       setSelectedUnitIds(units.filter(u => u.company_id === company.id).map(u => u.id));
+      setCreateAdmin(false);
+      setAdminName("");
+      setAdminEmail("");
     } else {
-      setName("");
-      setSystemName("");
-      setLogoUrl("");
-      setPrimaryColor("#3B82F6");
-      setSecondaryColor("#1E40AF");
-      setWhatsapp("");
-      setPlan("FREE");
-      setStatus("ATIVO");
-      setMaxUnits("1");
-      setMaxUsers("10");
-      setSelectedUnitIds([]);
+      setName(""); setSystemName(""); setCnpj(""); setEmail(""); setPhone("");
+      setLogoUrl(""); setPrimaryColor("#3B82F6"); setSecondaryColor("#1E40AF");
+      setWhatsapp(""); setPlan("FREE"); setStatus("ATIVO");
+      setMaxUnits("1"); setMaxUsers("10"); setSelectedUnitIds([]);
+      setCreateAdmin(true); setAdminName(""); setAdminEmail("");
     }
   }, [company, open, units]);
 
@@ -89,11 +98,19 @@ const CompanyDialog = ({ open, onOpenChange, company, onSaved }: Props) => {
       return;
     }
 
+    if (!isEditing && createAdmin && (!adminName.trim() || !adminEmail.trim())) {
+      toast({ title: "Preencha nome e e-mail do administrador", variant: "destructive" });
+      return;
+    }
+
     setSaving(true);
 
     const payload = {
       name: name.trim(),
       system_name: systemName.trim(),
+      cnpj: cnpj.trim() || null,
+      email: email.trim() || null,
+      phone: phone.trim() || null,
       logo_url: logoUrl.trim() || null,
       primary_color: primaryColor,
       secondary_color: secondaryColor,
@@ -123,7 +140,6 @@ const CompanyDialog = ({ open, onOpenChange, company, onSaved }: Props) => {
 
     // Update unit linkages
     if (companyId) {
-      // Unlink units previously linked to this company but now deselected
       const previouslyLinked = units.filter(u => u.company_id === companyId).map(u => u.id);
       const toUnlink = previouslyLinked.filter(id => !selectedUnitIds.includes(id));
       const toLink = selectedUnitIds.filter(id => !previouslyLinked.includes(id));
@@ -136,12 +152,45 @@ const CompanyDialog = ({ open, onOpenChange, company, onSaved }: Props) => {
       }
     }
 
+    // Auto-create admin for new company
+    if (!isEditing && createAdmin && companyId && adminEmail.trim()) {
+      const firstLinkedUnit = selectedUnitIds[0] || null;
+      const { data: session } = await supabase.auth.getSession();
+      
+      const { data: adminResult, error: adminError } = await supabase.functions.invoke(
+        "create-company-admin",
+        {
+          body: {
+            company_id: companyId,
+            admin_name: adminName.trim(),
+            admin_email: adminEmail.trim(),
+            unit_id: firstLinkedUnit,
+          },
+          headers: {
+            Authorization: `Bearer ${session.session?.access_token}`,
+          },
+        }
+      );
+
+      if (adminError || adminResult?.error) {
+        toast({
+          title: "Empresa criada, mas erro ao criar admin",
+          description: adminResult?.error || adminError?.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Empresa e administrador criados!", description: "Senha padrão: 12345678" });
+        setSaving(false);
+        onSaved();
+        return;
+      }
+    }
+
     setSaving(false);
     toast({ title: company ? "Empresa atualizada!" : "Empresa criada!" });
     onSaved();
   };
 
-  // Units available: not linked to another company, or linked to this company
   const availableUnits = units.filter(u => !u.company_id || u.company_id === company?.id);
   const linkedElsewhere = units.filter(u => u.company_id && u.company_id !== company?.id);
 
@@ -153,6 +202,7 @@ const CompanyDialog = ({ open, onOpenChange, company, onSaved }: Props) => {
         </DialogHeader>
 
         <div className="space-y-4 mt-2">
+          {/* Name & System Name */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label>Nome da Empresa *</Label>
@@ -161,6 +211,22 @@ const CompanyDialog = ({ open, onOpenChange, company, onSaved }: Props) => {
             <div className="space-y-1.5">
               <Label>Nome do Sistema *</Label>
               <Input value={systemName} onChange={(e) => setSystemName(e.target.value)} placeholder="Ex: EscolaXYZ App" />
+            </div>
+          </div>
+
+          {/* CNPJ, Email, Phone */}
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <Label>CNPJ</Label>
+              <Input value={cnpj} onChange={(e) => setCnpj(e.target.value)} placeholder="00.000.000/0001-00" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>E-mail</Label>
+              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="contato@empresa.com" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Telefone</Label>
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(31) 99999-9999" />
             </div>
           </div>
 
@@ -258,6 +324,35 @@ const CompanyDialog = ({ open, onOpenChange, company, onSaved }: Props) => {
               </div>
             )}
           </div>
+
+          {/* Auto-create Admin (only for new companies) */}
+          {!isEditing && (
+            <div className="space-y-3 p-3 rounded-lg border border-border bg-muted/20">
+              <label className="flex items-center gap-2 cursor-pointer text-sm font-medium">
+                <Checkbox
+                  checked={createAdmin}
+                  onCheckedChange={(v) => setCreateAdmin(!!v)}
+                />
+                <UserPlus size={14} />
+                <span className="text-foreground">Criar administrador automaticamente</span>
+              </label>
+              {createAdmin && (
+                <div className="grid gap-3 sm:grid-cols-2 pt-1">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Nome do Admin</Label>
+                    <Input value={adminName} onChange={(e) => setAdminName(e.target.value)} placeholder="Nome completo" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">E-mail do Admin</Label>
+                    <Input type="email" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} placeholder="admin@empresa.com" />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground sm:col-span-2">
+                    Senha padrão: <strong>12345678</strong> — o admin deverá trocar no primeiro acesso.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Preview */}
           {name && (
