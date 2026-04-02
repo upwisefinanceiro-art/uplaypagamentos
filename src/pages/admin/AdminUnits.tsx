@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Plus, Pencil, Eye, EyeOff, Loader2, MessageCircle, Wifi, WifiOff, Building2, User, MapPin, Mail, Phone } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,6 +46,8 @@ const ESTADOS = [
 
 const AdminUnits = () => {
   const { toast } = useToast();
+  const { profile } = useAuth();
+  const [companyId, setCompanyId] = useState<string | null>(null);
   const [units, setUnits] = useState<UnitRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
@@ -77,6 +80,16 @@ const AdminUnits = () => {
   };
 
   useEffect(() => { fetchUnits(); }, []);
+
+  // Fetch current admin's company_id
+  useEffect(() => {
+    const fetchCompanyId = async () => {
+      if (!profile?.unit_id) return;
+      const { data } = await supabase.from("units").select("company_id").eq("id", profile.unit_id).maybeSingle();
+      if (data?.company_id) setCompanyId(data.company_id);
+    };
+    fetchCompanyId();
+  }, [profile?.unit_id]);
 
   const resetForm = () => {
     setForm({
@@ -168,10 +181,17 @@ const AdminUnits = () => {
     };
 
     let error;
+    let newUnitId: string | null = null;
     if (editingUnit) {
       ({ error } = await supabase.from("units").update(payload as any).eq("id", editingUnit.id));
     } else {
-      ({ error } = await supabase.from("units").insert(payload as any));
+      // Auto-assign company_id for new units
+      if (companyId) {
+        payload.company_id = companyId;
+      }
+      const res = await supabase.from("units").insert(payload as any).select("id").single();
+      error = res.error;
+      newUnitId = res.data?.id ?? null;
     }
 
     if (error) {
