@@ -206,6 +206,7 @@ const CompanyDialog = ({ open, onOpenChange, company, onSaved }: Props) => {
   const linkedElsewhere = units.filter(u => u.company_id && u.company_id !== company?.id);
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
