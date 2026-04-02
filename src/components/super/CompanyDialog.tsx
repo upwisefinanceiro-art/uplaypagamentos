@@ -394,6 +394,18 @@ const CompanyDialog = ({ open, onOpenChange, company, onSaved }: Props) => {
         </div>
       </DialogContent>
     </Dialog>
+
+    {createdAdminInfo && (
+      <CompanyAccessModal
+        open={accessModalOpen}
+        onOpenChange={setAccessModalOpen}
+        companyName={createdAdminInfo.companyName}
+        adminName={createdAdminInfo.adminName}
+        adminEmail={createdAdminInfo.adminEmail}
+        companyPhone={createdAdminInfo.companyPhone}
+      />
+    )}
+    </>
   );
 };
 
