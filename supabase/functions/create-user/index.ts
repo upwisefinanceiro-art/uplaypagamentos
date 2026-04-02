@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Sem permissão" });
     }
 
-    const { cpf, full_name, phone, password, role, unit_id } = await req.json();
+    const { cpf, full_name, phone, password, role, unit_id, email_override } = await req.json();
 
     const finalPassword = password || "12345678";
 
@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
     const cleanCpf = String(cpf).replace(/\D/g, "");
     const normalizedName = String(full_name).trim();
     const normalizedPhone = typeof phone === "string" && phone.trim() ? phone.trim() : null;
-    const email = `${cleanCpf}@ensinup.app`;
+    const email = typeof email_override === "string" && email_override.trim() ? email_override.trim() : `${cleanCpf}@ensinup.app`;
 
     const { data: existingProfile } = await supabaseAdmin
       .from("profiles")

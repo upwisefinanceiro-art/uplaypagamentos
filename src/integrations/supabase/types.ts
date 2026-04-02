@@ -599,14 +599,25 @@ export type Database = {
           asaas_api_key: string | null
           asaas_base_url: string | null
           asaas_webhook_token: string | null
+          bairro: string | null
+          cep: string | null
+          cidade: string | null
           cnpj: string | null
           company_id: string | null
+          cpf: string | null
           created_at: string
+          email_acesso: string | null
+          email_empresa: string | null
+          estado: string | null
           id: string
           name: string
           phone: string | null
+          razao_social: string | null
+          rg_ie: string | null
+          tipo_cadastro: string | null
           updated_at: string
           usar_whatsapp_padrao: boolean
+          whatsapp: string | null
           whatsapp_financeiro: string | null
         }
         Insert: {
@@ -615,14 +626,25 @@ export type Database = {
           asaas_api_key?: string | null
           asaas_base_url?: string | null
           asaas_webhook_token?: string | null
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
           cnpj?: string | null
           company_id?: string | null
+          cpf?: string | null
           created_at?: string
+          email_acesso?: string | null
+          email_empresa?: string | null
+          estado?: string | null
           id?: string
           name: string
           phone?: string | null
+          razao_social?: string | null
+          rg_ie?: string | null
+          tipo_cadastro?: string | null
           updated_at?: string
           usar_whatsapp_padrao?: boolean
+          whatsapp?: string | null
           whatsapp_financeiro?: string | null
         }
         Update: {
@@ -631,14 +653,25 @@ export type Database = {
           asaas_api_key?: string | null
           asaas_base_url?: string | null
           asaas_webhook_token?: string | null
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
           cnpj?: string | null
           company_id?: string | null
+          cpf?: string | null
           created_at?: string
+          email_acesso?: string | null
+          email_empresa?: string | null
+          estado?: string | null
           id?: string
           name?: string
           phone?: string | null
+          razao_social?: string | null
+          rg_ie?: string | null
+          tipo_cadastro?: string | null
           updated_at?: string
           usar_whatsapp_padrao?: boolean
+          whatsapp?: string | null
           whatsapp_financeiro?: string | null
         }
         Relationships: [
