@@ -46,12 +46,15 @@ export type Database = {
       }
       companies: {
         Row: {
+          cnpj: string | null
           created_at: string
+          email: string | null
           id: string
           logo_url: string | null
           max_units: number
           max_users: number
           name: string
+          phone: string | null
           plan: string
           primary_color: string | null
           secondary_color: string | null
@@ -61,12 +64,15 @@ export type Database = {
           whatsapp_financeiro: string | null
         }
         Insert: {
+          cnpj?: string | null
           created_at?: string
+          email?: string | null
           id?: string
           logo_url?: string | null
           max_units?: number
           max_users?: number
           name: string
+          phone?: string | null
           plan?: string
           primary_color?: string | null
           secondary_color?: string | null
@@ -76,12 +82,15 @@ export type Database = {
           whatsapp_financeiro?: string | null
         }
         Update: {
+          cnpj?: string | null
           created_at?: string
+          email?: string | null
           id?: string
           logo_url?: string | null
           max_units?: number
           max_users?: number
           name?: string
+          phone?: string | null
           plan?: string
           primary_color?: string | null
           secondary_color?: string | null
