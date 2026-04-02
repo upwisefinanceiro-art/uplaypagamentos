@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Sem permissão" });
     }
 
-    const { cpf, full_name, phone, password, role, unit_id } = await req.json();
+    const { cpf, full_name, phone, password, role, unit_id, email_override } = await req.json();
 
     const finalPassword = password || "12345678";
 
