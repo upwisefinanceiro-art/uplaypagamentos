@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Building2, UserPlus } from "lucide-react";
 import type { Company } from "@/pages/super/SuperCompanies";
+import CompanyAccessModal from "@/components/super/CompanyAccessModal";
 
 interface UnitOption {
   id: string;
@@ -48,6 +49,9 @@ const CompanyDialog = ({ open, onOpenChange, company, onSaved }: Props) => {
   const [createAdmin, setCreateAdmin] = useState(false);
   const [adminName, setAdminName] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
+
+  const [accessModalOpen, setAccessModalOpen] = useState(false);
+  const [createdAdminInfo, setCreatedAdminInfo] = useState<{ companyName: string; adminName: string; adminEmail: string; companyPhone: string | null } | null>(null);
 
   const isEditing = !!company;
 
@@ -181,6 +185,13 @@ const CompanyDialog = ({ open, onOpenChange, company, onSaved }: Props) => {
       } else {
         toast({ title: "Empresa e administrador criados!", description: "Senha padrão: 12345678" });
         setSaving(false);
+        setCreatedAdminInfo({
+          companyName: name.trim(),
+          adminName: adminName.trim(),
+          adminEmail: adminEmail.trim(),
+          companyPhone: phone.trim() || null,
+        });
+        setAccessModalOpen(true);
         onSaved();
         return;
       }
@@ -195,6 +206,7 @@ const CompanyDialog = ({ open, onOpenChange, company, onSaved }: Props) => {
   const linkedElsewhere = units.filter(u => u.company_id && u.company_id !== company?.id);
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -383,6 +395,18 @@ const CompanyDialog = ({ open, onOpenChange, company, onSaved }: Props) => {
         </div>
       </DialogContent>
     </Dialog>
+
+    {createdAdminInfo && (
+      <CompanyAccessModal
+        open={accessModalOpen}
+        onOpenChange={setAccessModalOpen}
+        companyName={createdAdminInfo.companyName}
+        adminName={createdAdminInfo.adminName}
+        adminEmail={createdAdminInfo.adminEmail}
+        companyPhone={createdAdminInfo.companyPhone}
+      />
+    )}
+    </>
   );
 };
 
