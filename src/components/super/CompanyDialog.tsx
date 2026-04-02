@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Building2, UserPlus } from "lucide-react";
 import type { Company } from "@/pages/super/SuperCompanies";
+import CompanyAccessModal from "@/components/super/CompanyAccessModal";
 
 interface UnitOption {
   id: string;
@@ -48,6 +49,9 @@ const CompanyDialog = ({ open, onOpenChange, company, onSaved }: Props) => {
   const [createAdmin, setCreateAdmin] = useState(false);
   const [adminName, setAdminName] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
+
+  const [accessModalOpen, setAccessModalOpen] = useState(false);
+  const [createdAdminInfo, setCreatedAdminInfo] = useState<{ companyName: string; adminName: string; adminEmail: string; companyPhone: string | null } | null>(null);
 
   const isEditing = !!company;
 
