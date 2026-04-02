@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
       email_confirm: true,
       user_metadata: {
         full_name: admin_name,
-        cpf: "",
+        cpf: `ADMIN-${crypto.randomUUID().slice(0, 8)}`,
         must_change_password: true,
       },
     });
@@ -98,7 +98,6 @@ Deno.serve(async (req) => {
         full_name: admin_name,
         email: admin_email,
         unit_id: unit_id || null,
-        cpf: "",
       })
       .eq("id", userId);
 

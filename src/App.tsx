@@ -22,6 +22,7 @@ import AdminUsers from "./pages/admin/AdminUsers";
 import AdminClients from "./pages/admin/AdminClients";
 import AdminContracts from "./pages/admin/AdminContracts";
 import AdminCharges from "./pages/admin/AdminCharges";
+import AdminCompanies from "./pages/admin/AdminCompanies";
 import SuperAdminLayout from "./components/layouts/SuperAdminLayout";
 import SuperDashboard from "./pages/super/SuperDashboard";
 import SuperCompanies from "./pages/super/SuperCompanies";
@@ -66,6 +67,7 @@ const App = () => (
               </ProtectedRoute>
             }>
               <Route index element={<AdminDashboard />} />
+              <Route path="empresa" element={<AdminCompanies />} />
               <Route path="administradores" element={<AdminAdmins />} />
               <Route path="unidades" element={<AdminUnits />} />
               <Route path="usuarios" element={<AdminUsers />} />
