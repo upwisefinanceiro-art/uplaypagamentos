@@ -17,6 +17,9 @@ export interface Company {
   primary_color: string;
   secondary_color: string;
   whatsapp_financeiro: string | null;
+  cnpj: string | null;
+  email: string | null;
+  phone: string | null;
   plan: string;
   status: string;
   max_units: number;
@@ -156,7 +159,9 @@ const SuperCompanies = () => {
                     </Button>
                   </div>
                 </div>
-                <div className="mt-3 flex gap-4 text-xs text-muted-foreground">
+                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  {company.cnpj && <span>CNPJ: {company.cnpj}</span>}
+                  {company.email && <span>{company.email}</span>}
                   <span>Máx. {company.max_units} unidades</span>
                   <span>Máx. {company.max_users} usuários</span>
                   {company.whatsapp_financeiro && <span>WhatsApp: {company.whatsapp_financeiro}</span>}
