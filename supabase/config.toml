@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.sync-all-payments]
 verify_jwt = false
+
+[functions.check-saas-overdue]
+verify_jwt = false
