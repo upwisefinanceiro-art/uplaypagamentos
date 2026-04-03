@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Eye, EyeOff, Loader2, MessageCircle, Wifi, WifiOff, Building2, User, MapPin, Mail, Phone } from "lucide-react";
+import { Plus, Pencil, Eye, EyeOff, Loader2, MessageCircle, Wifi, WifiOff, Building2, User, MapPin, Mail, Phone, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import UnitAccessModal from "@/components/admin/UnitAccessModal";
@@ -55,6 +56,9 @@ const AdminUnits = () => {
   const [editingUnit, setEditingUnit] = useState<UnitRow | null>(null);
   const [saving, setSaving] = useState(false);
   const [testingUnit, setTestingUnit] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; unit: UnitRow | null; loading: boolean; deps: string | null }>({
+    open: false, unit: null, loading: false, deps: null,
+  });
 
   // Access modal
   const [accessModal, setAccessModal] = useState<{ open: boolean; name: string; email: string; whatsapp: string | null }>({
@@ -269,7 +273,46 @@ const AdminUnits = () => {
     }
   };
 
+  const handleDeleteUnit = async () => {
+    const unit = deleteConfirm.unit;
+    if (!unit) return;
+    setDeleteConfirm(prev => ({ ...prev, loading: true }));
+
+    // Check dependencies
+    const [profilesRes, studentsRes, contractsRes, paymentsRes] = await Promise.all([
+      supabase.from("profiles").select("id", { count: "exact", head: true }).eq("unit_id", unit.id),
+      supabase.from("students").select("id", { count: "exact", head: true }).eq("unit_id", unit.id),
+      supabase.from("contracts").select("id", { count: "exact", head: true }).eq("unit_id", unit.id),
+      supabase.from("payments").select("id", { count: "exact", head: true }).eq("unit_id", unit.id),
+    ]);
+
+    const profileCount = profilesRes.count ?? 0;
+    const studentCount = studentsRes.count ?? 0;
+    const contractCount = contractsRes.count ?? 0;
+    const paymentCount = paymentsRes.count ?? 0;
+    const total = profileCount + studentCount + contractCount + paymentCount;
+
+    if (total > 0) {
+      const parts = [];
+      if (profileCount > 0) parts.push(`${profileCount} usuário(s)`);
+      if (studentCount > 0) parts.push(`${studentCount} aluno(s)`);
+      if (contractCount > 0) parts.push(`${contractCount} contrato(s)`);
+      if (paymentCount > 0) parts.push(`${paymentCount} cobrança(s)`);
+      setDeleteConfirm(prev => ({ ...prev, loading: false, deps: parts.join(", ") }));
+      return;
+    }
+
+    const { error } = await supabase.from("units").delete().eq("id", unit.id);
+    if (error) {
+      toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Unidade excluída com sucesso" });
+      fetchUnits();
+    }
+    setDeleteConfirm({ open: false, unit: null, loading: false, deps: null });
+  };
   const toggleKey = (id: string) => setShowKeys(prev => ({ ...prev, [id]: !prev[id] }));
+
 
   if (loading) {
     return (
@@ -475,9 +518,17 @@ const AdminUnits = () => {
                 </div>
                 {unit.razao_social && <p className="text-[11px] text-muted-foreground">{unit.razao_social}</p>}
               </div>
-              <button onClick={() => openEdit(unit)} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors">
-                <Pencil size={14} />
-              </button>
+              <div className="flex items-center gap-1">
+                <button onClick={() => openEdit(unit)} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors">
+                  <Pencil size={14} />
+                </button>
+                <button
+                  onClick={() => setDeleteConfirm({ open: true, unit, loading: false, deps: null })}
+                  className="p-1.5 text-muted-foreground hover:text-destructive transition-colors"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-xs mb-3">
@@ -561,6 +612,37 @@ const AdminUnits = () => {
           <p className="text-sm text-muted-foreground text-center py-10">Nenhum parceiro cadastrado</p>
         )}
       </div>
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteConfirm.open} onOpenChange={(o) => { if (!o) setDeleteConfirm({ open: false, unit: null, loading: false, deps: null }); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir unidade</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteConfirm.deps ? (
+                <span className="text-destructive">
+                  Não é possível excluir. Esta unidade possui registros vinculados: {deleteConfirm.deps}.
+                  Remova ou transfira esses registros antes de excluir.
+                </span>
+              ) : (
+                <>Tem certeza que deseja excluir <strong>{deleteConfirm.unit?.name}</strong>? Esta ação não pode ser desfeita.</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            {!deleteConfirm.deps && (
+              <AlertDialogAction
+                onClick={handleDeleteUnit}
+                disabled={deleteConfirm.loading}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleteConfirm.loading && <Loader2 size={14} className="mr-2 animate-spin" />}
+                Excluir
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
