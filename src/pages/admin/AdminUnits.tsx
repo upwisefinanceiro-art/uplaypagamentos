@@ -643,7 +643,8 @@ const AdminUnits = () => {
               {deleteConfirm.deps ? (
                 <span className="text-destructive">
                   Não é possível excluir. Esta unidade possui registros vinculados: {deleteConfirm.deps}.
-                  Remova ou transfira esses registros antes de excluir.
+                  <br /><br />
+                  <strong>Use o botão "Desativar" para ocultar esta unidade sem perder dados.</strong>
                 </span>
               ) : (
                 <>Tem certeza que deseja excluir <strong>{deleteConfirm.unit?.name}</strong>? Esta ação não pode ser desfeita.</>
@@ -652,7 +653,17 @@ const AdminUnits = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            {!deleteConfirm.deps && (
+            {deleteConfirm.deps ? (
+              <AlertDialogAction
+                onClick={() => {
+                  if (deleteConfirm.unit) handleDeactivateUnit(deleteConfirm.unit);
+                  setDeleteConfirm({ open: false, unit: null, loading: false, deps: null });
+                }}
+                className="bg-yellow-600 text-white hover:bg-yellow-700"
+              >
+                Desativar
+              </AlertDialogAction>
+            ) : (
               <AlertDialogAction
                 onClick={handleDeleteUnit}
                 disabled={deleteConfirm.loading}
