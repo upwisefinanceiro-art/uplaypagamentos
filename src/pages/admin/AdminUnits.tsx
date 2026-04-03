@@ -518,9 +518,17 @@ const AdminUnits = () => {
                 </div>
                 {unit.razao_social && <p className="text-[11px] text-muted-foreground">{unit.razao_social}</p>}
               </div>
-              <button onClick={() => openEdit(unit)} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors">
-                <Pencil size={14} />
-              </button>
+              <div className="flex items-center gap-1">
+                <button onClick={() => openEdit(unit)} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors">
+                  <Pencil size={14} />
+                </button>
+                <button
+                  onClick={() => setDeleteConfirm({ open: true, unit, loading: false, deps: null })}
+                  className="p-1.5 text-muted-foreground hover:text-destructive transition-colors"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-xs mb-3">
