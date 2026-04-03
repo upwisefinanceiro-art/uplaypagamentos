@@ -612,6 +612,37 @@ const AdminUnits = () => {
           <p className="text-sm text-muted-foreground text-center py-10">Nenhum parceiro cadastrado</p>
         )}
       </div>
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteConfirm.open} onOpenChange={(o) => { if (!o) setDeleteConfirm({ open: false, unit: null, loading: false, deps: null }); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir unidade</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteConfirm.deps ? (
+                <span className="text-destructive">
+                  Não é possível excluir. Esta unidade possui registros vinculados: {deleteConfirm.deps}.
+                  Remova ou transfira esses registros antes de excluir.
+                </span>
+              ) : (
+                <>Tem certeza que deseja excluir <strong>{deleteConfirm.unit?.name}</strong>? Esta ação não pode ser desfeita.</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            {!deleteConfirm.deps && (
+              <AlertDialogAction
+                onClick={handleDeleteUnit}
+                disabled={deleteConfirm.loading}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleteConfirm.loading && <Loader2 size={14} className="mr-2 animate-spin" />}
+                Excluir
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
