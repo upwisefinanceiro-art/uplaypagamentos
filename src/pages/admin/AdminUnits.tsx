@@ -273,7 +273,46 @@ const AdminUnits = () => {
     }
   };
 
-  const toggleKey = (id: string) => setShowKeys(prev => ({ ...prev, [id]: !prev[id] }));
+  const handleDeleteUnit = async () => {
+    const unit = deleteConfirm.unit;
+    if (!unit) return;
+    setDeleteConfirm(prev => ({ ...prev, loading: true }));
+
+    // Check dependencies
+    const [profilesRes, studentsRes, contractsRes, paymentsRes] = await Promise.all([
+      supabase.from("profiles").select("id", { count: "exact", head: true }).eq("unit_id", unit.id),
+      supabase.from("students").select("id", { count: "exact", head: true }).eq("unit_id", unit.id),
+      supabase.from("contracts").select("id", { count: "exact", head: true }).eq("unit_id", unit.id),
+      supabase.from("payments").select("id", { count: "exact", head: true }).eq("unit_id", unit.id),
+    ]);
+
+    const profileCount = profilesRes.count ?? 0;
+    const studentCount = studentsRes.count ?? 0;
+    const contractCount = contractsRes.count ?? 0;
+    const paymentCount = paymentsRes.count ?? 0;
+    const total = profileCount + studentCount + contractCount + paymentCount;
+
+    if (total > 0) {
+      const parts = [];
+      if (profileCount > 0) parts.push(`${profileCount} usuário(s)`);
+      if (studentCount > 0) parts.push(`${studentCount} aluno(s)`);
+      if (contractCount > 0) parts.push(`${contractCount} contrato(s)`);
+      if (paymentCount > 0) parts.push(`${paymentCount} cobrança(s)`);
+      setDeleteConfirm(prev => ({ ...prev, loading: false, deps: parts.join(", ") }));
+      return;
+    }
+
+    const { error } = await supabase.from("units").delete().eq("id", unit.id);
+    if (error) {
+      toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Unidade excluída com sucesso" });
+      fetchUnits();
+    }
+    setDeleteConfirm({ open: false, unit: null, loading: false, deps: null });
+  };
+
+
 
   if (loading) {
     return (
