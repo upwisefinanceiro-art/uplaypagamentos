@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Eye, EyeOff, Loader2, MessageCircle, Wifi, WifiOff, Building2, User, MapPin, Mail, Phone } from "lucide-react";
+import { Plus, Pencil, Eye, EyeOff, Loader2, MessageCircle, Wifi, WifiOff, Building2, User, MapPin, Mail, Phone, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
