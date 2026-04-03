@@ -311,7 +311,7 @@ const AdminUnits = () => {
     }
     setDeleteConfirm({ open: false, unit: null, loading: false, deps: null });
   };
-
+  const toggleKey = (id: string) => setShowKeys(prev => ({ ...prev, [id]: !prev[id] }));
 
 
   if (loading) {
