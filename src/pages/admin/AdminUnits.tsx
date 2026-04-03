@@ -311,6 +311,20 @@ const AdminUnits = () => {
     }
     setDeleteConfirm({ open: false, unit: null, loading: false, deps: null });
   };
+
+  const handleDeactivateUnit = async (unit: UnitRow) => {
+    const { error } = await supabase
+      .from("units")
+      .update({ active: !unit.active } as any)
+      .eq("id", unit.id);
+
+    if (error) {
+      toast({ title: "Erro ao alterar status", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: unit.active ? "Parceiro desativado" : "Parceiro reativado" });
+      fetchUnits();
+    }
+  };
   const toggleKey = (id: string) => setShowKeys(prev => ({ ...prev, [id]: !prev[id] }));
 
 
@@ -519,12 +533,20 @@ const AdminUnits = () => {
                 {unit.razao_social && <p className="text-[11px] text-muted-foreground">{unit.razao_social}</p>}
               </div>
               <div className="flex items-center gap-1">
-                <button onClick={() => openEdit(unit)} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors">
+                <button onClick={() => openEdit(unit)} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors" title="Editar">
                   <Pencil size={14} />
+                </button>
+                <button
+                  onClick={() => handleDeactivateUnit(unit)}
+                  className={`p-1.5 transition-colors ${unit.active ? "text-muted-foreground hover:text-yellow-600" : "text-yellow-600 hover:text-green-600"}`}
+                  title={unit.active ? "Desativar" : "Reativar"}
+                >
+                  {unit.active ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
                 <button
                   onClick={() => setDeleteConfirm({ open: true, unit, loading: false, deps: null })}
                   className="p-1.5 text-muted-foreground hover:text-destructive transition-colors"
+                  title="Excluir"
                 >
                   <Trash2 size={14} />
                 </button>
@@ -621,7 +643,8 @@ const AdminUnits = () => {
               {deleteConfirm.deps ? (
                 <span className="text-destructive">
                   Não é possível excluir. Esta unidade possui registros vinculados: {deleteConfirm.deps}.
-                  Remova ou transfira esses registros antes de excluir.
+                  <br /><br />
+                  <strong>Use o botão "Desativar" para ocultar esta unidade sem perder dados.</strong>
                 </span>
               ) : (
                 <>Tem certeza que deseja excluir <strong>{deleteConfirm.unit?.name}</strong>? Esta ação não pode ser desfeita.</>
@@ -630,7 +653,17 @@ const AdminUnits = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            {!deleteConfirm.deps && (
+            {deleteConfirm.deps ? (
+              <AlertDialogAction
+                onClick={() => {
+                  if (deleteConfirm.unit) handleDeactivateUnit(deleteConfirm.unit);
+                  setDeleteConfirm({ open: false, unit: null, loading: false, deps: null });
+                }}
+                className="bg-yellow-600 text-white hover:bg-yellow-700"
+              >
+                Desativar
+              </AlertDialogAction>
+            ) : (
               <AlertDialogAction
                 onClick={handleDeleteUnit}
                 disabled={deleteConfirm.loading}

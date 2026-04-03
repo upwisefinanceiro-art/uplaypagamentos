@@ -1,40 +1,40 @@
+## Plano de Implementação
 
-## Plano: Camada SaaS Multi-Empresa (Aditiva)
+### Fase 1 — Exclusão e Desativação de Unidades
+1. **Corrigir exclusão**: Garantir que a exclusão funcione quando não há vínculos
+2. **Adicionar botão "Desativar"**: Setar `active = false` na unidade quando houver vínculos
+3. **Bloquear operações em unidades inativas**: Impedir criação de clientes/contratos/cobranças
 
-### Princípio: ZERO alterações em código/tabelas existentes. Tudo é ADIÇÃO.
+### Fase 2 — Estrutura de Assinatura SaaS (Banco de Dados)
+- Já existem as tabelas `saas_subscriptions` e `saas_invoices` — vou adicionar os campos faltantes:
+  - `due_day` (dia do vencimento, ex: 10)
+  - `block_deadline` (data limite de bloqueio = vencimento + 10 dias)
+  - `asaas_customer_id`, `asaas_payment_id`, `invoice_url` na `saas_invoices`
+- Atualizar status da company baseado na assinatura (ATIVO/ATRASADO/BLOQUEADO)
 
----
+### Fase 3 — Lógica de Bloqueio Automático
+- Edge Function agendada (cron) que verifica diariamente:
+  - Se `next_billing_date + 10 dias < hoje` e não pago → bloqueia empresa
+  - Se pago → reativa empresa
+- No frontend: interceptar login de empresa bloqueada e mostrar tela de bloqueio
 
-### Fase 1 — Banco de Dados (Migration)
+### Fase 4 — Dashboard Super Admin
+- Atualizar SuperDashboard com:
+  - Empresas ativas/atrasadas/bloqueadas
+  - Vencendo hoje
+  - Valor total a receber/recebido do SaaS
+  - Detalhes por empresa (próximo vencimento, status)
 
-1. **Criar tabela `companies`** com campos:
-   - `id`, `name`, `system_name`, `logo_url`, `primary_color`, `secondary_color`
-   - `whatsapp_financeiro`, `plan` (FREE/BASIC/PRO/ENTERPRISE)
-   - `status` (ATIVO/INATIVO/BLOQUEADO), `max_units`, `max_users`
-   - `created_at`, `updated_at`
+### Fase 5 — Tela de Empresas (Super Admin)
+- Mostrar status da assinatura, valor, vencimento, data limite
+- Botões: "Ver cobrança", "Abrir boleto", "Copiar link"
 
-2. **Adicionar coluna `company_id` na tabela `units`** (nullable, sem quebrar dados existentes)
+### Fase 6 — Integração Asaas para SaaS
+- Edge Function para criar customer/cobrança da empresa no Asaas
+- Webhook para receber pagamento e reativar automaticamente
 
-3. **Criar empresa padrão "EnsinUP"** e vincular todas as unidades existentes a ela
+### ⚠️ Observação
+A integração Asaas para cobrar empresas requer uma **API Key do ADMIN_MASTER** (proprietário da plataforma), separada das API Keys das unidades. Será necessário configurar isso como secret.
 
-4. **Adicionar role `SUPER_ADMIN`** ao enum `app_role` (para o dono do SaaS)
-
-5. **RLS na tabela `companies`**:
-   - SUPER_ADMIN: acesso total
-   - ADMIN_MASTER: visualiza apenas sua empresa
-   - Demais: sem acesso direto
-
-6. **Atualizar RLS de `units`** para incluir filtro por `company_id` (mantendo políticas atuais funcionando)
-
-### Fase 2 — Frontend (após migration aprovada)
-- Painel SUPER_ADMIN para gerenciar empresas
-- Tela de criação/edição de empresa
-- Dashboard com métricas globais
-
-### O que NÃO muda:
-- ✅ Tabelas existentes continuam intactas
-- ✅ RLS existente continua funcionando
-- ✅ Integração Asaas não é tocada
-- ✅ Telas admin e app do cliente não mudam
-- ✅ Fluxo de login/auth não muda
-- ✅ Edge Functions não são alteradas
+### Ordem de execução
+Fase 1 → Fase 2 → Fase 3 → Fase 4 → Fase 5 → Fase 6

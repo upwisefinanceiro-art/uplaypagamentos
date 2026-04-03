@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import CompanyBlockedOverlay from "@/components/admin/CompanyBlockedOverlay";
 
 const menuItems = [
   { path: "/admin", icon: LayoutDashboard, label: "Dashboard", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
@@ -130,6 +131,7 @@ const AdminLayout = () => {
         </header>
 
         <main className="flex-1 p-4 lg:p-6">
+          <CompanyBlockedOverlay />
           <Outlet />
         </main>
       </div>
