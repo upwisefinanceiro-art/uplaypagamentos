@@ -311,6 +311,20 @@ const AdminUnits = () => {
     }
     setDeleteConfirm({ open: false, unit: null, loading: false, deps: null });
   };
+
+  const handleDeactivateUnit = async (unit: UnitRow) => {
+    const { error } = await supabase
+      .from("units")
+      .update({ active: !unit.active } as any)
+      .eq("id", unit.id);
+
+    if (error) {
+      toast({ title: "Erro ao alterar status", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: unit.active ? "Parceiro desativado" : "Parceiro reativado" });
+      fetchUnits();
+    }
+  };
   const toggleKey = (id: string) => setShowKeys(prev => ({ ...prev, [id]: !prev[id] }));
 
 
