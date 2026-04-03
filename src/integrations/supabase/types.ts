@@ -445,34 +445,46 @@ export type Database = {
       }
       saas_invoices: {
         Row: {
+          asaas_payment_id: string | null
+          boleto_url: string | null
           company_id: string
           created_at: string
           description: string | null
           due_date: string
           id: string
+          invoice_url: string | null
           paid_at: string | null
+          pix_copy_paste: string | null
           status: string
           subscription_id: string | null
           value: number
         }
         Insert: {
+          asaas_payment_id?: string | null
+          boleto_url?: string | null
           company_id: string
           created_at?: string
           description?: string | null
           due_date: string
           id?: string
+          invoice_url?: string | null
           paid_at?: string | null
+          pix_copy_paste?: string | null
           status?: string
           subscription_id?: string | null
           value: number
         }
         Update: {
+          asaas_payment_id?: string | null
+          boleto_url?: string | null
           company_id?: string
           created_at?: string
           description?: string | null
           due_date?: string
           id?: string
+          invoice_url?: string | null
           paid_at?: string | null
+          pix_copy_paste?: string | null
           status?: string
           subscription_id?: string | null
           value?: number
@@ -496,8 +508,12 @@ export type Database = {
       }
       saas_subscriptions: {
         Row: {
+          asaas_customer_id: string | null
+          asaas_subscription_id: string | null
+          block_deadline: string | null
           company_id: string
           created_at: string
+          due_day: number
           ends_at: string | null
           id: string
           monthly_value: number
@@ -508,8 +524,12 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          asaas_customer_id?: string | null
+          asaas_subscription_id?: string | null
+          block_deadline?: string | null
           company_id: string
           created_at?: string
+          due_day?: number
           ends_at?: string | null
           id?: string
           monthly_value?: number
@@ -520,8 +540,12 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          asaas_customer_id?: string | null
+          asaas_subscription_id?: string | null
+          block_deadline?: string | null
           company_id?: string
           created_at?: string
+          due_day?: number
           ends_at?: string | null
           id?: string
           monthly_value?: number
