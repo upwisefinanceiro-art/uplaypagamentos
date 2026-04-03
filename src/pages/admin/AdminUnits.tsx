@@ -56,6 +56,9 @@ const AdminUnits = () => {
   const [editingUnit, setEditingUnit] = useState<UnitRow | null>(null);
   const [saving, setSaving] = useState(false);
   const [testingUnit, setTestingUnit] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; unit: UnitRow | null; loading: boolean; deps: string | null }>({
+    open: false, unit: null, loading: false, deps: null,
+  });
 
   // Access modal
   const [accessModal, setAccessModal] = useState<{ open: boolean; name: string; email: string; whatsapp: string | null }>({
