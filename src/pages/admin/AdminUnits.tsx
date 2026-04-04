@@ -635,43 +635,49 @@ const AdminUnits = () => {
         )}
       </div>
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteConfirm.open} onOpenChange={(o) => { if (!o) setDeleteConfirm({ open: false, unit: null, loading: false, deps: null }); }}>
+      <AlertDialog open={deleteConfirm.open} onOpenChange={(o) => { if (!o && !deleteConfirm.loading) setDeleteConfirm({ open: false, unit: null, loading: false, deps: null }); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir unidade</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteConfirm.deps ? (
-                <span className="text-destructive">
-                  Não é possível excluir. Esta unidade possui registros vinculados: {deleteConfirm.deps}.
-                  <br /><br />
-                  <strong>Use o botão "Desativar" para ocultar esta unidade sem perder dados.</strong>
-                </span>
-              ) : (
-                <>Tem certeza que deseja excluir <strong>{deleteConfirm.unit?.name}</strong>? Esta ação não pode ser desfeita.</>
-              )}
+            <AlertDialogTitle>Excluir parceiro</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                {deleteConfirm.deps ? (
+                  <span className="text-destructive">
+                    Não é possível excluir. Este parceiro possui registros vinculados: {deleteConfirm.deps}.
+                    <br /><br />
+                    <strong>Use o botão "Desativar" para ocultar este parceiro sem perder dados.</strong>
+                  </span>
+                ) : (
+                  <span>Tem certeza que deseja excluir <strong>{deleteConfirm.unit?.name}</strong>? Esta ação não pode ser desfeita.</span>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteConfirm.loading}>Cancelar</AlertDialogCancel>
             {deleteConfirm.deps ? (
-              <AlertDialogAction
+              <Button
                 onClick={() => {
                   if (deleteConfirm.unit) handleDeactivateUnit(deleteConfirm.unit);
                   setDeleteConfirm({ open: false, unit: null, loading: false, deps: null });
                 }}
                 className="bg-yellow-600 text-white hover:bg-yellow-700"
               >
-                Desativar
-              </AlertDialogAction>
+                <EyeOff size={14} className="mr-2" />
+                Desativar parceiro
+              </Button>
             ) : (
-              <AlertDialogAction
-                onClick={handleDeleteUnit}
+              <Button
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleDeleteUnit();
+                }}
                 disabled={deleteConfirm.loading}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                variant="destructive"
               >
                 {deleteConfirm.loading && <Loader2 size={14} className="mr-2 animate-spin" />}
-                Excluir
-              </AlertDialogAction>
+                Confirmar exclusão
+              </Button>
             )}
           </AlertDialogFooter>
         </AlertDialogContent>
