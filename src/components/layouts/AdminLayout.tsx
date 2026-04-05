@@ -10,6 +10,7 @@ import {
   Menu,
   X,
   ShieldCheck,
+  KeyRound,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
