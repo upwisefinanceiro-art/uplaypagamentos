@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Home, CreditCard, User, LogOut } from "lucide-react";
+import { Home, CreditCard, User, LogOut, KeyRound } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompanyBranding } from "@/contexts/CompanyBrandingContext";
@@ -31,6 +31,7 @@ const AppLayout = () => {
   const tabs = [
     { path: "/app", icon: Home, label: "Início" },
     { path: "/app/pagamentos", icon: CreditCard, label: "Pagamentos" },
+    { path: "/app/alterar-senha", icon: KeyRound, label: "Senha" },
     { path: "/app/perfil", icon: User, label: "Perfil" },
   ];
 

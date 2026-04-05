@@ -14,6 +14,7 @@ import AppHome from "./pages/app/AppHome";
 import AppPayments from "./pages/app/AppPayments";
 import AppPaymentDetail from "./pages/app/AppPaymentDetail";
 import AppProfile from "./pages/app/AppProfile";
+import AppChangePassword from "./pages/app/AppChangePassword";
 import AdminLayout from "./components/layouts/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminAdmins from "./pages/admin/AdminAdmins";
@@ -58,6 +59,7 @@ const App = () => (
               <Route path="pagamentos/:id" element={<AppPaymentDetail />} />
               <Route path="payment/:id" element={<AppPaymentDetail />} />
               <Route path="perfil" element={<AppProfile />} />
+              <Route path="alterar-senha" element={<AppChangePassword />} />
             </Route>
 
             {/* Painel Admin */}
@@ -74,6 +76,7 @@ const App = () => (
               <Route path="clientes" element={<AdminClients />} />
               <Route path="contratos" element={<AdminContracts />} />
               <Route path="cobrancas" element={<AdminCharges />} />
+              <Route path="alterar-senha" element={<AppChangePassword />} />
             </Route>
 
             {/* Painel Super Admin */}
