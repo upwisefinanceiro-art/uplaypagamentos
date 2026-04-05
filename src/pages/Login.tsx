@@ -107,6 +107,38 @@ const Login = () => {
         return;
       }
 
+      // Check if profile is active
+      const { data: profileData } = await supabase.from("profiles").select("active, unit_id").eq("email", email).maybeSingle();
+
+      if (profileData && !profileData.active) {
+        console.warn("[auth] Usuário inativo", { email });
+        await supabase.auth.signOut();
+        toast({ title: "Acesso inativo", description: "Seu acesso está inativo. Entre em contato com o administrador.", variant: "destructive" });
+        setLoading(false);
+        return;
+      }
+
+      // Check if unit is blocked/inactive
+      if (profileData?.unit_id) {
+        const { data: unitData } = await supabase.from("units").select("status").eq("id", profileData.unit_id).maybeSingle();
+        if (unitData && (unitData.status === "BLOQUEADO" || unitData.status === "INATIVO")) {
+          // Only block non-master roles
+          const { data: rolesData } = await supabase.from("user_roles").select("role").eq("user_id", (await supabase.auth.getUser()).data.user?.id || "");
+          const isMaster = rolesData?.some((r: { role: string }) => r.role === "ADMIN_MASTER" || r.role === "SUPER_ADMIN");
+          if (!isMaster) {
+            console.warn("[auth] Empresa bloqueada/inativa", { email, status: unitData.status });
+            await supabase.auth.signOut();
+            toast({
+              title: unitData.status === "BLOQUEADO" ? "Empresa bloqueada" : "Empresa inativa",
+              description: "Sua empresa está temporariamente sem acesso à plataforma. Entre em contato com o administrador.",
+              variant: "destructive",
+            });
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
       console.info("[auth] Login realizado com sucesso", { loginMethod, email });
       toast({ title: "Bem-vindo!" });
     } catch (err) {
