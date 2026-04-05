@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Eye, EyeOff, Loader2, MessageCircle, Wifi, WifiOff, Building2, User, MapPin, Mail, Phone, Trash2 } from "lucide-react";
+import { Plus, Pencil, Loader2, MessageCircle, Wifi, WifiOff, Building2, MapPin, Mail, Phone, Trash2, Shield, ShieldOff, ShieldAlert, Filter } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,17 +8,20 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import UnitAccessModal from "@/components/admin/UnitAccessModal";
 
 const DEFAULT_WHATSAPP = "31996726918";
 
+type UnitStatus = "ATIVO" | "INATIVO" | "BLOQUEADO";
+
 interface UnitRow {
   id: string;
   name: string;
   active: boolean;
+  status: UnitStatus;
   cnpj: string | null;
   address: string | null;
   phone: string | null;
@@ -45,6 +48,12 @@ const ESTADOS = [
   "PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"
 ];
 
+const STATUS_CONFIG: Record<UnitStatus, { label: string; color: string; bgClass: string; borderClass: string }> = {
+  ATIVO: { label: "Ativo", color: "bg-green-500/15 text-green-700 border-green-500/30", bgClass: "", borderClass: "" },
+  BLOQUEADO: { label: "Bloqueado", color: "bg-destructive/15 text-destructive border-destructive/30", bgClass: "opacity-80", borderClass: "border-destructive/20" },
+  INATIVO: { label: "Inativo", color: "bg-muted text-muted-foreground border-border", bgClass: "opacity-60", borderClass: "border-muted" },
+};
+
 const AdminUnits = () => {
   const { toast } = useToast();
   const { profile } = useAuth();
@@ -56,8 +65,12 @@ const AdminUnits = () => {
   const [editingUnit, setEditingUnit] = useState<UnitRow | null>(null);
   const [saving, setSaving] = useState(false);
   const [testingUnit, setTestingUnit] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<"TODOS" | UnitStatus>("TODOS");
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; unit: UnitRow | null; loading: boolean; deps: string | null }>({
     open: false, unit: null, loading: false, deps: null,
+  });
+  const [statusChange, setStatusChange] = useState<{ open: boolean; unit: UnitRow | null; newStatus: UnitStatus | null; loading: boolean }>({
+    open: false, unit: null, newStatus: null, loading: false,
   });
 
   // Access modal
@@ -85,7 +98,6 @@ const AdminUnits = () => {
 
   useEffect(() => { fetchUnits(); }, []);
 
-  // Fetch current admin's company_id
   useEffect(() => {
     const fetchCompanyId = async () => {
       if (!profile?.unit_id) return;
@@ -189,10 +201,7 @@ const AdminUnits = () => {
     if (editingUnit) {
       ({ error } = await supabase.from("units").update(payload as any).eq("id", editingUnit.id));
     } else {
-      // Auto-assign company_id for new units
-      if (companyId) {
-        payload.company_id = companyId;
-      }
+      if (companyId) payload.company_id = companyId;
       const res = await supabase.from("units").insert(payload as any).select("id").single();
       error = res.error;
       newUnitId = res.data?.id ?? null;
@@ -204,7 +213,6 @@ const AdminUnits = () => {
       return;
     }
 
-    // Auto-create user for new units
     if (!editingUnit && form.email_acesso.trim()) {
       try {
         const { data: userData, error: userError } = await supabase.functions.invoke("create-user", {
@@ -226,7 +234,6 @@ const AdminUnits = () => {
             variant: "destructive",
           });
         } else {
-          // Show access modal
           setAccessModal({
             open: true,
             name: form.name.trim(),
@@ -278,7 +285,6 @@ const AdminUnits = () => {
     if (!unit) return;
     setDeleteConfirm(prev => ({ ...prev, loading: true }));
 
-    // Check dependencies
     const [profilesRes, studentsRes, contractsRes, paymentsRes] = await Promise.all([
       supabase.from("profiles").select("id", { count: "exact", head: true }).eq("unit_id", unit.id),
       supabase.from("students").select("id", { count: "exact", head: true }).eq("unit_id", unit.id),
@@ -306,27 +312,48 @@ const AdminUnits = () => {
     if (error) {
       toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Unidade excluída com sucesso" });
+      toast({ title: "Parceiro excluído com sucesso" });
       fetchUnits();
     }
     setDeleteConfirm({ open: false, unit: null, loading: false, deps: null });
   };
 
-  const handleDeactivateUnit = async (unit: UnitRow) => {
+  const handleChangeStatus = async () => {
+    const { unit, newStatus } = statusChange;
+    if (!unit || !newStatus) return;
+    setStatusChange(prev => ({ ...prev, loading: true }));
+
     const { error } = await supabase
       .from("units")
-      .update({ active: !unit.active } as any)
+      .update({ status: newStatus } as any)
       .eq("id", unit.id);
 
     if (error) {
       toast({ title: "Erro ao alterar status", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: unit.active ? "Parceiro desativado" : "Parceiro reativado" });
+      const labels: Record<UnitStatus, string> = {
+        ATIVO: "ativado",
+        INATIVO: "inativado",
+        BLOQUEADO: "bloqueado",
+      };
+      toast({ title: `Parceiro ${labels[newStatus]} com sucesso` });
       fetchUnits();
     }
+    setStatusChange({ open: false, unit: null, newStatus: null, loading: false });
   };
+
   const toggleKey = (id: string) => setShowKeys(prev => ({ ...prev, [id]: !prev[id] }));
 
+  const filteredUnits = statusFilter === "TODOS"
+    ? units
+    : units.filter(u => (u.status || (u.active ? "ATIVO" : "INATIVO")) === statusFilter);
+
+  const statusCounts = {
+    TODOS: units.length,
+    ATIVO: units.filter(u => (u.status || (u.active ? "ATIVO" : "INATIVO")) === "ATIVO").length,
+    BLOQUEADO: units.filter(u => u.status === "BLOQUEADO").length,
+    INATIVO: units.filter(u => (u.status || (u.active ? "ATIVO" : "INATIVO")) === "INATIVO").length,
+  };
 
   if (loading) {
     return (
@@ -343,6 +370,22 @@ const AdminUnits = () => {
         <Button onClick={openNew} className="bg-primary hover:bg-primary/90 text-primary-foreground">
           <Plus size={16} className="mr-2" /> Novo Parceiro
         </Button>
+      </div>
+
+      {/* Status Filter */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <Filter size={14} className="text-muted-foreground" />
+        {(["TODOS", "ATIVO", "BLOQUEADO", "INATIVO"] as const).map((s) => (
+          <Button
+            key={s}
+            size="sm"
+            variant={statusFilter === s ? "default" : "outline"}
+            onClick={() => setStatusFilter(s)}
+            className="text-xs h-7 px-3"
+          >
+            {s === "TODOS" ? "Todos" : STATUS_CONFIG[s].label} ({statusCounts[s]})
+          </Button>
+        ))}
       </div>
 
       {/* Form Dialog */}
@@ -517,123 +560,161 @@ const AdminUnits = () => {
 
       {/* LISTING */}
       <div className="space-y-3">
-        {units.map((unit) => (
-          <div key={unit.id} className="glass-card p-4">
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-sm font-semibold text-foreground">{unit.name}</h3>
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                    {unit.tipo_cadastro === "PF" ? "PF" : "PJ"}
-                  </Badge>
-                  {!unit.active && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-destructive/15 text-destructive font-medium">Inativa</span>
+        {filteredUnits.map((unit) => {
+          const unitStatus = (unit.status || (unit.active ? "ATIVO" : "INATIVO")) as UnitStatus;
+          const cfg = STATUS_CONFIG[unitStatus];
+
+          return (
+            <div key={unit.id} className={`glass-card p-4 transition-all ${cfg.bgClass} ${cfg.borderClass ? `border ${cfg.borderClass}` : ""}`}>
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm font-semibold text-foreground">{unit.name}</h3>
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                      {unit.tipo_cadastro === "PF" ? "PF" : "PJ"}
+                    </Badge>
+                    <Badge className={`text-[10px] px-1.5 py-0 border ${cfg.color}`}>
+                      {cfg.label}
+                    </Badge>
+                  </div>
+                  {unit.razao_social && <p className="text-[11px] text-muted-foreground">{unit.razao_social}</p>}
+                </div>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => openEdit(unit)} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors" title="Editar">
+                    <Pencil size={14} />
+                  </button>
+                  {/* Status action buttons */}
+                  {unitStatus === "ATIVO" && (
+                    <>
+                      <button
+                        onClick={() => setStatusChange({ open: true, unit, newStatus: "BLOQUEADO", loading: false })}
+                        className="p-1.5 text-muted-foreground hover:text-destructive transition-colors"
+                        title="Bloquear"
+                      >
+                        <ShieldAlert size={14} />
+                      </button>
+                      <button
+                        onClick={() => setStatusChange({ open: true, unit, newStatus: "INATIVO", loading: false })}
+                        className="p-1.5 text-muted-foreground hover:text-yellow-600 transition-colors"
+                        title="Inativar"
+                      >
+                        <ShieldOff size={14} />
+                      </button>
+                    </>
                   )}
-                </div>
-                {unit.razao_social && <p className="text-[11px] text-muted-foreground">{unit.razao_social}</p>}
-              </div>
-              <div className="flex items-center gap-1">
-                <button onClick={() => openEdit(unit)} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors" title="Editar">
-                  <Pencil size={14} />
-                </button>
-                <button
-                  onClick={() => handleDeactivateUnit(unit)}
-                  className={`p-1.5 transition-colors ${unit.active ? "text-muted-foreground hover:text-yellow-600" : "text-yellow-600 hover:text-green-600"}`}
-                  title={unit.active ? "Desativar" : "Reativar"}
-                >
-                  {unit.active ? <EyeOff size={14} /> : <Eye size={14} />}
-                </button>
-                <button
-                  onClick={() => setDeleteConfirm({ open: true, unit, loading: false, deps: null })}
-                  className="p-1.5 text-muted-foreground hover:text-destructive transition-colors"
-                  title="Excluir"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-xs mb-3">
-              <div className="flex items-center gap-1.5">
-                <Building2 size={11} className="text-muted-foreground flex-shrink-0" />
-                <span className="text-muted-foreground">{unit.tipo_cadastro === "PF" ? "CPF:" : "CNPJ:"}</span>
-                <span className="text-foreground">{(unit.tipo_cadastro === "PF" ? unit.cpf : unit.cnpj) || "—"}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <MapPin size={11} className="text-muted-foreground flex-shrink-0" />
-                <span className="text-foreground truncate">{[unit.cidade, unit.estado].filter(Boolean).join(" - ") || "—"}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Phone size={11} className="text-muted-foreground flex-shrink-0" />
-                <span className="text-foreground">{unit.phone || "—"}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <MessageCircle size={11} className="text-green-600 flex-shrink-0" />
-                <span className="text-foreground">{unit.whatsapp || getWhatsAppDisplay(unit)}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Mail size={11} className="text-muted-foreground flex-shrink-0" />
-                <span className="text-muted-foreground">Acesso:</span>
-                <span className="text-foreground truncate">{unit.email_acesso || "—"}</span>
-              </div>
-              {unit.email_empresa && (
-                <div className="flex items-center gap-1.5">
-                  <Mail size={11} className="text-muted-foreground flex-shrink-0" />
-                  <span className="text-foreground truncate">{unit.email_empresa}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Asaas section */}
-            <details className="text-xs">
-              <summary className="text-muted-foreground cursor-pointer hover:text-foreground transition-colors mb-2">Integração Asaas</summary>
-              <div className="space-y-1.5 pl-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground w-20">API Key:</span>
-                  <code className="text-foreground flex-1 truncate">
-                    {showKeys[unit.id] ? (unit.asaas_api_key || "—") : "••••••••••••"}
-                  </code>
-                  <button onClick={() => toggleKey(unit.id)} className="text-muted-foreground hover:text-foreground">
-                    {showKeys[unit.id] ? <EyeOff size={14} /> : <Eye size={14} />}
+                  {unitStatus === "BLOQUEADO" && (
+                    <button
+                      onClick={() => setStatusChange({ open: true, unit, newStatus: "ATIVO", loading: false })}
+                      className="p-1.5 text-green-600 hover:text-green-700 transition-colors"
+                      title="Reativar"
+                    >
+                      <Shield size={14} />
+                    </button>
+                  )}
+                  {unitStatus === "INATIVO" && (
+                    <button
+                      onClick={() => setStatusChange({ open: true, unit, newStatus: "ATIVO", loading: false })}
+                      className="p-1.5 text-green-600 hover:text-green-700 transition-colors"
+                      title="Ativar"
+                    >
+                      <Shield size={14} />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setDeleteConfirm({ open: true, unit, loading: false, deps: null })}
+                    className="p-1.5 text-muted-foreground hover:text-destructive transition-colors"
+                    title="Excluir"
+                  >
+                    <Trash2 size={14} />
                   </button>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground w-20">Base URL:</span>
-                  <code className="text-foreground truncate">{unit.asaas_base_url || "—"}</code>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground w-20">Webhook:</span>
-                  <code className="text-foreground truncate">{unit.asaas_webhook_token || "—"}</code>
-                </div>
               </div>
-            </details>
 
-            <div className="mt-3 pt-3 border-t border-border">
-              <Button
-                size="sm" variant="outline"
-                onClick={() => handleTestConnection(unit.id)}
-                disabled={testingUnit === unit.id || !unit.asaas_api_key}
-                className="text-xs"
-              >
-                {testingUnit === unit.id ? (
-                  <Loader2 size={12} className="mr-1.5 animate-spin" />
-                ) : unit.asaas_api_key ? (
-                  <Wifi size={12} className="mr-1.5" />
-                ) : (
-                  <WifiOff size={12} className="mr-1.5" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-xs mb-3">
+                <div className="flex items-center gap-1.5">
+                  <Building2 size={11} className="text-muted-foreground flex-shrink-0" />
+                  <span className="text-muted-foreground">{unit.tipo_cadastro === "PF" ? "CPF:" : "CNPJ:"}</span>
+                  <span className="text-foreground">{(unit.tipo_cadastro === "PF" ? unit.cpf : unit.cnpj) || "—"}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <MapPin size={11} className="text-muted-foreground flex-shrink-0" />
+                  <span className="text-foreground truncate">{[unit.cidade, unit.estado].filter(Boolean).join(" - ") || "—"}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Phone size={11} className="text-muted-foreground flex-shrink-0" />
+                  <span className="text-foreground">{unit.phone || "—"}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <MessageCircle size={11} className="text-green-600 flex-shrink-0" />
+                  <span className="text-foreground">{unit.whatsapp || getWhatsAppDisplay(unit)}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Mail size={11} className="text-muted-foreground flex-shrink-0" />
+                  <span className="text-muted-foreground">Acesso:</span>
+                  <span className="text-foreground truncate">{unit.email_acesso || "—"}</span>
+                </div>
+                {unit.email_empresa && (
+                  <div className="flex items-center gap-1.5">
+                    <Mail size={11} className="text-muted-foreground flex-shrink-0" />
+                    <span className="text-foreground truncate">{unit.email_empresa}</span>
+                  </div>
                 )}
-                {testingUnit === unit.id ? "Testando..." : "Testar conexão Asaas"}
-              </Button>
-              {!unit.asaas_api_key && (
-                <span className="text-[10px] text-destructive ml-2">API Key não configurada</span>
-              )}
+              </div>
+
+              {/* Asaas section */}
+              <details className="text-xs">
+                <summary className="text-muted-foreground cursor-pointer hover:text-foreground transition-colors mb-2">Integração Asaas</summary>
+                <div className="space-y-1.5 pl-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground w-20">API Key:</span>
+                    <code className="text-foreground flex-1 truncate">
+                      {showKeys[unit.id] ? (unit.asaas_api_key || "—") : "••••••••••••"}
+                    </code>
+                    <button onClick={() => toggleKey(unit.id)} className="text-muted-foreground hover:text-foreground">
+                      {showKeys[unit.id] ? <ShieldOff size={14} /> : <Shield size={14} />}
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground w-20">Base URL:</span>
+                    <code className="text-foreground truncate">{unit.asaas_base_url || "—"}</code>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground w-20">Webhook:</span>
+                    <code className="text-foreground truncate">{unit.asaas_webhook_token || "—"}</code>
+                  </div>
+                </div>
+              </details>
+
+              <div className="mt-3 pt-3 border-t border-border">
+                <Button
+                  size="sm" variant="outline"
+                  onClick={() => handleTestConnection(unit.id)}
+                  disabled={testingUnit === unit.id || !unit.asaas_api_key}
+                  className="text-xs"
+                >
+                  {testingUnit === unit.id ? (
+                    <Loader2 size={12} className="mr-1.5 animate-spin" />
+                  ) : unit.asaas_api_key ? (
+                    <Wifi size={12} className="mr-1.5" />
+                  ) : (
+                    <WifiOff size={12} className="mr-1.5" />
+                  )}
+                  {testingUnit === unit.id ? "Testando..." : "Testar conexão Asaas"}
+                </Button>
+                {!unit.asaas_api_key && (
+                  <span className="text-[10px] text-destructive ml-2">API Key não configurada</span>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
-        {units.length === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-10">Nenhum parceiro cadastrado</p>
+          );
+        })}
+        {filteredUnits.length === 0 && (
+          <p className="text-sm text-muted-foreground text-center py-10">
+            {statusFilter === "TODOS" ? "Nenhum parceiro cadastrado" : `Nenhum parceiro com status "${STATUS_CONFIG[statusFilter].label}"`}
+          </p>
         )}
       </div>
+
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteConfirm.open} onOpenChange={(o) => { if (!o && !deleteConfirm.loading) setDeleteConfirm({ open: false, unit: null, loading: false, deps: null }); }}>
         <AlertDialogContent>
@@ -658,12 +739,21 @@ const AdminUnits = () => {
             {deleteConfirm.deps ? (
               <Button
                 onClick={() => {
-                  if (deleteConfirm.unit) handleDeactivateUnit(deleteConfirm.unit);
+                  if (deleteConfirm.unit) {
+                    supabase.from("units").update({ status: "INATIVO" } as any).eq("id", deleteConfirm.unit.id).then(({ error }) => {
+                      if (error) {
+                        toast({ title: "Erro ao desativar", description: error.message, variant: "destructive" });
+                      } else {
+                        toast({ title: "Parceiro desativado com sucesso" });
+                        fetchUnits();
+                      }
+                    });
+                  }
                   setDeleteConfirm({ open: false, unit: null, loading: false, deps: null });
                 }}
                 className="bg-yellow-600 text-white hover:bg-yellow-700"
               >
-                <EyeOff size={14} className="mr-2" />
+                <ShieldOff size={14} className="mr-2" />
                 Desativar parceiro
               </Button>
             ) : (
@@ -679,6 +769,42 @@ const AdminUnits = () => {
                 Confirmar exclusão
               </Button>
             )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Status Change Confirmation Dialog */}
+      <AlertDialog open={statusChange.open} onOpenChange={(o) => { if (!o && !statusChange.loading) setStatusChange({ open: false, unit: null, newStatus: null, loading: false }); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Alterar status do parceiro</AlertDialogTitle>
+            <AlertDialogDescription>
+              {statusChange.newStatus === "BLOQUEADO" && (
+                <>Tem certeza que deseja <strong>bloquear</strong> o parceiro <strong>{statusChange.unit?.name}</strong>? O parceiro não poderá acessar a plataforma.</>
+              )}
+              {statusChange.newStatus === "INATIVO" && (
+                <>Tem certeza que deseja <strong>inativar</strong> o parceiro <strong>{statusChange.unit?.name}</strong>? O parceiro será ocultado das operações principais.</>
+              )}
+              {statusChange.newStatus === "ATIVO" && (
+                <>Tem certeza que deseja <strong>reativar</strong> o parceiro <strong>{statusChange.unit?.name}</strong>? O acesso será restaurado.</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={statusChange.loading}>Cancelar</AlertDialogCancel>
+            <Button
+              onClick={(e) => {
+                e.preventDefault();
+                handleChangeStatus();
+              }}
+              disabled={statusChange.loading}
+              variant={statusChange.newStatus === "ATIVO" ? "default" : "destructive"}
+            >
+              {statusChange.loading && <Loader2 size={14} className="mr-2 animate-spin" />}
+              {statusChange.newStatus === "BLOQUEADO" && "Bloquear"}
+              {statusChange.newStatus === "INATIVO" && "Inativar"}
+              {statusChange.newStatus === "ATIVO" && "Reativar"}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
