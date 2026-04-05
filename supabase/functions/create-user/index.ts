@@ -91,6 +91,15 @@ Deno.serve(async (req) => {
     const normalizedPhone = typeof phone === "string" && phone.trim() ? phone.trim() : null;
     const email = typeof email_override === "string" && email_override.trim() ? email_override.trim() : `${cleanCpf}@ensinup.app`;
 
+    // Check if email already exists in auth
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const emailExists = existingUsers?.users?.find(
+      (u: { email?: string }) => u.email?.toLowerCase() === email.toLowerCase()
+    );
+    if (emailExists) {
+      return jsonResponse({ error: "Este e-mail já está em uso por outro usuário" });
+    }
+
     const { data: existingProfile } = await supabaseAdmin
       .from("profiles")
       .select("id")
