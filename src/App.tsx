@@ -76,6 +76,7 @@ const App = () => (
               <Route path="clientes" element={<AdminClients />} />
               <Route path="contratos" element={<AdminContracts />} />
               <Route path="cobrancas" element={<AdminCharges />} />
+              <Route path="alterar-senha" element={<AppChangePassword />} />
             </Route>
 
             {/* Painel Super Admin */}
