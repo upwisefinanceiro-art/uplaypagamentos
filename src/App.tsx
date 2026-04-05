@@ -14,6 +14,7 @@ import AppHome from "./pages/app/AppHome";
 import AppPayments from "./pages/app/AppPayments";
 import AppPaymentDetail from "./pages/app/AppPaymentDetail";
 import AppProfile from "./pages/app/AppProfile";
+import AppChangePassword from "./pages/app/AppChangePassword";
 import AdminLayout from "./components/layouts/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminAdmins from "./pages/admin/AdminAdmins";
