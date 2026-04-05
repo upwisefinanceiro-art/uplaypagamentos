@@ -63,6 +63,7 @@ export type DashboardPayment = {
   pix_copy_paste: string | null;
   payment_method: string | null;
   payment_type: string;
+  student_id: string | null;
 };
 
 export type DashboardUnit = {
