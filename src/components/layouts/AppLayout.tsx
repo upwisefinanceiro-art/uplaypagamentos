@@ -31,6 +31,7 @@ const AppLayout = () => {
   const tabs = [
     { path: "/app", icon: Home, label: "Início" },
     { path: "/app/pagamentos", icon: CreditCard, label: "Pagamentos" },
+    { path: "/app/alterar-senha", icon: KeyRound, label: "Senha" },
     { path: "/app/perfil", icon: User, label: "Perfil" },
   ];
 

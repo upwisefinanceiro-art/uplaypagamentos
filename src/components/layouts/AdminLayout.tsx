@@ -72,7 +72,17 @@ const AdminLayout = () => {
         ))}
       </nav>
 
-      <div className="p-3 border-t border-sidebar-border">
+      <div className="p-3 border-t border-sidebar-border space-y-1">
+        <button
+          onClick={() => {
+            navigate("/admin/alterar-senha");
+            setSidebarOpen(false);
+          }}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+        >
+          <KeyRound size={18} />
+          Alterar senha
+        </button>
         <button
           onClick={async () => {
             await signOut();
