@@ -213,23 +213,33 @@ const AdminUnits = () => {
       return;
     }
 
-    if (!editingUnit && form.email_acesso.trim()) {
+    // Determine if we need to create a user (new unit with email, or editing and email changed)
+    const emailChanged = editingUnit && form.email_acesso.trim() && form.email_acesso.trim() !== (editingUnit.email_acesso || "");
+    const shouldCreateUser = (!editingUnit && form.email_acesso.trim()) || emailChanged;
+    const targetUnitId = editingUnit ? editingUnit.id : newUnitId;
+
+    if (shouldCreateUser && targetUnitId) {
       try {
+        // Generate a unique placeholder CPF for PJ to avoid duplicates
+        const userCpf = form.tipo_cadastro === "PF"
+          ? form.cpf.trim()
+          : `99${Date.now().toString().slice(-9)}`;
+
         const { data: userData, error: userError } = await supabase.functions.invoke("create-user", {
           body: {
-            cpf: form.tipo_cadastro === "PF" ? form.cpf.trim() : (form.cnpj.trim() || "00000000000"),
+            cpf: userCpf,
             full_name: form.name.trim(),
             phone: form.whatsapp.trim() || form.phone.trim() || null,
             password: "12345678",
             role: "ADMIN_UNIDADE",
             email_override: form.email_acesso.trim(),
-            unit_id: newUnitId,
+            unit_id: targetUnitId,
           },
         });
 
         if (userError || !userData?.success) {
           toast({
-            title: "Unidade criada, mas erro ao criar usuário",
+            title: editingUnit ? "Parceiro atualizado, mas erro ao criar usuário" : "Unidade criada, mas erro ao criar usuário",
             description: userData?.error || userError?.message || "Erro desconhecido",
             variant: "destructive",
           });
@@ -242,7 +252,7 @@ const AdminUnits = () => {
           });
         }
       } catch (err: any) {
-        toast({ title: "Unidade criada, mas erro ao criar usuário", description: err.message, variant: "destructive" });
+        toast({ title: "Parceiro salvo, mas erro ao criar usuário", description: err.message, variant: "destructive" });
       }
     } else {
       toast({ title: editingUnit ? "Parceiro atualizado" : "Parceiro criado" });
