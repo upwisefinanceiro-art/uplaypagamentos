@@ -513,8 +513,12 @@ const AdminClients = () => {
                   <div className="space-y-2 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="text-sm font-semibold text-foreground">{client.full_name}</h3>
-                      {!client.active && (
-                        <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                      {client.active ? (
+                        <Badge className="text-[10px] px-1.5 py-0 bg-green-500/15 text-green-700 border-green-500/30 hover:bg-green-500/20">
+                          Ativo
+                        </Badge>
+                      ) : (
+                        <Badge className="text-[10px] px-1.5 py-0 bg-muted text-muted-foreground border-border hover:bg-muted">
                           Inativo
                         </Badge>
                       )}
