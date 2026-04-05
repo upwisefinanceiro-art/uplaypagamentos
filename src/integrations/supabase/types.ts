@@ -638,6 +638,7 @@ export type Database = {
           phone: string | null
           razao_social: string | null
           rg_ie: string | null
+          status: string
           tipo_cadastro: string | null
           updated_at: string
           usar_whatsapp_padrao: boolean
@@ -665,6 +666,7 @@ export type Database = {
           phone?: string | null
           razao_social?: string | null
           rg_ie?: string | null
+          status?: string
           tipo_cadastro?: string | null
           updated_at?: string
           usar_whatsapp_padrao?: boolean
@@ -692,6 +694,7 @@ export type Database = {
           phone?: string | null
           razao_social?: string | null
           rg_ie?: string | null
+          status?: string
           tipo_cadastro?: string | null
           updated_at?: string
           usar_whatsapp_padrao?: boolean
