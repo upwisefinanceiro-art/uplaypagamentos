@@ -16,11 +16,18 @@ const CompanyBlockedOverlay = () => {
       if (!profile?.unit_id) return;
       if (hasRole("SUPER_ADMIN")) return;
 
+      // Also check unit-level status (BLOQUEADO/INATIVO)
       const { data: unit } = await supabase
         .from("units")
-        .select("company_id")
+        .select("company_id, status")
         .eq("id", profile.unit_id)
         .maybeSingle();
+
+      // If unit itself is blocked/inactive, show blocked
+      if (unit?.status === "BLOQUEADO" || unit?.status === "INATIVO") {
+        setCompanyStatus("BLOQUEADO");
+        return;
+      }
 
       if (!unit?.company_id) return;
 
