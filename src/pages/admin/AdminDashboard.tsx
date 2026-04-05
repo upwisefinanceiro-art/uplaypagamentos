@@ -223,9 +223,25 @@ const AdminDashboard = () => {
     });
     const totalOverdue = overdueAll.reduce((sum, p) => sum + (p.final_value ?? p.value), 0);
 
-    const filteredStudents = unitFilter === "all"
-      ? students.filter((s) => s.active)
-      : students.filter((s) => s.active && s.unit_id === unitFilter);
+    // Alunos ativos: only students with active profile, active contract, and pending monthly payments
+    const activeContractStudentIds = new Set<string>();
+    // Get contracts that are ACTIVE
+    const activeContractPayments = fp.filter(
+      (p) => p.contract_id && p.payment_type === "MENSALIDADE" && (p.status === "PENDING" || p.status === "OVERDUE")
+    );
+    activeContractPayments.forEach((p) => {
+      if (p.student_id) activeContractStudentIds.add(p.student_id);
+    });
+
+    // Also check by responsible_id for students linked to those responsibles
+    const responsibleIdsWithActivePayments = new Set(activeContractPayments.map((p) => p.responsible_id));
+
+    const filteredStudents = students.filter((s) => {
+      if (!s.active) return false;
+      if (unitFilter !== "all" && s.unit_id !== unitFilter) return false;
+      // Student must have active monthly payments (either directly or via responsible)
+      return activeContractStudentIds.has(s.id) || responsibleIdsWithActivePayments.has(s.responsible_id);
+    });
 
     // Inadimplência: atraso / (a receber + atraso)
     const totalAReceber = totalToReceive + totalOverdue;
