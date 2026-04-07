@@ -73,6 +73,7 @@ export type Database = {
           updated_at: string
           valor_mensalidade: number | null
           whatsapp_financeiro: string | null
+          whatsapp_master: string | null
         }
         Insert: {
           asaas_api_key_master?: string | null
@@ -102,6 +103,7 @@ export type Database = {
           updated_at?: string
           valor_mensalidade?: number | null
           whatsapp_financeiro?: string | null
+          whatsapp_master?: string | null
         }
         Update: {
           asaas_api_key_master?: string | null
@@ -131,6 +133,7 @@ export type Database = {
           updated_at?: string
           valor_mensalidade?: number | null
           whatsapp_financeiro?: string | null
+          whatsapp_master?: string | null
         }
         Relationships: []
       }
@@ -479,6 +482,7 @@ export type Database = {
       saas_invoices: {
         Row: {
           asaas_payment_id: string | null
+          billing_type: string
           boleto_url: string | null
           company_id: string
           created_at: string
@@ -486,14 +490,17 @@ export type Database = {
           due_date: string
           id: string
           invoice_url: string | null
+          original_value: number | null
           paid_at: string | null
           pix_copy_paste: string | null
+          punctuality_discount: number
           status: string
           subscription_id: string | null
           value: number
         }
         Insert: {
           asaas_payment_id?: string | null
+          billing_type?: string
           boleto_url?: string | null
           company_id: string
           created_at?: string
@@ -501,14 +508,17 @@ export type Database = {
           due_date: string
           id?: string
           invoice_url?: string | null
+          original_value?: number | null
           paid_at?: string | null
           pix_copy_paste?: string | null
+          punctuality_discount?: number
           status?: string
           subscription_id?: string | null
           value: number
         }
         Update: {
           asaas_payment_id?: string | null
+          billing_type?: string
           boleto_url?: string | null
           company_id?: string
           created_at?: string
@@ -516,8 +526,10 @@ export type Database = {
           due_date?: string
           id?: string
           invoice_url?: string | null
+          original_value?: number | null
           paid_at?: string | null
           pix_copy_paste?: string | null
+          punctuality_discount?: number
           status?: string
           subscription_id?: string | null
           value?: number
@@ -543,49 +555,61 @@ export type Database = {
         Row: {
           asaas_customer_id: string | null
           asaas_subscription_id: string | null
+          billing_type: string
           block_deadline: string | null
           company_id: string
           created_at: string
           due_day: number
           ends_at: string | null
+          first_due_date: string | null
           id: string
           monthly_value: number
           next_billing_date: string | null
           plan: string
+          punctuality_discount: number
           started_at: string
           status: string
+          total_installments: number
           updated_at: string
         }
         Insert: {
           asaas_customer_id?: string | null
           asaas_subscription_id?: string | null
+          billing_type?: string
           block_deadline?: string | null
           company_id: string
           created_at?: string
           due_day?: number
           ends_at?: string | null
+          first_due_date?: string | null
           id?: string
           monthly_value?: number
           next_billing_date?: string | null
           plan?: string
+          punctuality_discount?: number
           started_at?: string
           status?: string
+          total_installments?: number
           updated_at?: string
         }
         Update: {
           asaas_customer_id?: string | null
           asaas_subscription_id?: string | null
+          billing_type?: string
           block_deadline?: string | null
           company_id?: string
           created_at?: string
           due_day?: number
           ends_at?: string | null
+          first_due_date?: string | null
           id?: string
           monthly_value?: number
           next_billing_date?: string | null
           plan?: string
+          punctuality_discount?: number
           started_at?: string
           status?: string
+          total_installments?: number
           updated_at?: string
         }
         Relationships: [
