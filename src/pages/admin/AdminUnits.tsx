@@ -696,6 +696,7 @@ const AdminUnits = () => {
                   </p>
                 )}
               </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs">Valor real da mensalidade</Label>
                   <Input value={form.saas_valor_mensalidade} onChange={e => setField("saas_valor_mensalidade", e.target.value)} placeholder="97.00" type="number" step="0.01" />
