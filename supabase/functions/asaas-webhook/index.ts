@@ -131,14 +131,25 @@ Deno.serve(async (req) => {
         if (saasInvoice.subscription_id) {
           const { data: sub } = await supabase
             .from("saas_subscriptions")
-            .select("due_day, next_billing_date")
+            .select("due_day, next_billing_date, plan_id")
             .eq("id", saasInvoice.subscription_id)
             .single();
 
           if (sub) {
+            // Get plan duration for renewal interval
+            let durationMonths = 1;
+            if (sub.plan_id) {
+              const { data: plan } = await supabase
+                .from("saas_plans")
+                .select("duracao_meses")
+                .eq("id", sub.plan_id)
+                .single();
+              if (plan) durationMonths = plan.duracao_meses || 1;
+            }
+
             const now = new Date();
             const dueDay = sub.due_day || 10;
-            let nextBilling = new Date(now.getFullYear(), now.getMonth() + 1, dueDay);
+            let nextBilling = new Date(now.getFullYear(), now.getMonth() + durationMonths, dueDay);
             
             // Get dias_bloqueio from company config
             const { data: masterCo } = await supabase
