@@ -268,6 +268,7 @@ const AdminSaasBilling = () => {
             <p className="text-[11px] text-muted-foreground">Teste Grátis</p>
           </CardContent>
         </Card>
+        <Card className="border-border">
           <CardContent className="p-4 text-center">
             <p className="text-2xl font-bold text-success">{activeCompanies}</p>
             <p className="text-[11px] text-muted-foreground">Empresas Ativas</p>
