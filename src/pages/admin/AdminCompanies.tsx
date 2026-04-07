@@ -414,6 +414,7 @@ const AdminCompanies = () => {
               </div>
 
               <FormField label="WhatsApp Financeiro" value={form.whatsapp_financeiro ?? ""} onChange={v => updateForm("whatsapp_financeiro", v)} />
+              <FormField label="WhatsApp Master (cobrança SaaS)" value={form.whatsapp_master ?? ""} onChange={v => updateForm("whatsapp_master", v)} placeholder="Número para cobrar empresas parceiras" />
             </CardContent>
           </Card>
         </TabsContent>
