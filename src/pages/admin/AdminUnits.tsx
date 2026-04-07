@@ -567,6 +567,101 @@ const AdminUnits = () => {
               </div>
             </div>
 
+            {/* CONTRATO SAAS */}
+            <div className="border border-primary/30 bg-primary/5 rounded-lg p-3 mt-4">
+              <p className="text-xs font-semibold text-primary mb-3">💰 Contrato SaaS da Empresa</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Valor real da mensalidade</Label>
+                  <Input value={form.saas_valor_mensalidade} onChange={e => setField("saas_valor_mensalidade", e.target.value)} placeholder="97.00" type="number" step="0.01" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Desconto pontualidade</Label>
+                  <Input value={form.saas_desconto_pontualidade} onChange={e => setField("saas_desconto_pontualidade", e.target.value)} placeholder="10.00" type="number" step="0.01" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Valor final</Label>
+                  <Input
+                    value={(() => {
+                      const v = parseFloat(form.saas_valor_mensalidade) || 0;
+                      const d = parseFloat(form.saas_desconto_pontualidade) || 0;
+                      return (v - d).toFixed(2);
+                    })()}
+                    disabled
+                    className="bg-muted"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Nº de parcelas</Label>
+                  <Input value={form.saas_parcelas} onChange={e => setField("saas_parcelas", e.target.value)} placeholder="12" type="number" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">1º vencimento</Label>
+                  <Input value={form.saas_primeiro_vencimento} onChange={e => setField("saas_primeiro_vencimento", e.target.value)} type="date" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Dia do vencimento</Label>
+                  <Input value={form.saas_dia_vencimento} onChange={e => setField("saas_dia_vencimento", e.target.value)} placeholder="10" type="number" min="1" max="28" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <Label className="text-xs">Forma de pagamento</Label>
+                <Select value={form.saas_forma_pagamento} onValueChange={v => setField("saas_forma_pagamento", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="UNDEFINED">Todos (Boleto + PIX + Cartão)</SelectItem>
+                    <SelectItem value="BOLETO">Boleto</SelectItem>
+                    <SelectItem value="PIX">PIX</SelectItem>
+                    <SelectItem value="CREDIT_CARD">Cartão de Crédito</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Preview do contrato */}
+              {parseFloat(form.saas_valor_mensalidade) > 0 && (
+                <div className="mt-4 p-3 rounded-lg bg-muted/50 border border-border space-y-1">
+                  <p className="text-xs font-semibold text-foreground mb-2">📋 Prévia do Contrato</p>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-muted-foreground">Parcela sem desconto:</span>
+                      <span className="text-foreground font-medium ml-1">R$ {(parseFloat(form.saas_valor_mensalidade) || 0).toFixed(2)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Desc. pontualidade:</span>
+                      <span className="text-foreground font-medium ml-1">R$ {(parseFloat(form.saas_desconto_pontualidade) || 0).toFixed(2)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Parcela com desconto:</span>
+                      <span className="font-medium ml-1 text-green-600">R$ {((parseFloat(form.saas_valor_mensalidade) || 0) - (parseFloat(form.saas_desconto_pontualidade) || 0)).toFixed(2)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Total de parcelas:</span>
+                      <span className="text-foreground font-medium ml-1">{form.saas_parcelas || "12"}</span>
+                    </div>
+                  </div>
+                  {form.saas_primeiro_vencimento && (
+                    <div className="mt-2 pt-2 border-t border-border">
+                      <p className="text-[10px] text-muted-foreground mb-1">Próximos vencimentos:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {Array.from({ length: Math.min(parseInt(form.saas_parcelas) || 12, 6) }, (_, i) => {
+                          const d = new Date(form.saas_primeiro_vencimento + "T00:00:00");
+                          d.setMonth(d.getMonth() + i);
+                          return (
+                            <Badge key={i} variant="outline" className="text-[9px]">
+                              {d.toLocaleDateString("pt-BR")}
+                            </Badge>
+                          );
+                        })}
+                        {parseInt(form.saas_parcelas) > 6 && <Badge variant="outline" className="text-[9px]">...</Badge>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* WHATSAPP FINANCEIRO */}
             <div className="border-t border-border pt-4 mt-4">
               <p className="text-xs font-semibold text-muted-foreground mb-3 flex items-center gap-1.5">
