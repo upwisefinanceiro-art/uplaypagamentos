@@ -655,7 +655,47 @@ const AdminUnits = () => {
             {/* CONTRATO SAAS */}
             <div className="border border-primary/30 bg-primary/5 rounded-lg p-3 mt-4">
               <p className="text-xs font-semibold text-primary mb-3">💰 Contrato SaaS da Empresa</p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+
+              {/* Plan selector */}
+              {saasPlans.length > 0 && (
+                <div className="mb-3">
+                  <Label className="text-xs">Plano SaaS</Label>
+                  <Select value={form.saas_plan_id} onValueChange={v => {
+                    setField("saas_plan_id", v);
+                    const plan = saasPlans.find(p => p.id === v);
+                    if (plan) {
+                      const valorFinal = plan.valor_base - (plan.valor_base * plan.desconto_percentual / 100);
+                      setForm(prev => ({
+                        ...prev,
+                        saas_plan_id: v,
+                        saas_valor_mensalidade: String(valorFinal.toFixed(2)),
+                        saas_parcelas: String(plan.duracao_meses),
+                      }));
+                    }
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="Selecione um plano (opcional)" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="custom">Personalizado</SelectItem>
+                      {saasPlans.map(p => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.nome_plano} — R$ {(p.valor_base - (p.valor_base * p.desconto_percentual / 100)).toFixed(2)}/mês ({p.duracao_meses}m{p.desconto_percentual > 0 ? `, ${p.desconto_percentual}% desc.` : ""})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Trial days */}
+              <div className="mb-3">
+                <Label className="text-xs">Dias de teste grátis</Label>
+                <Input value={form.saas_trial_days} onChange={e => setField("saas_trial_days", e.target.value)} placeholder="0" type="number" min="0" />
+                {parseInt(form.saas_trial_days) > 0 && (
+                  <p className="text-[10px] text-primary mt-1">
+                    ⏱️ Teste grátis de {form.saas_trial_days} dias. Cobrança inicia após o período.
+                  </p>
+                )}
+              </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Valor real da mensalidade</Label>
                   <Input value={form.saas_valor_mensalidade} onChange={e => setField("saas_valor_mensalidade", e.target.value)} placeholder="97.00" type="number" step="0.01" />
