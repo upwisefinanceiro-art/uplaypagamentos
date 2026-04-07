@@ -261,8 +261,13 @@ const AdminSaasBilling = () => {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <Card className="border-border">
+          <CardContent className="p-4 text-center">
+            <p className="text-2xl font-bold text-primary">{trialCompanies}</p>
+            <p className="text-[11px] text-muted-foreground">Teste Grátis</p>
+          </CardContent>
+        </Card>
           <CardContent className="p-4 text-center">
             <p className="text-2xl font-bold text-success">{activeCompanies}</p>
             <p className="text-[11px] text-muted-foreground">Empresas Ativas</p>
