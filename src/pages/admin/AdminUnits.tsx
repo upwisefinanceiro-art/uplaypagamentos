@@ -184,6 +184,8 @@ const AdminUnits = () => {
             saas_primeiro_vencimento: sub.first_due_date || "",
             saas_dia_vencimento: String(sub.due_day || "10"),
             saas_forma_pagamento: sub.billing_type || "UNDEFINED",
+            saas_plan_id: sub.plan_id || "",
+            saas_trial_days: String(sub.trial_days || "0"),
           }));
         }
       }
