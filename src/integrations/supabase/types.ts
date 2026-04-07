@@ -46,14 +46,24 @@ export type Database = {
       }
       companies: {
         Row: {
+          asaas_api_key_master: string | null
+          asaas_base_url_master: string | null
+          asaas_webhook_token_master: string | null
+          bairro: string | null
+          cep: string | null
+          cidade: string | null
           cnpj: string | null
           created_at: string
+          dias_bloqueio: number | null
           email: string | null
+          endereco: string | null
+          estado: string | null
           id: string
           logo_url: string | null
           max_units: number
           max_users: number
           name: string
+          numero: string | null
           phone: string | null
           plan: string
           primary_color: string | null
@@ -61,17 +71,28 @@ export type Database = {
           status: string
           system_name: string
           updated_at: string
+          valor_mensalidade: number | null
           whatsapp_financeiro: string | null
         }
         Insert: {
+          asaas_api_key_master?: string | null
+          asaas_base_url_master?: string | null
+          asaas_webhook_token_master?: string | null
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
           cnpj?: string | null
           created_at?: string
+          dias_bloqueio?: number | null
           email?: string | null
+          endereco?: string | null
+          estado?: string | null
           id?: string
           logo_url?: string | null
           max_units?: number
           max_users?: number
           name: string
+          numero?: string | null
           phone?: string | null
           plan?: string
           primary_color?: string | null
@@ -79,17 +100,28 @@ export type Database = {
           status?: string
           system_name?: string
           updated_at?: string
+          valor_mensalidade?: number | null
           whatsapp_financeiro?: string | null
         }
         Update: {
+          asaas_api_key_master?: string | null
+          asaas_base_url_master?: string | null
+          asaas_webhook_token_master?: string | null
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
           cnpj?: string | null
           created_at?: string
+          dias_bloqueio?: number | null
           email?: string | null
+          endereco?: string | null
+          estado?: string | null
           id?: string
           logo_url?: string | null
           max_units?: number
           max_users?: number
           name?: string
+          numero?: string | null
           phone?: string | null
           plan?: string
           primary_color?: string | null
@@ -97,6 +129,7 @@ export type Database = {
           status?: string
           system_name?: string
           updated_at?: string
+          valor_mensalidade?: number | null
           whatsapp_financeiro?: string | null
         }
         Relationships: []
