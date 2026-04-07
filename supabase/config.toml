@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.check-saas-overdue]
 verify_jwt = false
+
+[functions.create-saas-charge]
+verify_jwt = false

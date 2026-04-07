@@ -102,7 +102,91 @@ Deno.serve(async (req) => {
 
     const asaasPaymentId = payment.id;
 
-    // Find payment in our database
+    // Check if this is a SaaS invoice payment first
+    const { data: saasInvoice } = await supabase
+      .from("saas_invoices")
+      .select("id, company_id, status, subscription_id")
+      .eq("asaas_payment_id", asaasPaymentId)
+      .maybeSingle();
+
+    if (saasInvoice) {
+      // Handle SaaS invoice payment
+      const saasStatus = statusMap[payment.status] || saasInvoice.status;
+      
+      const saasUpdate: Record<string, unknown> = { status: saasStatus };
+      if (saasStatus === "PAID" && payment.paymentDate) {
+        saasUpdate.paid_at = payment.paymentDate;
+      }
+      if (payment.invoiceUrl) saasUpdate.invoice_url = payment.invoiceUrl;
+      if (payment.bankSlipUrl) saasUpdate.boleto_url = payment.bankSlipUrl;
+
+      await supabase.from("saas_invoices").update(saasUpdate).eq("id", saasInvoice.id);
+
+      // Auto-reactivate company on payment
+      if (saasStatus === "PAID") {
+        // Reactivate company
+        await supabase.from("companies").update({ status: "ATIVO" }).eq("id", saasInvoice.company_id);
+
+        // Update subscription: set ACTIVE, advance next billing date
+        if (saasInvoice.subscription_id) {
+          const { data: sub } = await supabase
+            .from("saas_subscriptions")
+            .select("due_day, next_billing_date")
+            .eq("id", saasInvoice.subscription_id)
+            .single();
+
+          if (sub) {
+            const now = new Date();
+            const dueDay = sub.due_day || 10;
+            let nextBilling = new Date(now.getFullYear(), now.getMonth() + 1, dueDay);
+            
+            // Get dias_bloqueio from company config
+            const { data: masterCo } = await supabase
+              .from("companies")
+              .select("dias_bloqueio")
+              .not("asaas_api_key_master", "is", null)
+              .limit(1)
+              .maybeSingle();
+            
+            const diasBloqueio = masterCo?.dias_bloqueio || 10;
+            const blockDeadline = new Date(nextBilling);
+            blockDeadline.setDate(blockDeadline.getDate() + diasBloqueio);
+
+            await supabase
+              .from("saas_subscriptions")
+              .update({
+                status: "ACTIVE",
+                next_billing_date: nextBilling.toISOString().split("T")[0],
+                block_deadline: blockDeadline.toISOString().split("T")[0],
+              })
+              .eq("id", saasInvoice.subscription_id);
+          }
+        }
+      } else if (saasStatus === "OVERDUE") {
+        await supabase.from("companies").update({ status: "ATRASADO" }).eq("id", saasInvoice.company_id);
+        if (saasInvoice.subscription_id) {
+          await supabase.from("saas_subscriptions").update({ status: "OVERDUE" }).eq("id", saasInvoice.subscription_id);
+        }
+      }
+
+      await logWebhook(supabase, {
+        event,
+        asaas_payment_id: asaasPaymentId,
+        local_payment_id: saasInvoice.id,
+        old_status: saasInvoice.status,
+        new_status: saasStatus,
+        payload: body,
+        processed: true,
+      });
+
+      console.log(`SaaS invoice ${saasInvoice.id} updated: ${saasInvoice.status} -> ${saasStatus}`);
+      return new Response(JSON.stringify({ received: true, updated: true, type: "saas", status: saasStatus }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Find payment in our database (regular unit payments)
     const { data: localPayment, error: findErr } = await supabase
       .from("payments")
       .select("id, unit_id, status, paid_at, pix_qr_code, pix_copy_paste, payment_method")
