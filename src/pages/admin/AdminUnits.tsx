@@ -85,6 +85,9 @@ const AdminUnits = () => {
     phone: "", whatsapp: "", email_empresa: "", email_acesso: "",
     asaas_api_key: "", asaas_base_url: "https://api.asaas.com/v3", asaas_webhook_token: "",
     whatsapp_financeiro: "", usar_whatsapp_padrao: true,
+    // SaaS contract fields
+    saas_valor_mensalidade: "", saas_desconto_pontualidade: "", saas_parcelas: "12",
+    saas_primeiro_vencimento: "", saas_dia_vencimento: "10", saas_forma_pagamento: "UNDEFINED",
   });
 
   const setField = (key: string, value: string | boolean) => setForm(prev => ({ ...prev, [key]: value }));
@@ -107,6 +110,9 @@ const AdminUnits = () => {
     fetchCompanyId();
   }, [profile?.unit_id]);
 
+  // SaaS subscription data for editing
+  const [unitSubscription, setUnitSubscription] = useState<any>(null);
+
   const resetForm = () => {
     setForm({
       name: "", razao_social: "", tipo_cadastro: "PJ", cnpj: "", cpf: "", rg_ie: "",
@@ -114,11 +120,14 @@ const AdminUnits = () => {
       phone: "", whatsapp: "", email_empresa: "", email_acesso: "",
       asaas_api_key: "", asaas_base_url: "https://api.asaas.com/v3", asaas_webhook_token: "",
       whatsapp_financeiro: "", usar_whatsapp_padrao: true,
+      saas_valor_mensalidade: "", saas_desconto_pontualidade: "", saas_parcelas: "12",
+      saas_primeiro_vencimento: "", saas_dia_vencimento: "10", saas_forma_pagamento: "UNDEFINED",
     });
     setEditingUnit(null);
+    setUnitSubscription(null);
   };
 
-  const openEdit = (unit: UnitRow) => {
+  const openEdit = async (unit: UnitRow) => {
     setEditingUnit(unit);
     setForm({
       name: unit.name || "",
@@ -141,8 +150,34 @@ const AdminUnits = () => {
       asaas_webhook_token: unit.asaas_webhook_token || "",
       whatsapp_financeiro: unit.whatsapp_financeiro || "",
       usar_whatsapp_padrao: unit.usar_whatsapp_padrao,
+      saas_valor_mensalidade: "", saas_desconto_pontualidade: "", saas_parcelas: "12",
+      saas_primeiro_vencimento: "", saas_dia_vencimento: "10", saas_forma_pagamento: "UNDEFINED",
     });
     setDialogOpen(true);
+
+    // Load SaaS subscription if exists
+    if (unit.id) {
+      const companyRes = await supabase.from("units").select("company_id").eq("id", unit.id).maybeSingle();
+      if (companyRes.data?.company_id) {
+        const { data: sub } = await supabase
+          .from("saas_subscriptions")
+          .select("*")
+          .eq("company_id", companyRes.data.company_id)
+          .maybeSingle();
+        if (sub) {
+          setUnitSubscription(sub);
+          setForm(prev => ({
+            ...prev,
+            saas_valor_mensalidade: String(sub.monthly_value || ""),
+            saas_desconto_pontualidade: String(sub.punctuality_discount || "0"),
+            saas_parcelas: String(sub.total_installments || "12"),
+            saas_primeiro_vencimento: sub.first_due_date || "",
+            saas_dia_vencimento: String(sub.due_day || "10"),
+            saas_forma_pagamento: sub.billing_type || "UNDEFINED",
+          }));
+        }
+      }
+    }
   };
 
   const openNew = () => { resetForm(); setDialogOpen(true); };
@@ -256,6 +291,67 @@ const AdminUnits = () => {
       }
     } else {
       toast({ title: editingUnit ? "Parceiro atualizado" : "Parceiro criado" });
+    }
+
+    // Save SaaS subscription data if value is provided
+    const saasValue = parseFloat(form.saas_valor_mensalidade);
+    if (saasValue > 0 && targetUnitId) {
+      try {
+        // Get the company_id for this unit
+        const { data: unitData } = await supabase.from("units").select("company_id").eq("id", targetUnitId).maybeSingle();
+        const unitCompanyId = unitData?.company_id;
+        
+        if (unitCompanyId) {
+          const saasDiscount = parseFloat(form.saas_desconto_pontualidade) || 0;
+          const saasInstallments = parseInt(form.saas_parcelas) || 12;
+          const saasDueDay = parseInt(form.saas_dia_vencimento) || 10;
+          
+          const subPayload = {
+            company_id: unitCompanyId,
+            monthly_value: saasValue,
+            punctuality_discount: saasDiscount,
+            total_installments: saasInstallments,
+            due_day: saasDueDay,
+            billing_type: form.saas_forma_pagamento || "UNDEFINED",
+            first_due_date: form.saas_primeiro_vencimento || null,
+            status: "ACTIVE",
+            plan: "BASIC",
+          };
+
+          // Check if subscription exists
+          const { data: existingSub } = await supabase
+            .from("saas_subscriptions")
+            .select("id")
+            .eq("company_id", unitCompanyId)
+            .maybeSingle();
+
+          if (existingSub) {
+            await supabase.from("saas_subscriptions").update(subPayload as any).eq("id", existingSub.id);
+          } else {
+            // Calculate next billing date
+            const firstDue = form.saas_primeiro_vencimento
+              ? form.saas_primeiro_vencimento
+              : (() => {
+                  const now = new Date();
+                  const next = new Date(now.getFullYear(), now.getMonth(), saasDueDay);
+                  if (next <= now) next.setMonth(next.getMonth() + 1);
+                  return next.toISOString().split("T")[0];
+                })();
+
+            await supabase.from("saas_subscriptions").insert({
+              ...subPayload,
+              next_billing_date: firstDue,
+              block_deadline: (() => {
+                const bd = new Date(firstDue + "T00:00:00");
+                bd.setDate(bd.getDate() + 10);
+                return bd.toISOString().split("T")[0];
+              })(),
+            } as any);
+          }
+        }
+      } catch (err: any) {
+        console.error("Error saving SaaS subscription:", err);
+      }
     }
 
     setSaving(false);
@@ -530,6 +626,101 @@ const AdminUnits = () => {
                   <Input value={form.asaas_webhook_token} onChange={e => setField("asaas_webhook_token", e.target.value)} placeholder="Token de validação" />
                 </div>
               </div>
+            </div>
+
+            {/* CONTRATO SAAS */}
+            <div className="border border-primary/30 bg-primary/5 rounded-lg p-3 mt-4">
+              <p className="text-xs font-semibold text-primary mb-3">💰 Contrato SaaS da Empresa</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Valor real da mensalidade</Label>
+                  <Input value={form.saas_valor_mensalidade} onChange={e => setField("saas_valor_mensalidade", e.target.value)} placeholder="97.00" type="number" step="0.01" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Desconto pontualidade</Label>
+                  <Input value={form.saas_desconto_pontualidade} onChange={e => setField("saas_desconto_pontualidade", e.target.value)} placeholder="10.00" type="number" step="0.01" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Valor final</Label>
+                  <Input
+                    value={(() => {
+                      const v = parseFloat(form.saas_valor_mensalidade) || 0;
+                      const d = parseFloat(form.saas_desconto_pontualidade) || 0;
+                      return (v - d).toFixed(2);
+                    })()}
+                    disabled
+                    className="bg-muted"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Nº de parcelas</Label>
+                  <Input value={form.saas_parcelas} onChange={e => setField("saas_parcelas", e.target.value)} placeholder="12" type="number" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">1º vencimento</Label>
+                  <Input value={form.saas_primeiro_vencimento} onChange={e => setField("saas_primeiro_vencimento", e.target.value)} type="date" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Dia do vencimento</Label>
+                  <Input value={form.saas_dia_vencimento} onChange={e => setField("saas_dia_vencimento", e.target.value)} placeholder="10" type="number" min="1" max="28" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <Label className="text-xs">Forma de pagamento</Label>
+                <Select value={form.saas_forma_pagamento} onValueChange={v => setField("saas_forma_pagamento", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="UNDEFINED">Todos (Boleto + PIX + Cartão)</SelectItem>
+                    <SelectItem value="BOLETO">Boleto</SelectItem>
+                    <SelectItem value="PIX">PIX</SelectItem>
+                    <SelectItem value="CREDIT_CARD">Cartão de Crédito</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Preview do contrato */}
+              {parseFloat(form.saas_valor_mensalidade) > 0 && (
+                <div className="mt-4 p-3 rounded-lg bg-muted/50 border border-border space-y-1">
+                  <p className="text-xs font-semibold text-foreground mb-2">📋 Prévia do Contrato</p>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-muted-foreground">Parcela sem desconto:</span>
+                      <span className="text-foreground font-medium ml-1">R$ {(parseFloat(form.saas_valor_mensalidade) || 0).toFixed(2)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Desc. pontualidade:</span>
+                      <span className="text-foreground font-medium ml-1">R$ {(parseFloat(form.saas_desconto_pontualidade) || 0).toFixed(2)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Parcela com desconto:</span>
+                      <span className="font-medium ml-1 text-green-600">R$ {((parseFloat(form.saas_valor_mensalidade) || 0) - (parseFloat(form.saas_desconto_pontualidade) || 0)).toFixed(2)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Total de parcelas:</span>
+                      <span className="text-foreground font-medium ml-1">{form.saas_parcelas || "12"}</span>
+                    </div>
+                  </div>
+                  {form.saas_primeiro_vencimento && (
+                    <div className="mt-2 pt-2 border-t border-border">
+                      <p className="text-[10px] text-muted-foreground mb-1">Próximos vencimentos:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {Array.from({ length: Math.min(parseInt(form.saas_parcelas) || 12, 6) }, (_, i) => {
+                          const d = new Date(form.saas_primeiro_vencimento + "T00:00:00");
+                          d.setMonth(d.getMonth() + i);
+                          return (
+                            <Badge key={i} variant="outline" className="text-[9px]">
+                              {d.toLocaleDateString("pt-BR")}
+                            </Badge>
+                          );
+                        })}
+                        {parseInt(form.saas_parcelas) > 6 && <Badge variant="outline" className="text-[9px]">...</Badge>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* WHATSAPP FINANCEIRO */}

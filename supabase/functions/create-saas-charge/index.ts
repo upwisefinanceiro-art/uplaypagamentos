@@ -167,9 +167,12 @@ Deno.serve(async (req) => {
       adjustedDueDate = today;
     }
 
+    // Use billing_type from subscription if configured
+    const billingType = subscription.billing_type || "UNDEFINED";
+
     const chargePayload = {
       customer: asaasCustomerId,
-      billingType: "UNDEFINED", // Let Asaas show all payment options
+      billingType,
       value: subscription.monthly_value,
       dueDate: adjustedDueDate || today,
       description: `Mensalidade SaaS - ${company.name}`,
@@ -204,6 +207,9 @@ Deno.serve(async (req) => {
         company_id,
         subscription_id: subscription.id,
         value: subscription.monthly_value,
+        original_value: subscription.monthly_value,
+        punctuality_discount: subscription.punctuality_discount || 0,
+        billing_type: billingType,
         due_date: adjustedDueDate || today,
         status: "PENDING",
         asaas_payment_id: chargeData.id,

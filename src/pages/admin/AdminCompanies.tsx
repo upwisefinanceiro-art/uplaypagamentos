@@ -38,6 +38,7 @@ interface Company {
   asaas_webhook_token_master: string | null;
   valor_mensalidade: number | null;
   dias_bloqueio: number | null;
+  whatsapp_master: string | null;
 }
 
 const ESTADOS_BR = [
@@ -202,6 +203,7 @@ const AdminCompanies = () => {
         asaas_webhook_token_master: form.asaas_webhook_token_master?.trim() || null,
         valor_mensalidade: form.valor_mensalidade ?? 97,
         dias_bloqueio: form.dias_bloqueio ?? 10,
+        whatsapp_master: form.whatsapp_master?.trim() || null,
       })
       .eq("id", company.id);
 
@@ -275,6 +277,7 @@ const AdminCompanies = () => {
             {company.email && <InfoRow label="E-mail" value={company.email} />}
             {company.phone && <InfoRow label="Telefone" value={company.phone} />}
             {company.whatsapp_financeiro && <InfoRow label="WhatsApp" value={company.whatsapp_financeiro} />}
+            {company.whatsapp_master && <InfoRow label="WhatsApp Master (SaaS)" value={company.whatsapp_master} />}
             <InfoRow label="Máx. Unidades" value={String(company.max_units)} />
             <InfoRow label="Máx. Usuários" value={String(company.max_users)} />
           </div>
@@ -413,6 +416,7 @@ const AdminCompanies = () => {
               </div>
 
               <FormField label="WhatsApp Financeiro" value={form.whatsapp_financeiro ?? ""} onChange={v => updateForm("whatsapp_financeiro", v)} />
+              <FormField label="WhatsApp Master (cobrança SaaS)" value={form.whatsapp_master ?? ""} onChange={v => updateForm("whatsapp_master", v)} placeholder="Número para cobrar empresas parceiras" />
             </CardContent>
           </Card>
         </TabsContent>
