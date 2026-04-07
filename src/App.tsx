@@ -24,6 +24,7 @@ import AdminClients from "./pages/admin/AdminClients";
 import AdminContracts from "./pages/admin/AdminContracts";
 import AdminCharges from "./pages/admin/AdminCharges";
 import AdminCompanies from "./pages/admin/AdminCompanies";
+import AdminSaasBilling from "./pages/admin/AdminSaasBilling";
 import SuperAdminLayout from "./components/layouts/SuperAdminLayout";
 import SuperDashboard from "./pages/super/SuperDashboard";
 import SuperCompanies from "./pages/super/SuperCompanies";
@@ -76,6 +77,7 @@ const App = () => (
               <Route path="clientes" element={<AdminClients />} />
               <Route path="contratos" element={<AdminContracts />} />
               <Route path="cobrancas" element={<AdminCharges />} />
+              <Route path="cobrancas-saas" element={<AdminSaasBilling />} />
               <Route path="alterar-senha" element={<AppChangePassword />} />
             </Route>
 
