@@ -318,7 +318,10 @@ const AdminUnits = () => {
           const saasInstallments = parseInt(form.saas_parcelas) || 12;
           const saasDueDay = parseInt(form.saas_dia_vencimento) || 10;
           
-          const subPayload = {
+          const trialDays = parseInt(form.saas_trial_days) || 0;
+          const isTrialNew = trialDays > 0 && !unitSubscription;
+          
+          const subPayload: Record<string, unknown> = {
             company_id: unitCompanyId,
             monthly_value: saasValue,
             punctuality_discount: saasDiscount,
@@ -326,9 +329,18 @@ const AdminUnits = () => {
             due_day: saasDueDay,
             billing_type: form.saas_forma_pagamento || "UNDEFINED",
             first_due_date: form.saas_primeiro_vencimento || null,
-            status: "ACTIVE",
+            status: isTrialNew ? "TRIAL" : "ACTIVE",
             plan: "BASIC",
+            plan_id: form.saas_plan_id || null,
+            trial_days: trialDays,
           };
+
+          // Calculate trial_ends_at for new subscriptions with trial
+          if (isTrialNew) {
+            const trialEnd = new Date();
+            trialEnd.setDate(trialEnd.getDate() + trialDays);
+            (subPayload as any).trial_ends_at = trialEnd.toISOString().split("T")[0];
+          }
 
           // Check if subscription exists
           const { data: existingSub } = await supabase
