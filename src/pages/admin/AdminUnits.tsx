@@ -161,6 +161,7 @@ const AdminUnits = () => {
       usar_whatsapp_padrao: unit.usar_whatsapp_padrao,
       saas_valor_mensalidade: "", saas_desconto_pontualidade: "", saas_parcelas: "12",
       saas_primeiro_vencimento: "", saas_dia_vencimento: "10", saas_forma_pagamento: "UNDEFINED",
+      saas_plan_id: "", saas_trial_days: "0",
     });
     setDialogOpen(true);
 
