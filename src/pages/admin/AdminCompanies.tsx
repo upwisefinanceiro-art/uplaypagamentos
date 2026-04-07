@@ -277,6 +277,7 @@ const AdminCompanies = () => {
             {company.email && <InfoRow label="E-mail" value={company.email} />}
             {company.phone && <InfoRow label="Telefone" value={company.phone} />}
             {company.whatsapp_financeiro && <InfoRow label="WhatsApp" value={company.whatsapp_financeiro} />}
+            {company.whatsapp_master && <InfoRow label="WhatsApp Master (SaaS)" value={company.whatsapp_master} />}
             <InfoRow label="Máx. Unidades" value={String(company.max_units)} />
             <InfoRow label="Máx. Usuários" value={String(company.max_users)} />
           </div>
