@@ -551,6 +551,42 @@ export type Database = {
           },
         ]
       }
+      saas_plans: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          desconto_percentual: number
+          descricao: string | null
+          duracao_meses: number
+          id: string
+          nome_plano: string
+          updated_at: string
+          valor_base: number
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          desconto_percentual?: number
+          descricao?: string | null
+          duracao_meses?: number
+          id?: string
+          nome_plano: string
+          updated_at?: string
+          valor_base?: number
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          desconto_percentual?: number
+          descricao?: string | null
+          duracao_meses?: number
+          id?: string
+          nome_plano?: string
+          updated_at?: string
+          valor_base?: number
+        }
+        Relationships: []
+      }
       saas_subscriptions: {
         Row: {
           asaas_customer_id: string | null
@@ -566,10 +602,13 @@ export type Database = {
           monthly_value: number
           next_billing_date: string | null
           plan: string
+          plan_id: string | null
           punctuality_discount: number
           started_at: string
           status: string
           total_installments: number
+          trial_days: number
+          trial_ends_at: string | null
           updated_at: string
         }
         Insert: {
@@ -586,10 +625,13 @@ export type Database = {
           monthly_value?: number
           next_billing_date?: string | null
           plan?: string
+          plan_id?: string | null
           punctuality_discount?: number
           started_at?: string
           status?: string
           total_installments?: number
+          trial_days?: number
+          trial_ends_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -606,10 +648,13 @@ export type Database = {
           monthly_value?: number
           next_billing_date?: string | null
           plan?: string
+          plan_id?: string | null
           punctuality_discount?: number
           started_at?: string
           status?: string
           total_installments?: number
+          trial_days?: number
+          trial_ends_at?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -618,6 +663,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: true
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saas_subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "saas_plans"
             referencedColumns: ["id"]
           },
         ]

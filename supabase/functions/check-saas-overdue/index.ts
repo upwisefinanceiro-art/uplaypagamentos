@@ -17,11 +17,11 @@ Deno.serve(async (req) => {
 
     const today = new Date().toISOString().split("T")[0];
 
-    // Get all active subscriptions that are past block deadline
-    const { data: overdueSubscriptions, error: subError } = await supabase
+    // Get all subscriptions that need checking
+    const { data: allSubscriptions, error: subError } = await supabase
       .from("saas_subscriptions")
-      .select("id, company_id, next_billing_date, block_deadline, status")
-      .in("status", ["ACTIVE", "OVERDUE"])
+      .select("id, company_id, next_billing_date, block_deadline, status, trial_ends_at, trial_days")
+      .in("status", ["ACTIVE", "OVERDUE", "TRIAL"])
       .not("block_deadline", "is", null);
 
     if (subError) {
@@ -34,10 +34,22 @@ Deno.serve(async (req) => {
 
     let blocked = 0;
     let markedOverdue = 0;
+    let trialExpired = 0;
 
-    for (const sub of overdueSubscriptions || []) {
+    for (const sub of allSubscriptions || []) {
       const blockDeadline = sub.block_deadline;
       const nextBilling = sub.next_billing_date;
+
+      // Handle trial expiration
+      if (sub.status === "TRIAL" && sub.trial_ends_at && today > sub.trial_ends_at) {
+        await supabase
+          .from("saas_subscriptions")
+          .update({ status: "ACTIVE" })
+          .eq("id", sub.id);
+
+        trialExpired++;
+        continue;
+      }
 
       if (!nextBilling) continue;
 
@@ -74,9 +86,10 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        checked: (overdueSubscriptions || []).length,
+        checked: (allSubscriptions || []).length,
         blocked,
         markedOverdue,
+        trialExpired,
         date: today,
       }),
       {

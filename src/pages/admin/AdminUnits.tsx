@@ -88,6 +88,7 @@ const AdminUnits = () => {
     // SaaS contract fields
     saas_valor_mensalidade: "", saas_desconto_pontualidade: "", saas_parcelas: "12",
     saas_primeiro_vencimento: "", saas_dia_vencimento: "10", saas_forma_pagamento: "UNDEFINED",
+    saas_plan_id: "", saas_trial_days: "0",
   });
 
   const setField = (key: string, value: string | boolean) => setForm(prev => ({ ...prev, [key]: value }));
@@ -112,6 +113,13 @@ const AdminUnits = () => {
 
   // SaaS subscription data for editing
   const [unitSubscription, setUnitSubscription] = useState<any>(null);
+  // SaaS plans for selector
+  const [saasPlans, setSaasPlans] = useState<{ id: string; nome_plano: string; valor_base: number; duracao_meses: number; desconto_percentual: number }[]>([]);
+
+  useEffect(() => {
+    supabase.from("saas_plans").select("id, nome_plano, valor_base, duracao_meses, desconto_percentual").eq("ativo", true).order("duracao_meses")
+      .then(({ data }) => setSaasPlans((data ?? []) as any));
+  }, []);
 
   const resetForm = () => {
     setForm({
@@ -122,6 +130,7 @@ const AdminUnits = () => {
       whatsapp_financeiro: "", usar_whatsapp_padrao: true,
       saas_valor_mensalidade: "", saas_desconto_pontualidade: "", saas_parcelas: "12",
       saas_primeiro_vencimento: "", saas_dia_vencimento: "10", saas_forma_pagamento: "UNDEFINED",
+      saas_plan_id: "", saas_trial_days: "0",
     });
     setEditingUnit(null);
     setUnitSubscription(null);
@@ -152,6 +161,7 @@ const AdminUnits = () => {
       usar_whatsapp_padrao: unit.usar_whatsapp_padrao,
       saas_valor_mensalidade: "", saas_desconto_pontualidade: "", saas_parcelas: "12",
       saas_primeiro_vencimento: "", saas_dia_vencimento: "10", saas_forma_pagamento: "UNDEFINED",
+      saas_plan_id: "", saas_trial_days: "0",
     });
     setDialogOpen(true);
 
@@ -174,6 +184,8 @@ const AdminUnits = () => {
             saas_primeiro_vencimento: sub.first_due_date || "",
             saas_dia_vencimento: String(sub.due_day || "10"),
             saas_forma_pagamento: sub.billing_type || "UNDEFINED",
+            saas_plan_id: sub.plan_id || "",
+            saas_trial_days: String(sub.trial_days || "0"),
           }));
         }
       }
@@ -306,7 +318,10 @@ const AdminUnits = () => {
           const saasInstallments = parseInt(form.saas_parcelas) || 12;
           const saasDueDay = parseInt(form.saas_dia_vencimento) || 10;
           
-          const subPayload = {
+          const trialDays = parseInt(form.saas_trial_days) || 0;
+          const isTrialNew = trialDays > 0 && !unitSubscription;
+          
+          const subPayload: Record<string, unknown> = {
             company_id: unitCompanyId,
             monthly_value: saasValue,
             punctuality_discount: saasDiscount,
@@ -314,9 +329,18 @@ const AdminUnits = () => {
             due_day: saasDueDay,
             billing_type: form.saas_forma_pagamento || "UNDEFINED",
             first_due_date: form.saas_primeiro_vencimento || null,
-            status: "ACTIVE",
+            status: isTrialNew ? "TRIAL" : "ACTIVE",
             plan: "BASIC",
+            plan_id: form.saas_plan_id || null,
+            trial_days: trialDays,
           };
+
+          // Calculate trial_ends_at for new subscriptions with trial
+          if (isTrialNew) {
+            const trialEnd = new Date();
+            trialEnd.setDate(trialEnd.getDate() + trialDays);
+            (subPayload as any).trial_ends_at = trialEnd.toISOString().split("T")[0];
+          }
 
           // Check if subscription exists
           const { data: existingSub } = await supabase
@@ -631,6 +655,47 @@ const AdminUnits = () => {
             {/* CONTRATO SAAS */}
             <div className="border border-primary/30 bg-primary/5 rounded-lg p-3 mt-4">
               <p className="text-xs font-semibold text-primary mb-3">💰 Contrato SaaS da Empresa</p>
+
+              {/* Plan selector */}
+              {saasPlans.length > 0 && (
+                <div className="mb-3">
+                  <Label className="text-xs">Plano SaaS</Label>
+                  <Select value={form.saas_plan_id} onValueChange={v => {
+                    setField("saas_plan_id", v);
+                    const plan = saasPlans.find(p => p.id === v);
+                    if (plan) {
+                      const valorFinal = plan.valor_base - (plan.valor_base * plan.desconto_percentual / 100);
+                      setForm(prev => ({
+                        ...prev,
+                        saas_plan_id: v,
+                        saas_valor_mensalidade: String(valorFinal.toFixed(2)),
+                        saas_parcelas: String(plan.duracao_meses),
+                      }));
+                    }
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="Selecione um plano (opcional)" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="custom">Personalizado</SelectItem>
+                      {saasPlans.map(p => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.nome_plano} — R$ {(p.valor_base - (p.valor_base * p.desconto_percentual / 100)).toFixed(2)}/mês ({p.duracao_meses}m{p.desconto_percentual > 0 ? `, ${p.desconto_percentual}% desc.` : ""})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Trial days */}
+              <div className="mb-3">
+                <Label className="text-xs">Dias de teste grátis</Label>
+                <Input value={form.saas_trial_days} onChange={e => setField("saas_trial_days", e.target.value)} placeholder="0" type="number" min="0" />
+                {parseInt(form.saas_trial_days) > 0 && (
+                  <p className="text-[10px] text-primary mt-1">
+                    ⏱️ Teste grátis de {form.saas_trial_days} dias. Cobrança inicia após o período.
+                  </p>
+                )}
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs">Valor real da mensalidade</Label>
