@@ -123,6 +123,7 @@ const AdminSaasBilling = () => {
       ATRASADO: { label: "Atrasado", cls: "bg-warning/20 text-warning border-warning/30" },
       BLOQUEADO: { label: "Bloqueado", cls: "bg-destructive/20 text-destructive border-destructive/30" },
       CANCELADO: { label: "Cancelado", cls: "bg-muted text-muted-foreground border-border" },
+      TESTE_GRATIS: { label: "Teste Grátis", cls: "bg-primary/20 text-primary border-primary/30" },
     };
     const s = map[status] ?? map.ATIVO;
     return <Badge variant="outline" className={s.cls}>{s.label}</Badge>;
@@ -221,6 +222,7 @@ const AdminSaasBilling = () => {
 
   // KPIs
   const activeCompanies = companies.filter(c => c.status === "ATIVO").length;
+  const trialCompanies = companies.filter(c => c.status === "TESTE_GRATIS").length;
   const overdueCompanies = companies.filter(c => c.status === "ATRASADO").length;
   const blockedCompanies = companies.filter(c => c.status === "BLOQUEADO").length;
   const totalReceivable = invoices.filter(i => i.status === "PENDING" || i.status === "OVERDUE").reduce((s, i) => s + i.value, 0);
