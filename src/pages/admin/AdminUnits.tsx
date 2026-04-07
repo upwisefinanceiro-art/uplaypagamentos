@@ -127,7 +127,7 @@ const AdminUnits = () => {
     setUnitSubscription(null);
   };
 
-  const openEdit = (unit: UnitRow) => {
+  const openEdit = async (unit: UnitRow) => {
     setEditingUnit(unit);
     setForm({
       name: unit.name || "",
@@ -150,8 +150,34 @@ const AdminUnits = () => {
       asaas_webhook_token: unit.asaas_webhook_token || "",
       whatsapp_financeiro: unit.whatsapp_financeiro || "",
       usar_whatsapp_padrao: unit.usar_whatsapp_padrao,
+      saas_valor_mensalidade: "", saas_desconto_pontualidade: "", saas_parcelas: "12",
+      saas_primeiro_vencimento: "", saas_dia_vencimento: "10", saas_forma_pagamento: "UNDEFINED",
     });
     setDialogOpen(true);
+
+    // Load SaaS subscription if exists
+    if (unit.id) {
+      const companyRes = await supabase.from("units").select("company_id").eq("id", unit.id).maybeSingle();
+      if (companyRes.data?.company_id) {
+        const { data: sub } = await supabase
+          .from("saas_subscriptions")
+          .select("*")
+          .eq("company_id", companyRes.data.company_id)
+          .maybeSingle();
+        if (sub) {
+          setUnitSubscription(sub);
+          setForm(prev => ({
+            ...prev,
+            saas_valor_mensalidade: String(sub.monthly_value || ""),
+            saas_desconto_pontualidade: String(sub.punctuality_discount || "0"),
+            saas_parcelas: String(sub.total_installments || "12"),
+            saas_primeiro_vencimento: sub.first_due_date || "",
+            saas_dia_vencimento: String(sub.due_day || "10"),
+            saas_forma_pagamento: sub.billing_type || "UNDEFINED",
+          }));
+        }
+      }
+    }
   };
 
   const openNew = () => { resetForm(); setDialogOpen(true); };
