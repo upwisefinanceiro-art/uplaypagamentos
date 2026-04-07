@@ -25,11 +25,37 @@ const ForgotPassword = () => {
     if (digits.length === 11 && !/[@]/.test(credential)) {
       const { data, error } = await supabase.rpc("get_email_by_cpf", { _cpf: digits });
       if (error || !data) {
-        toast({ title: "CPF não encontrado", description: "Verifique o CPF digitado.", variant: "destructive" });
+        toast({ title: "Usuário não encontrado", description: "Não localizamos um acesso com este CPF.", variant: "destructive" });
         setLoading(false);
         return;
       }
       email = data as string;
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("active")
+      .eq("email", email)
+      .maybeSingle();
+
+    if (profileError || !profile) {
+      toast({
+        title: "Usuário não encontrado",
+        description: "Não localizamos um acesso com este CPF ou e-mail.",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+
+    if (!profile.active) {
+      toast({
+        title: "Acesso inativo",
+        description: "Seu acesso está inativo. Entre em contato com o administrador.",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
     }
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
