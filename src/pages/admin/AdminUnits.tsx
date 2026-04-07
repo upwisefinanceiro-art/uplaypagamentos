@@ -293,6 +293,67 @@ const AdminUnits = () => {
       toast({ title: editingUnit ? "Parceiro atualizado" : "Parceiro criado" });
     }
 
+    // Save SaaS subscription data if value is provided
+    const saasValue = parseFloat(form.saas_valor_mensalidade);
+    if (saasValue > 0 && targetUnitId) {
+      try {
+        // Get the company_id for this unit
+        const { data: unitData } = await supabase.from("units").select("company_id").eq("id", targetUnitId).maybeSingle();
+        const unitCompanyId = unitData?.company_id;
+        
+        if (unitCompanyId) {
+          const saasDiscount = parseFloat(form.saas_desconto_pontualidade) || 0;
+          const saasInstallments = parseInt(form.saas_parcelas) || 12;
+          const saasDueDay = parseInt(form.saas_dia_vencimento) || 10;
+          
+          const subPayload = {
+            company_id: unitCompanyId,
+            monthly_value: saasValue,
+            punctuality_discount: saasDiscount,
+            total_installments: saasInstallments,
+            due_day: saasDueDay,
+            billing_type: form.saas_forma_pagamento || "UNDEFINED",
+            first_due_date: form.saas_primeiro_vencimento || null,
+            status: "ACTIVE",
+            plan: "BASIC",
+          };
+
+          // Check if subscription exists
+          const { data: existingSub } = await supabase
+            .from("saas_subscriptions")
+            .select("id")
+            .eq("company_id", unitCompanyId)
+            .maybeSingle();
+
+          if (existingSub) {
+            await supabase.from("saas_subscriptions").update(subPayload as any).eq("id", existingSub.id);
+          } else {
+            // Calculate next billing date
+            const firstDue = form.saas_primeiro_vencimento
+              ? form.saas_primeiro_vencimento
+              : (() => {
+                  const now = new Date();
+                  const next = new Date(now.getFullYear(), now.getMonth(), saasDueDay);
+                  if (next <= now) next.setMonth(next.getMonth() + 1);
+                  return next.toISOString().split("T")[0];
+                })();
+
+            await supabase.from("saas_subscriptions").insert({
+              ...subPayload,
+              next_billing_date: firstDue,
+              block_deadline: (() => {
+                const bd = new Date(firstDue + "T00:00:00");
+                bd.setDate(bd.getDate() + 10);
+                return bd.toISOString().split("T")[0];
+              })(),
+            } as any);
+          }
+        }
+      } catch (err: any) {
+        console.error("Error saving SaaS subscription:", err);
+      }
+    }
+
     setSaving(false);
     setDialogOpen(false);
     resetForm();
