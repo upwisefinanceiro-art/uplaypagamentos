@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 
@@ -37,6 +37,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [loading, setLoading] = useState(true);
+  const mountedRef = useRef(false);
+  const loadingRef = useRef(true);
+  const syncRequestRef = useRef(0);
 
   const clearUserData = () => {
     setProfile(null);
@@ -54,57 +57,87 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (profileRes.error) console.error("[auth] profile lookup error:", profileRes.error);
       if (rolesRes.error) console.error("[auth] roles lookup error:", rolesRes.error);
 
-      setProfile((profileRes.data as Profile | null) ?? null);
       const fetchedRoles = (rolesRes.data ?? []).map((r: { role: string }) => r.role as AppRole);
-      setRoles(fetchedRoles);
       console.info("[auth] fetchUserData completed", { userId, roles: fetchedRoles, hasProfile: !!profileRes.data });
+      return {
+        profile: (profileRes.data as Profile | null) ?? null,
+        roles: fetchedRoles,
+      };
     } catch (err) {
       console.error("[auth] fetchUserData error:", err);
-      clearUserData();
+      return {
+        profile: null,
+        roles: [] as AppRole[],
+      };
     }
   };
 
   useEffect(() => {
-    let mounted = true;
+    mountedRef.current = true;
+    loadingRef.current = true;
 
-    const timeout = setTimeout(() => {
-      if (mounted && loading) {
-        console.warn("[auth] Loading timeout reached, forcing loading=false");
-        setLoading(false);
+    const setLoadingSafe = (value: boolean) => {
+      loadingRef.current = value;
+      if (mountedRef.current) {
+        setLoading(value);
       }
-    }, AUTH_TIMEOUT_MS);
+    };
 
-    const handleSession = (nextSession: Session | null) => {
-      if (!mounted) return;
+    const syncSession = async (nextSession: Session | null) => {
+      const requestId = ++syncRequestRef.current;
+
+      if (!mountedRef.current) return;
 
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
 
       if (!nextSession?.user) {
         clearUserData();
-        setLoading(false);
+        setLoadingSafe(false);
         return;
       }
 
-      fetchUserData(nextSession.user.id).finally(() => {
-        if (mounted) setLoading(false);
-      });
+      setLoadingSafe(true);
+      const userData = await fetchUserData(nextSession.user.id);
+
+      if (!mountedRef.current || syncRequestRef.current !== requestId) return;
+
+      setProfile(userData.profile);
+      setRoles(userData.roles);
+      setLoadingSafe(false);
     };
+
+    const timeout = setTimeout(() => {
+      if (mountedRef.current && loadingRef.current) {
+        console.warn("[auth] Loading timeout reached, forcing loading=false");
+        setLoadingSafe(false);
+      }
+    }, AUTH_TIMEOUT_MS);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         console.info("[auth] onAuthStateChange", { event: _event, hasSession: !!session });
-        handleSession(session);
+
+        if (_event === "INITIAL_SESSION") return;
+
+        if (_event === "TOKEN_REFRESHED" || _event === "USER_UPDATED") {
+          setSession(session);
+          setUser(session?.user ?? null);
+          return;
+        }
+
+        void syncSession(session);
       }
     );
 
     supabase.auth.getSession().then(({ data, error }) => {
       if (error) console.error("[auth] getSession error:", error);
-      if (mounted && loading) handleSession(data.session);
+      void syncSession(data.session);
     });
 
     return () => {
-      mounted = false;
+      mountedRef.current = false;
+      syncRequestRef.current += 1;
       clearTimeout(timeout);
       subscription.unsubscribe();
     };

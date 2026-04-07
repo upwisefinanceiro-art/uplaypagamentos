@@ -53,7 +53,11 @@ const AdminCompanies = () => {
   const [whatsapp, setWhatsapp] = useState("");
 
   const fetchCompany = async () => {
-    if (!profile?.unit_id) return;
+    if (!profile?.unit_id) {
+      setCompany(null);
+      setLoading(false);
+      return;
+    }
     
     // Get company_id from unit
     const { data: unit } = await supabase
