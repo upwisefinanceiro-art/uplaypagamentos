@@ -85,6 +85,9 @@ const AdminUnits = () => {
     phone: "", whatsapp: "", email_empresa: "", email_acesso: "",
     asaas_api_key: "", asaas_base_url: "https://api.asaas.com/v3", asaas_webhook_token: "",
     whatsapp_financeiro: "", usar_whatsapp_padrao: true,
+    // SaaS contract fields
+    saas_valor_mensalidade: "", saas_desconto_pontualidade: "", saas_parcelas: "12",
+    saas_primeiro_vencimento: "", saas_dia_vencimento: "10", saas_forma_pagamento: "UNDEFINED",
   });
 
   const setField = (key: string, value: string | boolean) => setForm(prev => ({ ...prev, [key]: value }));
@@ -107,6 +110,9 @@ const AdminUnits = () => {
     fetchCompanyId();
   }, [profile?.unit_id]);
 
+  // SaaS subscription data for editing
+  const [unitSubscription, setUnitSubscription] = useState<any>(null);
+
   const resetForm = () => {
     setForm({
       name: "", razao_social: "", tipo_cadastro: "PJ", cnpj: "", cpf: "", rg_ie: "",
@@ -114,8 +120,11 @@ const AdminUnits = () => {
       phone: "", whatsapp: "", email_empresa: "", email_acesso: "",
       asaas_api_key: "", asaas_base_url: "https://api.asaas.com/v3", asaas_webhook_token: "",
       whatsapp_financeiro: "", usar_whatsapp_padrao: true,
+      saas_valor_mensalidade: "", saas_desconto_pontualidade: "", saas_parcelas: "12",
+      saas_primeiro_vencimento: "", saas_dia_vencimento: "10", saas_forma_pagamento: "UNDEFINED",
     });
     setEditingUnit(null);
+    setUnitSubscription(null);
   };
 
   const openEdit = (unit: UnitRow) => {
