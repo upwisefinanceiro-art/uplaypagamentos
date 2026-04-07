@@ -38,6 +38,7 @@ interface Company {
   asaas_webhook_token_master: string | null;
   valor_mensalidade: number | null;
   dias_bloqueio: number | null;
+  whatsapp_master: string | null;
 }
 
 const ESTADOS_BR = [
