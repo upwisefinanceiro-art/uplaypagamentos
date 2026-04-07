@@ -203,6 +203,7 @@ const AdminCompanies = () => {
         asaas_webhook_token_master: form.asaas_webhook_token_master?.trim() || null,
         valor_mensalidade: form.valor_mensalidade ?? 97,
         dias_bloqueio: form.dias_bloqueio ?? 10,
+        whatsapp_master: form.whatsapp_master?.trim() || null,
       })
       .eq("id", company.id);
 
