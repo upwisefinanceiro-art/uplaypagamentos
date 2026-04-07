@@ -88,6 +88,7 @@ const AdminUnits = () => {
     // SaaS contract fields
     saas_valor_mensalidade: "", saas_desconto_pontualidade: "", saas_parcelas: "12",
     saas_primeiro_vencimento: "", saas_dia_vencimento: "10", saas_forma_pagamento: "UNDEFINED",
+    saas_plan_id: "", saas_trial_days: "0",
   });
 
   const setField = (key: string, value: string | boolean) => setForm(prev => ({ ...prev, [key]: value }));
@@ -112,6 +113,13 @@ const AdminUnits = () => {
 
   // SaaS subscription data for editing
   const [unitSubscription, setUnitSubscription] = useState<any>(null);
+  // SaaS plans for selector
+  const [saasPlans, setSaasPlans] = useState<{ id: string; nome_plano: string; valor_base: number; duracao_meses: number; desconto_percentual: number }[]>([]);
+
+  useEffect(() => {
+    supabase.from("saas_plans").select("id, nome_plano, valor_base, duracao_meses, desconto_percentual").eq("ativo", true).order("duracao_meses")
+      .then(({ data }) => setSaasPlans((data ?? []) as any));
+  }, []);
 
   const resetForm = () => {
     setForm({
@@ -122,6 +130,7 @@ const AdminUnits = () => {
       whatsapp_financeiro: "", usar_whatsapp_padrao: true,
       saas_valor_mensalidade: "", saas_desconto_pontualidade: "", saas_parcelas: "12",
       saas_primeiro_vencimento: "", saas_dia_vencimento: "10", saas_forma_pagamento: "UNDEFINED",
+      saas_plan_id: "", saas_trial_days: "0",
     });
     setEditingUnit(null);
     setUnitSubscription(null);
