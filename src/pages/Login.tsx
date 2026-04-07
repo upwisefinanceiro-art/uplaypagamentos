@@ -102,7 +102,12 @@ const Login = () => {
 
       if (error) {
         console.warn("[auth] Falha de autenticação", { loginMethod, email });
-        toast({ title: "Erro ao entrar", description: "Usuário ou senha inválidos", variant: "destructive" });
+        const inactiveAccess = error.includes("inativo");
+        toast({
+          title: inactiveAccess ? "Acesso inativo" : "Erro ao entrar",
+          description: error,
+          variant: "destructive",
+        });
         setLoading(false);
         return;
       }

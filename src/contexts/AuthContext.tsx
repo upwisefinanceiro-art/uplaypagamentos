@@ -114,6 +114,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       console.error("[auth] signInWithPassword error:", error);
+      const normalizedMessage = `${error.message ?? ""}`.toLowerCase();
+
+      if (normalizedMessage.includes("banned")) {
+        return { error: "Seu acesso está inativo. Entre em contato com o administrador." };
+      }
+
+      if (normalizedMessage.includes("email not confirmed")) {
+        return { error: "Confirme seu e-mail antes de entrar." };
+      }
+
       return { error: "Usuário ou senha inválidos" };
     }
 

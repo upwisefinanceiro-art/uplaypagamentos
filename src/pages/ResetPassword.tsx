@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Lock, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,20 +13,108 @@ const ResetPassword = () => {
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check for recovery session from URL hash
-    const hash = window.location.hash;
-    if (hash.includes("type=recovery")) {
+    let mounted = true;
+    let resolved = false;
+
+    const getRecoveryParams = () => {
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+      const searchParams = new URLSearchParams(window.location.search);
+
+      return {
+        type: hashParams.get("type") || searchParams.get("type"),
+        error: hashParams.get("error") || searchParams.get("error"),
+        errorDescription:
+          hashParams.get("error_description") || searchParams.get("error_description"),
+        hasAccessToken: hashParams.has("access_token") || searchParams.has("access_token"),
+        hasRefreshToken: hashParams.has("refresh_token") || searchParams.has("refresh_token"),
+      };
+    };
+
+    const getFriendlyMessage = (raw?: string | null) => {
+      const normalized = (raw || "").toLowerCase();
+
+      if (normalized.includes("banned")) {
+        return "Seu acesso está inativo. Entre em contato com o administrador.";
+      }
+
+      if (normalized.includes("expired") || normalized.includes("invalid")) {
+        return "Este link de recuperação é inválido ou expirou. Solicite um novo link.";
+      }
+
+      return "Não foi possível validar sua recuperação de senha. Solicite um novo link.";
+    };
+
+    const markReady = () => {
+      if (!mounted || resolved) return;
+      resolved = true;
+      setSessionError(null);
       setReady(true);
-    } else {
-      // Also check if user is already in a recovery session
-      supabase.auth.getSession().then(({ data }) => {
-        if (data.session) setReady(true);
-      });
-    }
+    };
+
+    const markError = (message: string) => {
+      if (!mounted || resolved) return;
+      resolved = true;
+      setReady(false);
+      setSessionError(message);
+    };
+
+    const evaluateRecovery = async () => {
+      const params = getRecoveryParams();
+
+      if (params.error || params.errorDescription) {
+        markError(getFriendlyMessage(params.errorDescription || params.error));
+        return;
+      }
+
+      if (params.type === "recovery" || params.hasAccessToken || params.hasRefreshToken) {
+        markReady();
+        return;
+      }
+
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error) {
+        markError(getFriendlyMessage(error.message));
+        return;
+      }
+
+      if (data.session) {
+        markReady();
+        return;
+      }
+
+      markError("Este link de recuperação é inválido ou expirou. Solicite um novo link.");
+    };
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted || resolved) return;
+
+      if ((event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") && session) {
+        markReady();
+      }
+    });
+
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        const params = getRecoveryParams();
+        markError(getFriendlyMessage(params.errorDescription || params.error));
+      }
+    }, 4000);
+
+    evaluateRecovery();
+
+    return () => {
+      mounted = false;
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,6 +137,30 @@ const ResetPassword = () => {
     }
     setLoading(false);
   };
+
+  if (sessionError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="w-full max-w-sm animate-fade-in text-center space-y-5">
+          <div className="flex justify-center mb-2">
+            <img src="/logo.png" alt="EnsinUP Educação" className="h-16 w-auto object-contain" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-xl font-bold text-foreground">Não foi possível abrir a recuperação</h1>
+            <p className="text-sm text-muted-foreground">{sessionError}</p>
+          </div>
+          <div className="space-y-3">
+            <Button asChild className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold">
+              <Link to="/forgot-password">Solicitar novo link</Link>
+            </Button>
+            <Button asChild variant="outline" className="w-full h-11">
+              <Link to="/login">Voltar ao login</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!ready) {
     return (
