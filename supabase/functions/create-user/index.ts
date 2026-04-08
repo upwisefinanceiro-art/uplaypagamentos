@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Sem permissão" });
     }
 
-    const { cpf, full_name, phone, password, role, unit_id, email_override } = await req.json();
+    const { cpf, full_name, phone, password, role, unit_id, email_override, email } = await req.json();
 
     const finalPassword = password || "12345678";
 
@@ -95,48 +95,67 @@ Deno.serve(async (req) => {
     const cleanCpf = String(cpf).replace(/\D/g, "");
     const normalizedName = String(full_name).trim();
     const normalizedPhone = typeof phone === "string" && phone.trim() ? phone.trim() : null;
-    const email = typeof email_override === "string" && email_override.trim() ? email_override.trim() : `${cleanCpf}@ensinup.app`;
+    const requestedEmail = typeof email_override === "string" && email_override.trim()
+      ? email_override.trim()
+      : typeof email === "string" && email.trim()
+        ? email.trim()
+        : `${cleanCpf}@ensinup.app`;
+    const normalizedEmail = requestedEmail.toLowerCase();
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return jsonResponse({ error: "E-mail inválido" });
+    }
 
     // Check if email already exists in auth
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
     const emailExists = existingUsers?.users?.find(
-      (u: { email?: string }) => u.email?.toLowerCase() === email.toLowerCase()
+      (u: { email?: string }) => u.email?.toLowerCase() === normalizedEmail
     );
     if (emailExists) {
-      // If the existing user is the same as what we'd create (same unit), update instead of error
-      const { data: existingProfileByEmail } = await supabaseAdmin
-        .from("profiles")
-        .select("id, unit_id")
-        .eq("email", email.toLowerCase())
-        .maybeSingle();
+      const existingUserId = emailExists.id;
 
-      if (existingProfileByEmail && existingProfileByEmail.unit_id === nextUnitId) {
-        // Update existing user instead of creating new one
-        const existingUserId = emailExists.id;
-        await supabaseAdmin.auth.admin.updateUserById(existingUserId, {
-          password: finalPassword,
-          email_confirm: true,
-          ban_duration: "none",
-          user_metadata: { cpf: cleanCpf, full_name: normalizedName },
-        });
+      const { error: authUpdateError } = await supabaseAdmin.auth.admin.updateUserById(existingUserId, {
+        email: normalizedEmail,
+        password: finalPassword,
+        email_confirm: true,
+        ban_duration: "none",
+        user_metadata: { cpf: cleanCpf, full_name: normalizedName },
+      });
 
-        await supabaseAdmin.from("profiles").update({
-          full_name: normalizedName,
-          phone: normalizedPhone,
-          cpf: cleanCpf,
-          active: true,
-        }).eq("id", existingUserId);
-
-        // Upsert role
-        await supabaseAdmin.from("user_roles").upsert({
-          user_id: existingUserId,
-          role: normalizedRole,
-        }, { onConflict: "user_id,role" });
-
-        return jsonResponse({ success: true, user_id: existingUserId, email, updated: true });
+      if (authUpdateError) {
+        return jsonResponse({ error: authUpdateError.message || "Erro ao atualizar acesso existente" });
       }
 
-      return jsonResponse({ error: "Este e-mail já está em uso por outro usuário" });
+      const { error: existingProfileError } = await supabaseAdmin.from("profiles").upsert({
+        id: existingUserId,
+        cpf: cleanCpf,
+        full_name: normalizedName,
+        phone: normalizedPhone,
+        email: normalizedEmail,
+        unit_id: nextUnitId,
+        active: true,
+      });
+
+      if (existingProfileError) {
+        return jsonResponse({ error: existingProfileError.message || "Erro ao sincronizar perfil existente" });
+      }
+
+      await supabaseAdmin
+        .from("user_roles")
+        .delete()
+        .eq("user_id", existingUserId)
+        .eq("role", "RESPONSAVEL");
+
+      const { error: roleUpsertError } = await supabaseAdmin.from("user_roles").upsert({
+        user_id: existingUserId,
+        role: normalizedRole,
+      }, { onConflict: "user_id,role" });
+
+      if (roleUpsertError) {
+        return jsonResponse({ error: roleUpsertError.message || "Erro ao sincronizar perfil de acesso" });
+      }
+
+      return jsonResponse({ success: true, user_id: existingUserId, email: normalizedEmail, updated: true });
     }
 
     const { data: existingProfile } = await supabaseAdmin
@@ -150,7 +169,7 @@ Deno.serve(async (req) => {
     }
 
     const { data: createdUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email,
+      email: normalizedEmail,
       password: finalPassword,
       email_confirm: true,
       user_metadata: { cpf: cleanCpf, full_name: normalizedName },
@@ -167,7 +186,7 @@ Deno.serve(async (req) => {
       cpf: cleanCpf,
       full_name: normalizedName,
       phone: normalizedPhone,
-      email,
+      email: normalizedEmail,
       unit_id: nextUnitId,
       active: true,
     });
@@ -198,7 +217,7 @@ Deno.serve(async (req) => {
       },
     });
 
-    return jsonResponse({ success: true, user_id: userId, email });
+    return jsonResponse({ success: true, user_id: userId, email: normalizedEmail });
   } catch (err) {
     return jsonResponse({ error: err instanceof Error ? err.message : "Erro interno" });
   }
