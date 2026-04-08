@@ -206,8 +206,8 @@ const AdminUnits = () => {
       toast({ title: "CPF é obrigatório para Pessoa Física", variant: "destructive" });
       return;
     }
-    if (!editingUnit && !form.email_acesso.trim()) {
-      toast({ title: "E-mail de acesso é obrigatório", variant: "destructive" });
+    if (!editingUnit && !form.email_empresa.trim()) {
+      toast({ title: "E-mail da empresa é obrigatório para criar acesso", variant: "destructive" });
       return;
     }
     if (!form.phone.trim() && !form.whatsapp.trim()) {
