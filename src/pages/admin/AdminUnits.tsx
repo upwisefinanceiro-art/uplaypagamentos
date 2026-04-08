@@ -612,7 +612,14 @@ const AdminUnits = () => {
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">E-mail da empresa</Label>
-                <Input value={form.email_empresa} onChange={e => setField("email_empresa", e.target.value)} placeholder="contato@empresa.com" type="email" />
+                <Input value={form.email_empresa} onChange={e => {
+                  const val = e.target.value;
+                  setField("email_empresa", val);
+                  // Auto-preencher e-mail de acesso se estiver vazio ou igual ao anterior
+                  if (!form.email_acesso || form.email_acesso === form.email_empresa) {
+                    setField("email_acesso", val);
+                  }
+                }} placeholder="contato@empresa.com" type="email" />
               </div>
             </div>
 
