@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Loader2, MessageCircle, Wifi, WifiOff, Building2, MapPin, Mail, Phone, Trash2, Shield, ShieldOff, ShieldAlert, Filter } from "lucide-react";
+import { Plus, Pencil, Loader2, MessageCircle, Wifi, WifiOff, Building2, MapPin, Mail, Phone, Trash2, Shield, ShieldOff, ShieldAlert, Filter, Copy } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -206,8 +206,8 @@ const AdminUnits = () => {
       toast({ title: "CPF é obrigatório para Pessoa Física", variant: "destructive" });
       return;
     }
-    if (!editingUnit && !form.email_acesso.trim()) {
-      toast({ title: "E-mail de acesso é obrigatório", variant: "destructive" });
+    if (!editingUnit && !form.email_empresa.trim()) {
+      toast({ title: "E-mail da empresa é obrigatório para criar acesso", variant: "destructive" });
       return;
     }
     if (!form.phone.trim() && !form.whatsapp.trim()) {
@@ -232,7 +232,7 @@ const AdminUnits = () => {
       phone: form.phone.trim() || null,
       whatsapp: form.whatsapp.trim() || null,
       email_empresa: form.email_empresa.trim() || null,
-      email_acesso: form.email_acesso.trim() || null,
+      email_acesso: form.email_empresa.trim() || null,
       asaas_api_key: form.asaas_api_key.trim() || null,
       asaas_base_url: form.asaas_base_url.trim() || "https://api.asaas.com/v3",
       asaas_webhook_token: form.asaas_webhook_token.trim() || null,
@@ -258,8 +258,9 @@ const AdminUnits = () => {
     }
 
     // Determine if we need to create a user (new unit with email, or editing and email changed)
-    const emailChanged = editingUnit && form.email_acesso.trim() && form.email_acesso.trim() !== (editingUnit.email_acesso || "");
-    const shouldCreateUser = (!editingUnit && form.email_acesso.trim()) || emailChanged;
+    const accessEmail = form.email_empresa.trim();
+    const emailChanged = editingUnit && accessEmail && accessEmail !== (editingUnit.email_acesso || "");
+    const shouldCreateUser = (!editingUnit && accessEmail) || emailChanged;
     const targetUnitId = editingUnit ? editingUnit.id : newUnitId;
 
     if (shouldCreateUser && targetUnitId) {
@@ -276,7 +277,7 @@ const AdminUnits = () => {
             phone: form.whatsapp.trim() || form.phone.trim() || null,
             password: "12345678",
             role: "ADMIN_UNIDADE",
-            email_override: form.email_acesso.trim(),
+            email_override: accessEmail,
             unit_id: targetUnitId,
           },
         });
@@ -291,7 +292,7 @@ const AdminUnits = () => {
           setAccessModal({
             open: true,
             name: form.name.trim(),
-            email: form.email_acesso.trim(),
+            email: accessEmail,
             whatsapp: form.whatsapp.trim() || form.phone.trim() || null,
           });
         }
@@ -610,14 +611,7 @@ const AdminUnits = () => {
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">E-mail da empresa</Label>
-                <Input value={form.email_empresa} onChange={e => {
-                  const val = e.target.value;
-                  setField("email_empresa", val);
-                  // Auto-preencher e-mail de acesso se estiver vazio ou igual ao anterior
-                  if (!form.email_acesso || form.email_acesso === form.email_empresa) {
-                    setField("email_acesso", val);
-                  }
-                }} placeholder="contato@empresa.com" type="email" />
+                <Input value={form.email_empresa} onChange={e => setField("email_empresa", e.target.value)} placeholder="contato@empresa.com" type="email" />
               </div>
             </div>
 
@@ -626,15 +620,30 @@ const AdminUnits = () => {
               <p className="text-xs font-semibold text-primary mb-2 flex items-center gap-1.5">
                 <Mail size={14} /> Dados de Acesso à Plataforma
               </p>
-              <div className="space-y-1">
-                <Label className="text-xs">E-mail de acesso do parceiro {!editingUnit && "*"}</Label>
-                <Input
-                  value={form.email_acesso}
-                  onChange={e => setField("email_acesso", e.target.value)}
-                  placeholder="login@parceiro.com"
-                  type="email"
-                />
-                <p className="text-[10px] text-muted-foreground">Este e-mail será usado para acessar a plataforma. Senha padrão: 12345678</p>
+              <div className="space-y-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Link do Painel do Parceiro</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value="https://ensinupapp.lovable.app/login"
+                      readOnly
+                      className="bg-muted/50 cursor-default text-xs"
+                    />
+                    <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText("https://ensinupapp.lovable.app/login");
+                        toast({ title: "Link copiado!" });
+                      } catch {
+                        toast({ title: "Erro ao copiar", variant: "destructive" });
+                      }
+                    }}>
+                      <Copy size={14} />
+                    </Button>
+                  </div>
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  O parceiro acessa com o <strong>e-mail da empresa</strong> ({form.email_empresa || "definido acima"}) e a senha padrão: <strong>12345678</strong>
+                </p>
               </div>
             </div>
 
