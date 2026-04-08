@@ -258,8 +258,9 @@ const AdminUnits = () => {
     }
 
     // Determine if we need to create a user (new unit with email, or editing and email changed)
-    const emailChanged = editingUnit && form.email_acesso.trim() && form.email_acesso.trim() !== (editingUnit.email_acesso || "");
-    const shouldCreateUser = (!editingUnit && form.email_acesso.trim()) || emailChanged;
+    const accessEmail = form.email_empresa.trim();
+    const emailChanged = editingUnit && accessEmail && accessEmail !== (editingUnit.email_acesso || "");
+    const shouldCreateUser = (!editingUnit && accessEmail) || emailChanged;
     const targetUnitId = editingUnit ? editingUnit.id : newUnitId;
 
     if (shouldCreateUser && targetUnitId) {
@@ -276,7 +277,7 @@ const AdminUnits = () => {
             phone: form.whatsapp.trim() || form.phone.trim() || null,
             password: "12345678",
             role: "ADMIN_UNIDADE",
-            email_override: form.email_acesso.trim(),
+            email_override: accessEmail,
             unit_id: targetUnitId,
           },
         });
@@ -291,7 +292,7 @@ const AdminUnits = () => {
           setAccessModal({
             open: true,
             name: form.name.trim(),
-            email: form.email_acesso.trim(),
+            email: accessEmail,
             whatsapp: form.whatsapp.trim() || form.phone.trim() || null,
           });
         }
