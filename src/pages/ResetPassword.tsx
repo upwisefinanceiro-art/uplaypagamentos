@@ -143,7 +143,7 @@ const ResetPassword = () => {
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="w-full max-w-sm animate-fade-in text-center space-y-5">
           <div className="flex justify-center mb-2">
-            <img src="/logo.png" alt="EnsinUP Educação" className="h-16 w-auto object-contain" />
+            <img src="/logo.png" alt="UPLAY Pagamentos" className="h-16 w-auto object-contain" />
           </div>
           <div className="space-y-2">
             <h1 className="text-xl font-bold text-foreground">Não foi possível abrir a recuperação</h1>
@@ -177,7 +177,7 @@ const ResetPassword = () => {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm animate-fade-in">
         <div className="flex justify-center mb-8">
-          <img src="/logo.png" alt="EnsinUP Educação" className="h-20 w-auto object-contain" />
+          <img src="/logo.png" alt="UPLAY Pagamentos" className="h-20 w-auto object-contain" />
         </div>
         <div className="text-center mb-8">
           <h1 className="text-xl font-bold text-foreground">Nova Senha</h1>
@@ -201,7 +201,7 @@ const ResetPassword = () => {
             {loading ? <Loader2 size={18} className="animate-spin" /> : <span className="flex items-center gap-2"><Lock size={18} /> Salvar nova senha</span>}
           </Button>
         </form>
-        <p className="text-center text-xs text-muted-foreground mt-8">© {new Date().getFullYear()} EnsinUP Educação</p>
+        <p className="text-center text-xs text-muted-foreground mt-8">© {new Date().getFullYear()} UPLAY Pagamentos</p>
       </div>
     </div>
   );

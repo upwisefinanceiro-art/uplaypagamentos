@@ -230,7 +230,7 @@ const AdminSaasBilling = () => {
   };
 
   const buildWhatsAppMessage = (unitName: string, inv: Invoice, isOverdue = false) => {
-    const platformName = masterCompany?.name || "EnsinUP";
+    const platformName = masterCompany?.name || "UPLAY";
     if (isOverdue) {
       return `Olá, ${unitName}.\n\nVerificamos que sua mensalidade da plataforma está em atraso.\n\nValor: ${fmt(inv.value)}\nVencimento: ${format(new Date(inv.due_date + "T00:00:00"), "dd/MM/yyyy")}\n\nSegue o link para regularização:\n${inv.invoice_url || "(link não disponível)"}\n\nSe precisar de apoio ou ajuste, fale conosco.`;
     }

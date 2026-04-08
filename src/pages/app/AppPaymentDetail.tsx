@@ -133,7 +133,7 @@ const AppPaymentDetail = () => {
     const currentStatus = payment.status as PaymentStatus;
     const statusLabel = (statusConfig[currentStatus] || statusConfig.PENDING).label;
 
-    let msg = `📚 *EnsinUP - Área do Cliente* 📚\n\n`;
+    let msg = `📚 *UPLAY - Área do Cliente* 📚\n\n`;
     msg += `Olá, aqui é *${responsibleName}*.\n\n`;
     msg += `Estou entrando em contato sobre uma cobrança:\n\n`;
     msg += `📋 *${desc}*\n`;

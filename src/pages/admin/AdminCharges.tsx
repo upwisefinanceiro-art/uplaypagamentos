@@ -725,7 +725,7 @@ const AdminCharges = () => {
 
                   <div className="space-y-1.5">
                     <Label>Descrição</Label>
-                    <Input value={chargeDescription} onChange={(event) => setChargeDescription(event.target.value)} placeholder="Ex: Mensalidade EnsinUP" />
+                    <Input value={chargeDescription} onChange={(event) => setChargeDescription(event.target.value)} placeholder="Ex: Mensalidade UPLAY" />
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-2">

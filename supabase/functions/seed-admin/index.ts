@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
     }
 
     const adminCpf = String(cpf || "00000000000").replace(/\D/g, "");
-    const adminEmail = email || "admin@ensinup.com";
+    const adminEmail = email || "admin@uplay.app";
     const adminPassword = password || "12345678";
     const adminName = full_name || "Admin Master";
 

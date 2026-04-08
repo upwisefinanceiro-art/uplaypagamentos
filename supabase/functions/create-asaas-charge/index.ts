@@ -158,7 +158,7 @@ Deno.serve(async (req) => {
       const customerPayload = {
         name: responsible.full_name,
         cpfCnpj: cpfClean,
-        email: responsible.email || `${cpfClean}@ensinup.app`,
+        email: responsible.email || `${cpfClean}@uplay.app`,
         mobilePhone: responsible.phone || undefined,
       };
 
@@ -201,7 +201,7 @@ Deno.serve(async (req) => {
         billingType: billingTypeMap[billing_type],
         value,
         dueDate: due_date,
-        description: description || "Mensalidade EnsinUP",
+        description: description || "Mensalidade UPLAY",
       }),
     });
 
@@ -250,7 +250,7 @@ Deno.serve(async (req) => {
         due_date,
         value,
         final_value: value,
-        description: description || "Mensalidade EnsinUP",
+        description: description || "Mensalidade UPLAY",
         payment_type: payment_type || (contract_id ? "MENSALIDADE" : "AVULSA"),
         status: "PENDING",
         asaas_payment_id: chargeData.id,

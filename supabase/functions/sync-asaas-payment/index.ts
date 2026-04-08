@@ -279,7 +279,7 @@ Deno.serve(async (req) => {
       const customerPayload: Record<string, unknown> = {
         name: responsible.full_name.trim(),
         cpfCnpj: cpfClean,
-        email: responsible.email || `${cpfClean}@ensinup.app`,
+        email: responsible.email || `${cpfClean}@uplay.app`,
       };
 
       // Only add phone if valid
@@ -338,7 +338,7 @@ Deno.serve(async (req) => {
       billingType,
       value: Number(payment.final_value ?? payment.value),
       dueDate: effectiveDueDate,
-      description: payment.description || "Mensalidade EnsinUP",
+      description: payment.description || "Mensalidade UPLAY",
     };
 
     console.log("Criando cobrança no Asaas:", JSON.stringify(chargePayload));

@@ -14,8 +14,8 @@ interface CompanyBranding {
 
 const defaultBranding: CompanyBranding = {
   companyId: null,
-  name: "EnsinUP",
-  systemName: "EnsinUP Pagamentos",
+  name: "UPLAY",
+  systemName: "UPLAY Pagamentos",
   logoUrl: "/logo.png",
   primaryColor: "#3B82F6",
   secondaryColor: "#1E40AF",

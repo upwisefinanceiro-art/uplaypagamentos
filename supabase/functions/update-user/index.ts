@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
     const normalizedAddress = typeof address === "string" && address.trim() ? address.trim() : null;
     const normalizedEmail = typeof email === "string" && email.trim()
       ? email.trim().toLowerCase()
-      : targetProfile.email || `${cleanCpf}@ensinup.app`;
+      : targetProfile.email || `${cleanCpf}@uplay.app`;
 
     let nextUnitId = targetProfile.unit_id;
 

@@ -286,7 +286,7 @@ const AppPayments = () => {
                   </div>
                   <div className="space-y-1.5">
                     <Label>Descrição</Label>
-                    <Input value={chargeDescription} onChange={(e) => setChargeDescription(e.target.value)} placeholder="Mensalidade EnsinUP" />
+                    <Input value={chargeDescription} onChange={(e) => setChargeDescription(e.target.value)} placeholder="Mensalidade UPLAY" />
                   </div>
                   <Button className="w-full" onClick={handleCreateCharge} disabled={creating}>
                     {creating ? <><Loader2 size={16} className="animate-spin mr-2" /> Gerando...</> : "Gerar Cobrança"}
