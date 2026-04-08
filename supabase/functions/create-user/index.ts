@@ -48,10 +48,11 @@ Deno.serve(async (req) => {
       supabaseAdmin.from("profiles").select("unit_id").eq("id", callerId).maybeSingle(),
     ]);
 
+    const isSuperAdmin = callerRoles?.some((row: { role: string }) => row.role === "SUPER_ADMIN");
     const isAdminMaster = callerRoles?.some((row: { role: string }) => row.role === "ADMIN_MASTER");
     const isAdminUnidade = callerRoles?.some((row: { role: string }) => row.role === "ADMIN_UNIDADE");
 
-    if (!isAdminMaster && !isAdminUnidade) {
+    if (!isAdminMaster && !isAdminUnidade && !isSuperAdmin) {
       return jsonResponse({ error: "Sem permissão" });
     }
 
@@ -59,13 +60,18 @@ Deno.serve(async (req) => {
 
     const finalPassword = password || "12345678";
 
-    const normalizedRole = role === "RESPONSAVEL" || role === "ADMIN_UNIDADE" ? role : null;
+    const allowedRoles = ["RESPONSAVEL", "ADMIN_UNIDADE", "ADMIN_MASTER"];
+    const normalizedRole = allowedRoles.includes(role) ? role : null;
     if (!cpf || !full_name || !normalizedRole) {
       return jsonResponse({ error: "Campos obrigatórios: cpf, full_name e role válido" });
     }
 
-    if (normalizedRole === "ADMIN_UNIDADE" && !isAdminMaster) {
+    if (normalizedRole === "ADMIN_UNIDADE" && !isAdminMaster && !isSuperAdmin) {
       return jsonResponse({ error: "Apenas ADMIN_MASTER pode criar colaboradores" });
+    }
+
+    if (normalizedRole === "ADMIN_MASTER" && !isSuperAdmin && !isAdminMaster) {
+      return jsonResponse({ error: "Sem permissão para criar ADMIN_MASTER" });
     }
 
     let nextUnitId = typeof unit_id === "string" && unit_id.trim() ? unit_id.trim() : null;
