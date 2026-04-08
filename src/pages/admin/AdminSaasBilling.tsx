@@ -97,7 +97,7 @@ const AdminSaasBilling = () => {
 
   const [detailUnitId, setDetailUnitId] = useState<string | null>(null);
   const [chargeDialogOpen, setChargeDialogOpen] = useState(false);
-  const [chargeCompanyId, setChargeCompanyId] = useState("");
+  const [chargeUnitId, setChargeUnitId] = useState("");
   const [chargeSaving, setChargeSaving] = useState(false);
 
   /* ── fetch ── */
@@ -188,15 +188,15 @@ const AdminSaasBilling = () => {
 
   /* ── actions ── */
   const handleGenerateCharge = async () => {
-    if (!chargeCompanyId) {
-      toast({ title: "Selecione uma empresa", variant: "destructive" });
+    if (!chargeUnitId) {
+      toast({ title: "Selecione um parceiro", variant: "destructive" });
       return;
     }
     setChargeSaving(true);
     try {
-      const chargeUnit = units.find(u => u.company_id === chargeCompanyId);
+      const chargeUnit = units.find(u => u.id === chargeUnitId);
       const { data, error } = await supabase.functions.invoke("create-saas-charge", {
-        body: { company_id: chargeCompanyId, unit_id: chargeUnit?.id || null },
+        body: { unit_id: chargeUnitId, company_id: chargeUnit?.company_id || null },
       });
       let errorMsg: string | null = null;
       if (error) {
@@ -430,7 +430,7 @@ const AdminSaasBilling = () => {
                         <Eye size={12} /> Detalhes
                       </Button>
                       <Button size="sm" className="h-7 text-xs gap-1" onClick={() => {
-                        setChargeCompanyId(u.company_id || "");
+                        setChargeUnitId(u.id);
                         setChargeDialogOpen(true);
                       }}>
                         <Plus size={12} /> Cobrar
@@ -534,7 +534,7 @@ const AdminSaasBilling = () => {
                   </div>
                 </div>
                 <Button className="w-full gap-2" onClick={() => {
-                  setChargeCompanyId(detailUnit.company_id || "");
+                  setChargeUnitId(detailUnit.id);
                   setChargeDialogOpen(true);
                   setDetailUnitId(null);
                 }}>
@@ -612,12 +612,11 @@ const AdminSaasBilling = () => {
             <div>
               <p className="text-sm font-medium">Parceiro</p>
               <p className="text-sm text-muted-foreground">
-                {units.find(u => u.company_id === chargeCompanyId)?.name || "—"}
+                {units.find(u => u.id === chargeUnitId)?.name || "—"}
               </p>
             </div>
             {(() => {
-              const unit = units.find(u => u.company_id === chargeCompanyId);
-              const sub = unit ? subByUnit.get(unit.id) : null;
+              const sub = chargeUnitId ? subByUnit.get(chargeUnitId) : null;
               if (sub) return (
                 <div className="text-xs space-y-1 p-3 rounded-lg bg-muted/30 border border-border">
                   <p>Valor: <strong>{fmt(sub.monthly_value)}</strong></p>
