@@ -18,7 +18,7 @@ interface ClientAccessModalProps {
   data: ClientAccessData | null;
 }
 
-const APP_URL = "https://pagamentos.ensinup.com.br/login";
+const APP_URL = "https://uplaypagamento.com.br/login";
 const DEFAULT_PASSWORD = "12345678";
 
 const ClientAccessModal = ({ open, onOpenChange, data }: ClientAccessModalProps) => {
