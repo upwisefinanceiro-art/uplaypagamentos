@@ -626,15 +626,30 @@ const AdminUnits = () => {
               <p className="text-xs font-semibold text-primary mb-2 flex items-center gap-1.5">
                 <Mail size={14} /> Dados de Acesso à Plataforma
               </p>
-              <div className="space-y-1">
-                <Label className="text-xs">E-mail de acesso do parceiro {!editingUnit && "*"}</Label>
-                <Input
-                  value={form.email_acesso}
-                  onChange={e => setField("email_acesso", e.target.value)}
-                  placeholder="login@parceiro.com"
-                  type="email"
-                />
-                <p className="text-[10px] text-muted-foreground">Este e-mail será usado para acessar a plataforma. Senha padrão: 12345678</p>
+              <div className="space-y-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Link do Painel do Parceiro</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value="https://ensinupapp.lovable.app/login"
+                      readOnly
+                      className="bg-muted/50 cursor-default text-xs"
+                    />
+                    <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText("https://ensinupapp.lovable.app/login");
+                        toast({ title: "Link copiado!" });
+                      } catch {
+                        toast({ title: "Erro ao copiar", variant: "destructive" });
+                      }
+                    }}>
+                      <Copy size={14} />
+                    </Button>
+                  </div>
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  O parceiro acessa com o <strong>e-mail da empresa</strong> ({form.email_empresa || "definido acima"}) e a senha padrão: <strong>12345678</strong>
+                </p>
               </div>
             </div>
 
