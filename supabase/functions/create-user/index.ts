@@ -103,6 +103,39 @@ Deno.serve(async (req) => {
       (u: { email?: string }) => u.email?.toLowerCase() === email.toLowerCase()
     );
     if (emailExists) {
+      // If the existing user is the same as what we'd create (same unit), update instead of error
+      const { data: existingProfileByEmail } = await supabaseAdmin
+        .from("profiles")
+        .select("id, unit_id")
+        .eq("email", email.toLowerCase())
+        .maybeSingle();
+
+      if (existingProfileByEmail && existingProfileByEmail.unit_id === nextUnitId) {
+        // Update existing user instead of creating new one
+        const existingUserId = emailExists.id;
+        await supabaseAdmin.auth.admin.updateUserById(existingUserId, {
+          password: finalPassword,
+          email_confirm: true,
+          ban_duration: "none",
+          user_metadata: { cpf: cleanCpf, full_name: normalizedName },
+        });
+
+        await supabaseAdmin.from("profiles").update({
+          full_name: normalizedName,
+          phone: normalizedPhone,
+          cpf: cleanCpf,
+          active: true,
+        }).eq("id", existingUserId);
+
+        // Upsert role
+        await supabaseAdmin.from("user_roles").upsert({
+          user_id: existingUserId,
+          role: normalizedRole,
+        }, { onConflict: "user_id,role" });
+
+        return jsonResponse({ success: true, user_id: existingUserId, email, updated: true });
+      }
+
       return jsonResponse({ error: "Este e-mail já está em uso por outro usuário" });
     }
 
