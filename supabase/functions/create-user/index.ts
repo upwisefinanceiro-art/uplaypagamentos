@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
       ? email_override.trim()
       : typeof email === "string" && email.trim()
         ? email.trim()
-        : `${cleanCpf}@ensinup.app`;
+        : `${cleanCpf}@uplay.app`;
     const normalizedEmail = requestedEmail.toLowerCase();
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {

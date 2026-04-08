@@ -48,9 +48,9 @@ const AdminLayout = () => {
   const Sidebar = () => (
     <div className="flex flex-col h-full bg-sidebar">
       <div className="p-4 border-b border-sidebar-border flex items-center gap-3">
-        <img src="/logo.png" alt="EnsinUP" className="h-9 w-auto" />
+        <img src="/logo.png" alt="UPLAY" className="h-9 w-auto" />
         <div>
-          <p className="text-sm font-bold text-sidebar-accent-foreground">EnsinUP</p>
+          <p className="text-sm font-bold text-sidebar-accent-foreground">UPLAY</p>
           <p className="text-[10px] text-muted-foreground">Painel Administrativo</p>
         </div>
       </div>

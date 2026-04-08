@@ -64,9 +64,9 @@ const buildDefaultMessage = ({
     return "BOLETO";
   })();
 
-  let msg = `📚 *EnsinUP - Educação que transforma* 📚\n\n`;
+  let msg = `📚 *UPLAY - Gestão de Pagamentos* 📚\n\n`;
   msg += `Olá, ${responsibleName}! 👋\n\n`;
-  msg += `Aqui é do *financeiro da EnsinUP*.\n\n`;
+  msg += `Aqui é do *financeiro da UPLAY*.\n\n`;
   if (studentName) msg += `👤 Aluno: ${studentName}\n`;
   msg += `📋 Referência: ${description}\n`;
   msg += `💰 Valor: *${formatCurrency(value)}*\n`;
