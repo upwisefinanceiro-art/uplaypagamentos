@@ -48,10 +48,11 @@ Deno.serve(async (req) => {
       supabaseAdmin.from("profiles").select("unit_id").eq("id", callerId).maybeSingle(),
     ]);
 
+    const isSuperAdmin = callerRoles?.some((row: { role: string }) => row.role === "SUPER_ADMIN");
     const isAdminMaster = callerRoles?.some((row: { role: string }) => row.role === "ADMIN_MASTER");
     const isAdminUnidade = callerRoles?.some((row: { role: string }) => row.role === "ADMIN_UNIDADE");
 
-    if (!isAdminMaster && !isAdminUnidade) {
+    if (!isAdminMaster && !isAdminUnidade && !isSuperAdmin) {
       return jsonResponse({ error: "Sem permissão" });
     }
 
@@ -59,13 +60,18 @@ Deno.serve(async (req) => {
 
     const finalPassword = password || "12345678";
 
-    const normalizedRole = role === "RESPONSAVEL" || role === "ADMIN_UNIDADE" ? role : null;
+    const allowedRoles = ["RESPONSAVEL", "ADMIN_UNIDADE", "ADMIN_MASTER"];
+    const normalizedRole = allowedRoles.includes(role) ? role : null;
     if (!cpf || !full_name || !normalizedRole) {
       return jsonResponse({ error: "Campos obrigatórios: cpf, full_name e role válido" });
     }
 
-    if (normalizedRole === "ADMIN_UNIDADE" && !isAdminMaster) {
+    if (normalizedRole === "ADMIN_UNIDADE" && !isAdminMaster && !isSuperAdmin) {
       return jsonResponse({ error: "Apenas ADMIN_MASTER pode criar colaboradores" });
+    }
+
+    if (normalizedRole === "ADMIN_MASTER" && !isSuperAdmin && !isAdminMaster) {
+      return jsonResponse({ error: "Sem permissão para criar ADMIN_MASTER" });
     }
 
     let nextUnitId = typeof unit_id === "string" && unit_id.trim() ? unit_id.trim() : null;
@@ -97,6 +103,39 @@ Deno.serve(async (req) => {
       (u: { email?: string }) => u.email?.toLowerCase() === email.toLowerCase()
     );
     if (emailExists) {
+      // If the existing user is the same as what we'd create (same unit), update instead of error
+      const { data: existingProfileByEmail } = await supabaseAdmin
+        .from("profiles")
+        .select("id, unit_id")
+        .eq("email", email.toLowerCase())
+        .maybeSingle();
+
+      if (existingProfileByEmail && existingProfileByEmail.unit_id === nextUnitId) {
+        // Update existing user instead of creating new one
+        const existingUserId = emailExists.id;
+        await supabaseAdmin.auth.admin.updateUserById(existingUserId, {
+          password: finalPassword,
+          email_confirm: true,
+          ban_duration: "none",
+          user_metadata: { cpf: cleanCpf, full_name: normalizedName },
+        });
+
+        await supabaseAdmin.from("profiles").update({
+          full_name: normalizedName,
+          phone: normalizedPhone,
+          cpf: cleanCpf,
+          active: true,
+        }).eq("id", existingUserId);
+
+        // Upsert role
+        await supabaseAdmin.from("user_roles").upsert({
+          user_id: existingUserId,
+          role: normalizedRole,
+        }, { onConflict: "user_id,role" });
+
+        return jsonResponse({ success: true, user_id: existingUserId, email, updated: true });
+      }
+
       return jsonResponse({ error: "Este e-mail já está em uso por outro usuário" });
     }
 
