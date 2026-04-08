@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Copy, MessageCircle, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-const SYSTEM_URL = "https://pagamentos.ensinup.com.br/login";
+const SYSTEM_URL = "https://uplaypagamento.com.br/login";
 
 interface Props {
   open: boolean;
