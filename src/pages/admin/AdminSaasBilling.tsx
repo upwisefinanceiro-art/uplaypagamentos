@@ -1,6 +1,5 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
 import {
   CreditCard, Plus, CheckCircle2, AlertTriangle, Clock, ExternalLink,
   Copy, Building2, Eye, RefreshCw, Send, MessageCircle,
