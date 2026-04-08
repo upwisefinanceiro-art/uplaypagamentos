@@ -29,8 +29,35 @@ Deno.serve(async (req) => {
 
     const { company_id, unit_id: reqUnitId, action } = await req.json();
 
-    if (!company_id) {
-      return errorResponse("company_id é obrigatório");
+    if (!company_id && !reqUnitId) {
+      return errorResponse("company_id ou unit_id é obrigatório");
+    }
+
+    // Resolve unit_id — either passed directly or find first unit of company
+    let unitId = reqUnitId || null;
+    if (!unitId && company_id) {
+      const { data: firstUnit } = await supabase
+        .from("units")
+        .select("id")
+        .eq("company_id", company_id)
+        .limit(1)
+        .maybeSingle();
+      unitId = firstUnit?.id || null;
+    }
+
+    // Resolve company_id from unit if only unit_id was passed
+    let resolvedCompanyId = company_id;
+    if (!resolvedCompanyId && unitId) {
+      const { data: unitData } = await supabase
+        .from("units")
+        .select("company_id")
+        .eq("id", unitId)
+        .maybeSingle();
+      resolvedCompanyId = unitData?.company_id;
+    }
+
+    if (!resolvedCompanyId) {
+      return errorResponse("Não foi possível resolver a empresa");
     }
 
     // Get company data
