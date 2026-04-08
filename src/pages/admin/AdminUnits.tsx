@@ -625,13 +625,13 @@ const AdminUnits = () => {
                   <Label className="text-xs">Link do Painel do Parceiro</Label>
                   <div className="flex gap-2">
                     <Input
-                      value="https://ensinupapp.lovable.app/login"
+                      value="https://pagamentos.ensinup.com.br/login"
                       readOnly
                       className="bg-muted/50 cursor-default text-xs"
                     />
                     <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={async () => {
                       try {
-                        await navigator.clipboard.writeText("https://ensinupapp.lovable.app/login");
+                        await navigator.clipboard.writeText("https://pagamentos.ensinup.com.br/login");
                         toast({ title: "Link copiado!" });
                       } catch {
                         toast({ title: "Erro ao copiar", variant: "destructive" });
