@@ -1,8 +1,8 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.98.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 function jsonResponse(body: Record<string, unknown>, status = 200) {
@@ -33,21 +33,11 @@ Deno.serve(async (req) => {
       return errorResponse("company_id ou unit_id é obrigatório");
     }
 
-    // Resolve unit_id — either passed directly or find first unit of company
+    // Resolve unit_id and company_id
     let unitId = reqUnitId || null;
-    if (!unitId && company_id) {
-      const { data: firstUnit } = await supabase
-        .from("units")
-        .select("id")
-        .eq("company_id", company_id)
-        .limit(1)
-        .maybeSingle();
-      unitId = firstUnit?.id || null;
-    }
+    let resolvedCompanyId = company_id || null;
 
-    // Resolve company_id from unit if only unit_id was passed
-    let resolvedCompanyId = company_id;
-    if (!resolvedCompanyId && unitId) {
+    if (unitId && !resolvedCompanyId) {
       const { data: unitData } = await supabase
         .from("units")
         .select("company_id")
@@ -56,61 +46,77 @@ Deno.serve(async (req) => {
       resolvedCompanyId = unitData?.company_id;
     }
 
+    if (!unitId && resolvedCompanyId) {
+      const { data: firstUnit } = await supabase
+        .from("units")
+        .select("id")
+        .eq("company_id", resolvedCompanyId)
+        .limit(1)
+        .maybeSingle();
+      unitId = firstUnit?.id || null;
+    }
+
     if (!resolvedCompanyId) {
       return errorResponse("Não foi possível resolver a empresa");
     }
 
-    // Get company data
-    const { data: company, error: companyErr } = await supabase
+    // ── 1. Get MASTER company (the one that OWNS the unit) ──
+    const { data: masterCompany, error: companyErr } = await supabase
       .from("companies")
-      .select("*")
+      .select("id, name, asaas_api_key_master, asaas_base_url_master, valor_mensalidade, dias_bloqueio, whatsapp_master")
       .eq("id", resolvedCompanyId)
       .single();
 
-    if (companyErr || !company) {
+    if (companyErr || !masterCompany) {
       return errorResponse("Empresa não encontrada");
     }
 
-    // Find master company (one with asaas_api_key_master configured)
-    const { data: masterCompanies } = await supabase
-      .from("companies")
-      .select("id, asaas_api_key_master, asaas_base_url_master, valor_mensalidade, dias_bloqueio")
-      .not("asaas_api_key_master", "is", null);
-
-    const master = masterCompanies?.find(c => c.asaas_api_key_master) || null;
-
-    if (!master?.asaas_api_key_master) {
+    if (!masterCompany.asaas_api_key_master) {
       return errorResponse(
-        "API Key Asaas Master não configurada. Vá em 'Minha Empresa' e configure a API Key do Asaas Master antes de gerar cobranças."
+        "API Key Asaas Master não configurada. Vá em 'Minha Empresa' → aba 'Cobrança' e configure a API Key do Asaas Master antes de gerar cobranças SaaS."
       );
     }
 
-    const apiKey = master.asaas_api_key_master;
-    const baseUrl = master.asaas_base_url_master || "https://api.asaas.com/v3";
+    const apiKey = masterCompany.asaas_api_key_master;
+    const baseUrl = masterCompany.asaas_base_url_master || "https://api.asaas.com/v3";
 
-    // Validate company data before calling Asaas
-    if (!company.name || company.name.trim().length === 0) {
-      return errorResponse("A empresa precisa ter um nome cadastrado.");
+    // ── 2. Get UNIT/PARTNER data (who we are charging) ──
+    const { data: unit, error: unitErr } = await supabase
+      .from("units")
+      .select("id, name, cnpj, cpf, email_empresa, phone, whatsapp, address, bairro, cidade, estado, cep")
+      .eq("id", unitId)
+      .single();
+
+    if (unitErr || !unit) {
+      return errorResponse("Parceiro/unidade não encontrado");
     }
 
-    const cnpj = company.cnpj?.replace(/\D/g, "") || "";
-    if (!cnpj || (cnpj.length !== 11 && cnpj.length !== 14)) {
+    // Validate partner data
+    if (!unit.name || unit.name.trim().length === 0) {
+      return errorResponse("O parceiro precisa ter um nome cadastrado.");
+    }
+
+    const doc = (unit.cnpj || unit.cpf || "").replace(/\D/g, "");
+    if (!doc || (doc.length !== 11 && doc.length !== 14)) {
       return errorResponse(
-        `CPF/CNPJ inválido ou não cadastrado para a empresa "${company.name}". Cadastre um CNPJ (14 dígitos) ou CPF (11 dígitos) válido.`
+        `CPF/CNPJ inválido ou não cadastrado para o parceiro "${unit.name}". Cadastre um CNPJ (14 dígitos) ou CPF (11 dígitos) válido no cadastro do parceiro.`
       );
     }
 
-    console.log("[create-saas-charge] Processando empresa:", {
-      company_id,
-      name: company.name,
-      cnpj: cnpj.substring(0, 4) + "***",
+    console.log("[create-saas-charge] Processando parceiro:", {
+      unit_id: unitId,
+      name: unit.name,
+      doc: doc.substring(0, 4) + "***",
+      masterCompany: masterCompany.name,
       action: action || "generate",
     });
 
-    // Get or create subscription — prefer unit_id lookup
-    let { data: subscription } = unitId
-      ? await supabase.from("saas_subscriptions").select("*").eq("unit_id", unitId).maybeSingle()
-      : await supabase.from("saas_subscriptions").select("*").eq("company_id", resolvedCompanyId).maybeSingle();
+    // ── 3. Get or create subscription ──
+    let { data: subscription } = await supabase
+      .from("saas_subscriptions")
+      .select("*")
+      .eq("unit_id", unitId)
+      .maybeSingle();
 
     if (!subscription) {
       const dueDay = 10;
@@ -120,19 +126,19 @@ Deno.serve(async (req) => {
         nextBilling.setMonth(nextBilling.getMonth() + 1);
       }
       const blockDeadline = new Date(nextBilling);
-      blockDeadline.setDate(blockDeadline.getDate() + (master.dias_bloqueio || 10));
+      blockDeadline.setDate(blockDeadline.getDate() + (masterCompany.dias_bloqueio || 10));
 
       const { data: newSub, error: subErr } = await supabase
         .from("saas_subscriptions")
         .insert({
           company_id: resolvedCompanyId,
           unit_id: unitId,
-          monthly_value: master.valor_mensalidade || 97,
+          monthly_value: masterCompany.valor_mensalidade || 97,
           due_day: dueDay,
           next_billing_date: nextBilling.toISOString().split("T")[0],
           block_deadline: blockDeadline.toISOString().split("T")[0],
           status: "ACTIVE",
-          plan: company.plan || "BASIC",
+          plan: "BASIC",
         })
         .select()
         .single();
@@ -149,20 +155,42 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: true, subscription });
     }
 
-    // Step 1: Create or get Asaas customer
+    // ── 4. Create or get Asaas customer using PARTNER data on MASTER account ──
     let asaasCustomerId = subscription.asaas_customer_id;
 
+    if (asaasCustomerId) {
+      // Verify customer still exists
+      try {
+        const checkRes = await fetch(`${baseUrl}/customers/${asaasCustomerId}`, {
+          headers: { access_token: apiKey },
+        });
+        if (!checkRes.ok) {
+          console.log("[create-saas-charge] Customer inválido, recriando...");
+          asaasCustomerId = null;
+        }
+        await checkRes.text(); // consume body
+      } catch {
+        asaasCustomerId = null;
+      }
+    }
+
     if (!asaasCustomerId) {
-      console.log("[create-saas-charge] Criando customer no Asaas para:", company.name);
+      console.log("[create-saas-charge] Criando customer no Asaas MASTER para parceiro:", unit.name);
 
       const customerPayload: Record<string, unknown> = {
-        name: company.name,
-        cpfCnpj: cnpj,
-        externalReference: company_id,
+        name: unit.name,
+        cpfCnpj: doc,
+        externalReference: `saas_unit_${unitId}`,
       };
 
-      if (company.email) customerPayload.email = company.email;
-      if (company.phone) customerPayload.phone = company.phone.replace(/\D/g, "");
+      if (unit.email_empresa) customerPayload.email = unit.email_empresa;
+      const phone = (unit.whatsapp || unit.phone || "").replace(/\D/g, "");
+      if (phone) customerPayload.mobilePhone = phone;
+      if (unit.address) customerPayload.address = unit.address;
+      if (unit.bairro) customerPayload.complement = unit.bairro;
+      if (unit.cidade) customerPayload.cityName = unit.cidade;
+      if (unit.estado) customerPayload.state = unit.estado;
+      if (unit.cep) customerPayload.postalCode = unit.cep.replace(/\D/g, "");
 
       console.log("[create-saas-charge] Customer payload:", JSON.stringify(customerPayload));
 
@@ -170,22 +198,19 @@ Deno.serve(async (req) => {
       try {
         custRes = await fetch(`${baseUrl}/customers`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            access_token: apiKey,
-          },
+          headers: { "Content-Type": "application/json", access_token: apiKey },
           body: JSON.stringify(customerPayload),
         });
       } catch (fetchErr) {
-        console.error("[create-saas-charge] Erro de rede ao chamar Asaas:", fetchErr);
-        return errorResponse("Erro de conexão com o Asaas. Verifique a URL e API Key Master.", 502);
+        console.error("[create-saas-charge] Erro de rede:", fetchErr);
+        return errorResponse("Erro de conexão com o Asaas. Verifique a URL e API Key Master em 'Minha Empresa'.", 502);
       }
 
       const custText = await custRes.text();
       console.log("[create-saas-charge] Asaas customer response:", custRes.status, custText);
 
       if (!custRes.ok) {
-        let errorMsg = "Erro ao criar cliente no Asaas";
+        let errorMsg = "Erro ao criar cliente no Asaas MASTER";
         try {
           const custData = JSON.parse(custText);
           if (custData.errors?.length) {
@@ -196,9 +221,8 @@ Deno.serve(async (req) => {
         } catch { /* use default */ }
 
         if (custRes.status === 401) {
-          errorMsg = "API Key Asaas Master inválida ou sem permissão. Verifique em 'Minha Empresa'.";
+          errorMsg = "API Key Asaas Master inválida ou sem permissão. Verifique em 'Minha Empresa' → aba 'Cobrança'.";
         }
-
         return errorResponse(errorMsg);
       }
 
@@ -210,7 +234,7 @@ Deno.serve(async (req) => {
       }
 
       asaasCustomerId = custData.id;
-      console.log("[create-saas-charge] Customer criado:", asaasCustomerId);
+      console.log("[create-saas-charge] Customer criado no Asaas MASTER:", asaasCustomerId);
 
       await supabase
         .from("saas_subscriptions")
@@ -218,20 +242,29 @@ Deno.serve(async (req) => {
         .eq("id", subscription.id);
     }
 
-    // Step 2: Generate charge
+    // ── 5. Generate charge on Asaas MASTER ──
     const dueDate = subscription.next_billing_date;
     const today = new Date().toISOString().split("T")[0];
     const adjustedDueDate = (dueDate && dueDate < today) ? today : (dueDate || today);
 
-    const billingType = subscription.billing_type || "UNDEFINED";
+    // Use subscription billing_type, fallback to BOLETO
+    let billingType = subscription.billing_type;
+    if (!billingType || billingType === "UNDEFINED") {
+      billingType = "BOLETO";
+    }
+
+    const finalValue = Math.max(
+      subscription.monthly_value - (subscription.punctuality_discount || 0),
+      0
+    );
 
     const chargePayload = {
       customer: asaasCustomerId,
       billingType,
-      value: subscription.monthly_value,
+      value: finalValue > 0 ? finalValue : subscription.monthly_value,
       dueDate: adjustedDueDate,
-      description: `Mensalidade SaaS - ${company.name}`,
-      externalReference: `saas_${unitId || resolvedCompanyId}`,
+      description: `Mensalidade SaaS - ${unit.name}`,
+      externalReference: `saas_unit_${unitId}`,
     };
 
     console.log("[create-saas-charge] Charge payload:", JSON.stringify(chargePayload));
@@ -240,10 +273,7 @@ Deno.serve(async (req) => {
     try {
       chargeRes = await fetch(`${baseUrl}/payments`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          access_token: apiKey,
-        },
+        headers: { "Content-Type": "application/json", access_token: apiKey },
         body: JSON.stringify(chargePayload),
       });
     } catch (fetchErr) {
@@ -255,7 +285,7 @@ Deno.serve(async (req) => {
     console.log("[create-saas-charge] Asaas charge response:", chargeRes.status, chargeText);
 
     if (!chargeRes.ok) {
-      let errorMsg = "Erro ao criar cobrança no Asaas";
+      let errorMsg = "Erro ao criar cobrança no Asaas MASTER";
       try {
         const chargeData = JSON.parse(chargeText);
         if (chargeData.errors?.length) {
@@ -266,9 +296,8 @@ Deno.serve(async (req) => {
       } catch { /* use default */ }
 
       if (chargeRes.status === 401) {
-        errorMsg = "API Key Asaas Master inválida.";
+        errorMsg = "API Key Asaas Master inválida. Verifique em 'Minha Empresa'.";
       }
-
       return errorResponse(errorMsg);
     }
 
@@ -279,16 +308,21 @@ Deno.serve(async (req) => {
       return errorResponse("Resposta inválida do Asaas ao criar cobrança.");
     }
 
-    console.log("[create-saas-charge] Cobrança criada:", chargeData.id);
+    console.log("[create-saas-charge] Cobrança criada no Asaas MASTER:", {
+      id: chargeData.id,
+      invoiceUrl: chargeData.invoiceUrl,
+      bankSlipUrl: chargeData.bankSlipUrl,
+      billingType: chargeData.billingType,
+    });
 
-    // Save invoice
+    // ── 6. Save invoice ──
     const { data: invoice, error: invoiceErr } = await supabase
       .from("saas_invoices")
       .insert({
         company_id: resolvedCompanyId,
         unit_id: unitId,
         subscription_id: subscription.id,
-        value: subscription.monthly_value,
+        value: chargePayload.value,
         original_value: subscription.monthly_value,
         punctuality_discount: subscription.punctuality_discount || 0,
         billing_type: billingType,
@@ -298,17 +332,18 @@ Deno.serve(async (req) => {
         invoice_url: chargeData.invoiceUrl || null,
         boleto_url: chargeData.bankSlipUrl || null,
         pix_copy_paste: null,
-        description: `Mensalidade SaaS - ${company.name}`,
+        description: `Mensalidade SaaS - ${unit.name}`,
       })
       .select()
       .single();
 
     if (invoiceErr) {
       console.error("[create-saas-charge] Erro ao salvar fatura:", invoiceErr);
+      return errorResponse("Cobrança criada no Asaas mas erro ao salvar no banco: " + invoiceErr.message, 500);
     }
 
-    // Try to fetch PIX data
-    if (chargeData.id) {
+    // ── 7. Fetch PIX data if applicable ──
+    if (chargeData.id && (billingType === "PIX" || billingType === "UNDEFINED")) {
       try {
         const pixRes = await fetch(`${baseUrl}/payments/${chargeData.id}/pixQrCode`, {
           headers: { access_token: apiKey },
@@ -320,6 +355,7 @@ Deno.serve(async (req) => {
               .from("saas_invoices")
               .update({ pix_copy_paste: pixData.payload || null })
               .eq("id", invoice.id);
+            console.log("[create-saas-charge] PIX salvo para fatura:", invoice.id);
           }
         } else {
           const pixText = await pixRes.text();
@@ -330,13 +366,15 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Update next billing date
+    // ── 8. Update next billing date ──
     const nextDate = new Date(adjustedDueDate);
     nextDate.setMonth(nextDate.getMonth() + 1);
     await supabase
       .from("saas_subscriptions")
       .update({ next_billing_date: nextDate.toISOString().split("T")[0] })
       .eq("id", subscription.id);
+
+    console.log("[create-saas-charge] Próximo vencimento atualizado:", nextDate.toISOString().split("T")[0]);
 
     return jsonResponse({
       success: true,
