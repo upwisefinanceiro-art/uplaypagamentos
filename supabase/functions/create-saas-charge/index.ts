@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    const { company_id, action } = await req.json();
+    const { company_id, unit_id: reqUnitId, action } = await req.json();
 
     if (!company_id) {
       return errorResponse("company_id é obrigatório");
