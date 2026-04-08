@@ -111,6 +111,17 @@ const AdminSaasBilling = () => {
 
   useEffect(() => { fetchData(); }, []);
 
+  useEffect(() => {
+    const channel = supabase
+      .channel('saas-billing-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'saas_invoices' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'saas_subscriptions' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'companies' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'units' }, () => fetchData())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
   const getCompanyName = (id: string) => companies.find(c => c.id === id)?.name ?? "—";
   const getCompanySub = (id: string) => subscriptions.find(s => s.company_id === id);
   const getCompanyInvoices = (id: string) => invoices.filter(i => i.company_id === id);
