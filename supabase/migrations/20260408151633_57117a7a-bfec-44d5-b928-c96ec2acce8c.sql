@@ -1,0 +1,1 @@
+UPDATE public.saas_subscriptions SET billing_type = 'BOLETO' WHERE billing_type = 'UNDEFINED' OR billing_type IS NULL;
