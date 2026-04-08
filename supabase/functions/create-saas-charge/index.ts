@@ -17,6 +17,43 @@ function errorResponse(message: string, status = 400) {
   return jsonResponse({ success: false, error: message, message }, status);
 }
 
+// Map form values to Asaas billingType
+function resolveAsaasBillingType(bt: string | null | undefined): string {
+  if (!bt || bt === "UNDEFINED") return "BOLETO"; // Asaas BOLETO generates boleto+pix automatically
+  const map: Record<string, string> = {
+    PIX: "PIX",
+    BOLETO: "BOLETO",
+    CREDIT_CARD: "CREDIT_CARD",
+    CARTAO: "CREDIT_CARD",
+    CARD: "CREDIT_CARD",
+  };
+  return map[bt] || "BOLETO";
+}
+
+async function fetchPixData(baseUrl: string, paymentId: string, apiKey: string) {
+  try {
+    // Small delay to let Asaas generate PIX
+    await new Promise(r => setTimeout(r, 2000));
+
+    const pixRes = await fetch(`${baseUrl}/payments/${paymentId}/pixQrCode`, {
+      headers: { access_token: apiKey },
+    });
+    if (pixRes.ok) {
+      const pixData = await pixRes.json();
+      return {
+        payload: pixData.payload || null,
+        encodedImage: pixData.encodedImage || null,
+      };
+    }
+    const errText = await pixRes.text();
+    console.log("[create-saas-charge] PIX QR não disponível:", pixRes.status, errText);
+    return { payload: null, encodedImage: null };
+  } catch (err) {
+    console.log("[create-saas-charge] PIX fetch falhou:", err);
+    return { payload: null, encodedImage: null };
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -60,7 +97,7 @@ Deno.serve(async (req) => {
       return errorResponse("Não foi possível resolver a empresa");
     }
 
-    // ── 1. Get MASTER company (the one that OWNS the unit) ──
+    // ── 1. Get MASTER company ──
     const { data: masterCompany, error: companyErr } = await supabase
       .from("companies")
       .select("id, name, asaas_api_key_master, asaas_base_url_master, valor_mensalidade, dias_bloqueio, whatsapp_master")
@@ -80,7 +117,7 @@ Deno.serve(async (req) => {
     const apiKey = masterCompany.asaas_api_key_master;
     const baseUrl = masterCompany.asaas_base_url_master || "https://api.asaas.com/v3";
 
-    // ── 2. Get UNIT/PARTNER data (who we are charging) ──
+    // ── 2. Get UNIT/PARTNER data ──
     const { data: unit, error: unitErr } = await supabase
       .from("units")
       .select("id, name, cnpj, cpf, email_empresa, phone, whatsapp, address, bairro, cidade, estado, cep")
@@ -91,7 +128,6 @@ Deno.serve(async (req) => {
       return errorResponse("Parceiro/unidade não encontrado");
     }
 
-    // Validate partner data
     if (!unit.name || unit.name.trim().length === 0) {
       return errorResponse("O parceiro precisa ter um nome cadastrado.");
     }
@@ -139,6 +175,7 @@ Deno.serve(async (req) => {
           block_deadline: blockDeadline.toISOString().split("T")[0],
           status: "ACTIVE",
           plan: "BASIC",
+          billing_type: "BOLETO",
         })
         .select()
         .single();
@@ -155,11 +192,10 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: true, subscription });
     }
 
-    // ── 4. Create or get Asaas customer using PARTNER data on MASTER account ──
+    // ── 4. Create or get Asaas customer ──
     let asaasCustomerId = subscription.asaas_customer_id;
 
     if (asaasCustomerId) {
-      // Verify customer still exists
       try {
         const checkRes = await fetch(`${baseUrl}/customers/${asaasCustomerId}`, {
           headers: { access_token: apiKey },
@@ -168,7 +204,7 @@ Deno.serve(async (req) => {
           console.log("[create-saas-charge] Customer inválido, recriando...");
           asaasCustomerId = null;
         }
-        await checkRes.text(); // consume body
+        await checkRes.text();
       } catch {
         asaasCustomerId = null;
       }
@@ -247,11 +283,7 @@ Deno.serve(async (req) => {
     const today = new Date().toISOString().split("T")[0];
     const adjustedDueDate = (dueDate && dueDate < today) ? today : (dueDate || today);
 
-    // Use subscription billing_type, fallback to BOLETO
-    let billingType = subscription.billing_type;
-    if (!billingType || billingType === "UNDEFINED") {
-      billingType = "BOLETO";
-    }
+    const billingType = resolveAsaasBillingType(subscription.billing_type);
 
     const finalValue = Math.max(
       subscription.monthly_value - (subscription.punctuality_discount || 0),
@@ -325,7 +357,7 @@ Deno.serve(async (req) => {
         value: chargePayload.value,
         original_value: subscription.monthly_value,
         punctuality_discount: subscription.punctuality_discount || 0,
-        billing_type: billingType,
+        billing_type: chargeData.billingType || billingType,
         due_date: adjustedDueDate,
         status: "PENDING",
         asaas_payment_id: chargeData.id,
@@ -342,27 +374,17 @@ Deno.serve(async (req) => {
       return errorResponse("Cobrança criada no Asaas mas erro ao salvar no banco: " + invoiceErr.message, 500);
     }
 
-    // ── 7. Fetch PIX data if applicable ──
-    if (chargeData.id && (billingType === "PIX" || billingType === "UNDEFINED")) {
-      try {
-        const pixRes = await fetch(`${baseUrl}/payments/${chargeData.id}/pixQrCode`, {
-          headers: { access_token: apiKey },
-        });
-        if (pixRes.ok) {
-          const pixData = await pixRes.json();
-          if (invoice && (pixData.payload || pixData.encodedImage)) {
-            await supabase
-              .from("saas_invoices")
-              .update({ pix_copy_paste: pixData.payload || null })
-              .eq("id", invoice.id);
-            console.log("[create-saas-charge] PIX salvo para fatura:", invoice.id);
-          }
-        } else {
-          const pixText = await pixRes.text();
-          console.log("[create-saas-charge] PIX não disponível:", pixRes.status, pixText);
-        }
-      } catch (pixErr) {
-        console.log("[create-saas-charge] PIX fetch falhou (não crítico):", pixErr);
+    // ── 7. Always try to fetch PIX data (Asaas generates PIX for BOLETO too) ──
+    let pixPayload: string | null = null;
+    if (chargeData.id) {
+      const pixData = await fetchPixData(baseUrl, chargeData.id, apiKey);
+      pixPayload = pixData.payload;
+      if (invoice && pixPayload) {
+        await supabase
+          .from("saas_invoices")
+          .update({ pix_copy_paste: pixPayload })
+          .eq("id", invoice.id);
+        console.log("[create-saas-charge] PIX salvo para fatura:", invoice.id);
       }
     }
 
@@ -383,6 +405,8 @@ Deno.serve(async (req) => {
       asaas_payment_id: chargeData.id,
       invoice_url: chargeData.invoiceUrl,
       boleto_url: chargeData.bankSlipUrl,
+      pix_copy_paste: pixPayload,
+      billing_type: chargeData.billingType || billingType,
       invoice,
     });
   } catch (err) {
