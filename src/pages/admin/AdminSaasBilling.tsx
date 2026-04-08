@@ -160,16 +160,35 @@ const AdminSaasBilling = () => {
       const { data, error } = await supabase.functions.invoke("create-saas-charge", {
         body: { company_id: chargeCompanyId },
       });
-      if (error) throw error;
-      if (data?.error) {
-        toast({ title: "Erro", description: data.error, variant: "destructive" });
+
+      // Extract error message from response body or error object
+      let errorMsg: string | null = null;
+      if (error) {
+        // Try to parse context body for detailed message
+        try {
+          const ctx = (error as any)?.context;
+          if (ctx?.json) {
+            const body = await ctx.json();
+            errorMsg = body?.message || body?.error || error.message;
+          } else {
+            errorMsg = error.message;
+          }
+        } catch {
+          errorMsg = error.message;
+        }
+      } else if (data && !data.success && (data.error || data.message)) {
+        errorMsg = data.message || data.error;
+      }
+
+      if (errorMsg) {
+        toast({ title: "Erro ao gerar cobrança", description: errorMsg, variant: "destructive" });
       } else {
-        toast({ title: "Cobrança gerada com sucesso!" });
+        toast({ title: "Cobrança gerada com sucesso!", description: data?.message || "" });
         setChargeDialogOpen(false);
         fetchData();
       }
     } catch (err: any) {
-      toast({ title: "Erro", description: err.message, variant: "destructive" });
+      toast({ title: "Erro", description: err.message || "Erro inesperado", variant: "destructive" });
     } finally {
       setChargeSaving(false);
     }
