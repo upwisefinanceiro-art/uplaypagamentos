@@ -27,17 +27,44 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    const { company_id, action } = await req.json();
+    const { company_id, unit_id: reqUnitId, action } = await req.json();
 
-    if (!company_id) {
-      return errorResponse("company_id é obrigatório");
+    if (!company_id && !reqUnitId) {
+      return errorResponse("company_id ou unit_id é obrigatório");
+    }
+
+    // Resolve unit_id — either passed directly or find first unit of company
+    let unitId = reqUnitId || null;
+    if (!unitId && company_id) {
+      const { data: firstUnit } = await supabase
+        .from("units")
+        .select("id")
+        .eq("company_id", company_id)
+        .limit(1)
+        .maybeSingle();
+      unitId = firstUnit?.id || null;
+    }
+
+    // Resolve company_id from unit if only unit_id was passed
+    let resolvedCompanyId = company_id;
+    if (!resolvedCompanyId && unitId) {
+      const { data: unitData } = await supabase
+        .from("units")
+        .select("company_id")
+        .eq("id", unitId)
+        .maybeSingle();
+      resolvedCompanyId = unitData?.company_id;
+    }
+
+    if (!resolvedCompanyId) {
+      return errorResponse("Não foi possível resolver a empresa");
     }
 
     // Get company data
     const { data: company, error: companyErr } = await supabase
       .from("companies")
       .select("*")
-      .eq("id", company_id)
+      .eq("id", resolvedCompanyId)
       .single();
 
     if (companyErr || !company) {
@@ -80,12 +107,10 @@ Deno.serve(async (req) => {
       action: action || "generate",
     });
 
-    // Get or create subscription
-    let { data: subscription } = await supabase
-      .from("saas_subscriptions")
-      .select("*")
-      .eq("company_id", company_id)
-      .maybeSingle();
+    // Get or create subscription — prefer unit_id lookup
+    let { data: subscription } = unitId
+      ? await supabase.from("saas_subscriptions").select("*").eq("unit_id", unitId).maybeSingle()
+      : await supabase.from("saas_subscriptions").select("*").eq("company_id", resolvedCompanyId).maybeSingle();
 
     if (!subscription) {
       const dueDay = 10;
@@ -100,7 +125,8 @@ Deno.serve(async (req) => {
       const { data: newSub, error: subErr } = await supabase
         .from("saas_subscriptions")
         .insert({
-          company_id,
+          company_id: resolvedCompanyId,
+          unit_id: unitId,
           monthly_value: master.valor_mensalidade || 97,
           due_day: dueDay,
           next_billing_date: nextBilling.toISOString().split("T")[0],
@@ -205,7 +231,7 @@ Deno.serve(async (req) => {
       value: subscription.monthly_value,
       dueDate: adjustedDueDate,
       description: `Mensalidade SaaS - ${company.name}`,
-      externalReference: `saas_${company_id}`,
+      externalReference: `saas_${unitId || resolvedCompanyId}`,
     };
 
     console.log("[create-saas-charge] Charge payload:", JSON.stringify(chargePayload));
@@ -259,7 +285,8 @@ Deno.serve(async (req) => {
     const { data: invoice, error: invoiceErr } = await supabase
       .from("saas_invoices")
       .insert({
-        company_id,
+        company_id: resolvedCompanyId,
+        unit_id: unitId,
         subscription_id: subscription.id,
         value: subscription.monthly_value,
         original_value: subscription.monthly_value,

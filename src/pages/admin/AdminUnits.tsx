@@ -165,29 +165,26 @@ const AdminUnits = () => {
     });
     setDialogOpen(true);
 
-    // Load SaaS subscription if exists
+    // Load SaaS subscription if exists — query by unit_id
     if (unit.id) {
-      const companyRes = await supabase.from("units").select("company_id").eq("id", unit.id).maybeSingle();
-      if (companyRes.data?.company_id) {
-        const { data: sub } = await supabase
-          .from("saas_subscriptions")
-          .select("*")
-          .eq("company_id", companyRes.data.company_id)
-          .maybeSingle();
-        if (sub) {
-          setUnitSubscription(sub);
-          setForm(prev => ({
-            ...prev,
-            saas_valor_mensalidade: String(sub.monthly_value || ""),
-            saas_desconto_pontualidade: String(sub.punctuality_discount || "0"),
-            saas_parcelas: String(sub.total_installments || "12"),
-            saas_primeiro_vencimento: sub.first_due_date || "",
-            saas_dia_vencimento: String(sub.due_day || "10"),
-            saas_forma_pagamento: sub.billing_type || "UNDEFINED",
-            saas_plan_id: sub.plan_id || "",
-            saas_trial_days: String(sub.trial_days || "0"),
-          }));
-        }
+      const { data: sub } = await supabase
+        .from("saas_subscriptions")
+        .select("*")
+        .eq("unit_id", unit.id)
+        .maybeSingle();
+      if (sub) {
+        setUnitSubscription(sub);
+        setForm(prev => ({
+          ...prev,
+          saas_valor_mensalidade: String(sub.monthly_value || ""),
+          saas_desconto_pontualidade: String(sub.punctuality_discount || "0"),
+          saas_parcelas: String(sub.total_installments || "12"),
+          saas_primeiro_vencimento: sub.first_due_date || "",
+          saas_dia_vencimento: String(sub.due_day || "10"),
+          saas_forma_pagamento: sub.billing_type || "UNDEFINED",
+          saas_plan_id: sub.plan_id || "",
+          saas_trial_days: String(sub.trial_days || "0"),
+        }));
       }
     }
   };
@@ -323,6 +320,7 @@ const AdminUnits = () => {
           
           const subPayload: Record<string, unknown> = {
             company_id: unitCompanyId,
+            unit_id: targetUnitId,
             monthly_value: saasValue,
             punctuality_discount: saasDiscount,
             total_installments: saasInstallments,
@@ -342,11 +340,11 @@ const AdminUnits = () => {
             (subPayload as any).trial_ends_at = trialEnd.toISOString().split("T")[0];
           }
 
-          // Check if subscription exists
+          // Check if subscription exists by unit_id
           const { data: existingSub } = await supabase
             .from("saas_subscriptions")
             .select("id")
-            .eq("company_id", unitCompanyId)
+            .eq("unit_id", targetUnitId)
             .maybeSingle();
 
           if (existingSub) {

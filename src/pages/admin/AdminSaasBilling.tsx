@@ -194,8 +194,9 @@ const AdminSaasBilling = () => {
     }
     setChargeSaving(true);
     try {
+      const chargeUnit = units.find(u => u.company_id === chargeCompanyId);
       const { data, error } = await supabase.functions.invoke("create-saas-charge", {
-        body: { company_id: chargeCompanyId },
+        body: { company_id: chargeCompanyId, unit_id: chargeUnit?.id || null },
       });
       let errorMsg: string | null = null;
       if (error) {
