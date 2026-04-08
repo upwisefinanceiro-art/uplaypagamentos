@@ -496,6 +496,7 @@ export type Database = {
           punctuality_discount: number
           status: string
           subscription_id: string | null
+          unit_id: string | null
           value: number
         }
         Insert: {
@@ -514,6 +515,7 @@ export type Database = {
           punctuality_discount?: number
           status?: string
           subscription_id?: string | null
+          unit_id?: string | null
           value: number
         }
         Update: {
@@ -532,6 +534,7 @@ export type Database = {
           punctuality_discount?: number
           status?: string
           subscription_id?: string | null
+          unit_id?: string | null
           value?: number
         }
         Relationships: [
@@ -547,6 +550,20 @@ export type Database = {
             columns: ["subscription_id"]
             isOneToOne: false
             referencedRelation: "saas_subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saas_invoices_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saas_invoices_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units_public"
             referencedColumns: ["id"]
           },
         ]
@@ -609,6 +626,7 @@ export type Database = {
           total_installments: number
           trial_days: number
           trial_ends_at: string | null
+          unit_id: string | null
           updated_at: string
         }
         Insert: {
@@ -632,6 +650,7 @@ export type Database = {
           total_installments?: number
           trial_days?: number
           trial_ends_at?: string | null
+          unit_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -655,13 +674,14 @@ export type Database = {
           total_installments?: number
           trial_days?: number
           trial_ends_at?: string | null
+          unit_id?: string | null
           updated_at?: string
         }
         Relationships: [
           {
             foreignKeyName: "saas_subscriptions_company_id_fkey"
             columns: ["company_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
@@ -670,6 +690,20 @@ export type Database = {
             columns: ["plan_id"]
             isOneToOne: false
             referencedRelation: "saas_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saas_subscriptions_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: true
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saas_subscriptions_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: true
+            referencedRelation: "units_public"
             referencedColumns: ["id"]
           },
         ]
