@@ -231,7 +231,7 @@ Deno.serve(async (req) => {
       value: subscription.monthly_value,
       dueDate: adjustedDueDate,
       description: `Mensalidade SaaS - ${company.name}`,
-      externalReference: `saas_${company_id}`,
+      externalReference: `saas_${unitId || resolvedCompanyId}`,
     };
 
     console.log("[create-saas-charge] Charge payload:", JSON.stringify(chargePayload));
@@ -285,7 +285,8 @@ Deno.serve(async (req) => {
     const { data: invoice, error: invoiceErr } = await supabase
       .from("saas_invoices")
       .insert({
-        company_id,
+        company_id: resolvedCompanyId,
+        unit_id: unitId,
         subscription_id: subscription.id,
         value: subscription.monthly_value,
         original_value: subscription.monthly_value,
