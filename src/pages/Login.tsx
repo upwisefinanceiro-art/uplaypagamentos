@@ -158,11 +158,11 @@ const Login = () => {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm animate-fade-in">
         <div className="flex justify-center mb-8">
-          <img src="/logo.png" alt="EnsinUP Educação" className="h-20 w-auto object-contain" />
+          <img src="/logo.png" alt="UPLAY Pagamentos" className="h-20 w-auto object-contain" />
         </div>
 
         <div className="text-center mb-8">
-          <h1 className="text-xl font-bold text-foreground">EnsinUP Pagamentos</h1>
+          <h1 className="text-xl font-bold text-foreground">UPLAY Pagamentos</h1>
           <p className="text-sm text-muted-foreground mt-1">Acesse sua conta para continuar</p>
         </div>
 
@@ -222,7 +222,7 @@ const Login = () => {
           </Link>
         </form>
 
-        <p className="text-center text-xs text-muted-foreground mt-8">© {new Date().getFullYear()} EnsinUP Educação</p>
+        <p className="text-center text-xs text-muted-foreground mt-8">© {new Date().getFullYear()} UPLAY Pagamentos</p>
       </div>
     </div>
   );

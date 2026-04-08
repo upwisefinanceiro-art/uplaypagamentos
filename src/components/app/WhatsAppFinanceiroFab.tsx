@@ -21,7 +21,7 @@ const WhatsAppFinanceiroFab = ({ studentName, unitName }: Props) => {
   const handleOpen = () => {
     const responsibleName = profile?.full_name || "Responsável";
     let msg = `Olá, aqui é ${responsibleName}.\n\n`;
-    msg += `Estou na área de pagamentos da EnsinUP e preciso de ajuda com minha cobrança.\n\n`;
+    msg += `Estou na área de pagamentos da UPLAY e preciso de ajuda com minha cobrança.\n\n`;
     if (studentName) msg += `Aluno: ${studentName}\n`;
     if (unitName) msg += `Unidade: ${unitName}\n`;
 

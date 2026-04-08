@@ -20,8 +20,8 @@ export default defineConfig(({ mode }) => ({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "logo.png", "icons/icon-192x192.png", "icons/icon-512x512.png"],
       manifest: {
-        name: "EnsinUP Payments",
-        short_name: "EnsinUP",
+        name: "UPLAY Pagamentos",
+        short_name: "UPLAY",
         description: "Sistema de gestão de cobranças para escolas profissionalizantes",
         start_url: "/app",
         display: "standalone",

@@ -342,7 +342,7 @@ const AdminDashboard = () => {
   }, [students, units, profiles, unitFilter]);
 
   const openBirthdayWhatsApp = (person: BirthdayPerson) => {
-    const msg = `Olá, ${person.name}! A equipe da EnsinUP deseja um feliz aniversário! 🎉`;
+    const msg = `Olá, ${person.name}! A equipe da UPLAY deseja um feliz aniversário! 🎉`;
     if (person.phone) {
       const digits = person.phone.replace(/\D/g, "");
       const clean = digits.startsWith("55") ? digits : `55${digits}`;

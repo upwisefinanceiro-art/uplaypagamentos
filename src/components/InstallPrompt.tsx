@@ -37,7 +37,7 @@ const InstallPrompt = () => {
         <Download className="h-6 w-6 text-primary" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-foreground">Instalar App EnsinUP</p>
+        <p className="text-sm font-semibold text-foreground">Instalar App UPLAY</p>
         <p className="text-xs text-muted-foreground">Acesse direto da tela inicial</p>
       </div>
       <Button size="sm" onClick={handleInstall} className="flex-shrink-0">

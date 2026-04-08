@@ -75,7 +75,7 @@ const ForgotPassword = () => {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm animate-fade-in">
         <div className="flex justify-center mb-8">
-          <img src="/logo.png" alt="EnsinUP Educação" className="h-20 w-auto object-contain" />
+          <img src="/logo.png" alt="UPLAY Pagamentos" className="h-20 w-auto object-contain" />
         </div>
 
         <div className="text-center mb-8">
@@ -117,7 +117,7 @@ const ForgotPassword = () => {
           <ArrowLeft size={16} /> Voltar ao login
         </Link>
 
-        <p className="text-center text-xs text-muted-foreground mt-8">© {new Date().getFullYear()} EnsinUP Educação</p>
+        <p className="text-center text-xs text-muted-foreground mt-8">© {new Date().getFullYear()} UPLAY Pagamentos</p>
       </div>
     </div>
   );

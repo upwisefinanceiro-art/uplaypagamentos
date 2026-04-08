@@ -46,7 +46,7 @@ const AppLayout = () => {
       <header className="sticky top-0 z-30 bg-card/95 backdrop-blur-sm border-b border-border px-4 py-3 flex items-center justify-between" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
         <div className="flex items-center gap-3">
           <img src={branding.logoUrl || "/logo.png"} alt={branding.name} className="h-8 w-auto" />
-          <span className="text-sm font-semibold text-foreground">{branding.systemName || "EnsinUP"}</span>
+          <span className="text-sm font-semibold text-foreground">{branding.systemName || "UPLAY"}</span>
         </div>
         <button
           onClick={async () => {
