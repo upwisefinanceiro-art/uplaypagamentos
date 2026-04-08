@@ -107,12 +107,10 @@ Deno.serve(async (req) => {
       action: action || "generate",
     });
 
-    // Get or create subscription
-    let { data: subscription } = await supabase
-      .from("saas_subscriptions")
-      .select("*")
-      .eq("company_id", company_id)
-      .maybeSingle();
+    // Get or create subscription — prefer unit_id lookup
+    let { data: subscription } = unitId
+      ? await supabase.from("saas_subscriptions").select("*").eq("unit_id", unitId).maybeSingle()
+      : await supabase.from("saas_subscriptions").select("*").eq("company_id", resolvedCompanyId).maybeSingle();
 
     if (!subscription) {
       const dueDay = 10;
@@ -127,7 +125,8 @@ Deno.serve(async (req) => {
       const { data: newSub, error: subErr } = await supabase
         .from("saas_subscriptions")
         .insert({
-          company_id,
+          company_id: resolvedCompanyId,
+          unit_id: unitId,
           monthly_value: master.valor_mensalidade || 97,
           due_day: dueDay,
           next_billing_date: nextBilling.toISOString().split("T")[0],
