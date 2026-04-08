@@ -232,7 +232,7 @@ const AdminUnits = () => {
       phone: form.phone.trim() || null,
       whatsapp: form.whatsapp.trim() || null,
       email_empresa: form.email_empresa.trim() || null,
-      email_acesso: form.email_acesso.trim() || null,
+      email_acesso: form.email_empresa.trim() || null,
       asaas_api_key: form.asaas_api_key.trim() || null,
       asaas_base_url: form.asaas_base_url.trim() || "https://api.asaas.com/v3",
       asaas_webhook_token: form.asaas_webhook_token.trim() || null,
