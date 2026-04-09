@@ -398,14 +398,12 @@ const AdminSaasBilling = () => {
           <CardTitle className="text-base">Parceiros / Unidades</CardTitle>
         </CardHeader>
         <CardContent>
-          {partnersWithSub.length === 0 && units.length === 0 ? (
+          {units.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">Nenhum parceiro cadastrado.</p>
-          ) : partnersWithSub.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">Nenhum parceiro com contrato SaaS. Cadastre o contrato no menu "Unidades".</p>
           ) : (
             <div className="space-y-2">
-              {partnersWithSub.map(u => {
-                const sub = subByUnit.get(u.id)!;
+              {units.map(u => {
+                const sub = subByUnit.get(u.id);
                 const invCount = invoicesByUnit.get(u.id)?.length ?? 0;
                 return (
                   <div key={u.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg bg-muted/30 border border-border gap-2">
@@ -416,15 +414,20 @@ const AdminSaasBilling = () => {
                       <div className="min-w-0">
                         <p className="font-semibold text-sm text-foreground truncate">{u.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {u.cnpj || u.cpf || "Sem doc."} • {fmt(sub.monthly_value)}/mês
-                          {sub.punctuality_discount > 0 && ` (desc: ${fmt(sub.punctuality_discount)})`}
-                          {sub.next_billing_date && ` • Próx.: ${format(new Date(sub.next_billing_date + "T00:00:00"), "dd/MM/yyyy")}`}
+                          {u.cnpj || u.cpf || "Sem doc."}
+                          {sub ? (
+                            <>
+                              {` • ${fmt(sub.monthly_value)}/mês`}
+                              {sub.punctuality_discount > 0 && ` (desc: ${fmt(sub.punctuality_discount)})`}
+                              {sub.next_billing_date && ` • Próx.: ${format(new Date(sub.next_billing_date + "T00:00:00"), "dd/MM/yyyy")}`}
+                            </>
+                          ) : " • Sem contrato SaaS"}
                           {invCount > 0 && ` • ${invCount} fatura(s)`}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
-                      {subStatusBadge(sub.status)}
+                      {sub ? subStatusBadge(sub.status) : <Badge variant="outline" className="bg-muted text-muted-foreground border-border">Novo</Badge>}
                       <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setDetailUnitId(u.id)}>
                         <Eye size={12} /> Detalhes
                       </Button>
