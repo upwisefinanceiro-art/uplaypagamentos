@@ -37,7 +37,7 @@ export const CompanyBrandingProvider = ({ children }: { children: ReactNode }) =
 
       // Get company via unit
       const { data: unit } = await supabase
-        .from("units")
+        .from("units_public")
         .select("company_id")
         .eq("id", profile.unit_id)
         .maybeSingle();

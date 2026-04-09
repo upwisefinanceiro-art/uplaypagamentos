@@ -125,7 +125,7 @@ const Login = () => {
 
       // Check if unit is blocked/inactive
       if (profileData?.unit_id) {
-        const { data: unitData } = await supabase.from("units").select("status").eq("id", profileData.unit_id).maybeSingle();
+        const { data: unitData } = await supabase.from("units_public").select("status").eq("id", profileData.unit_id).maybeSingle();
         if (unitData && (unitData.status === "BLOQUEADO" || unitData.status === "INATIVO")) {
           // Only block non-master roles
           const { data: rolesData } = await supabase.from("user_roles").select("role").eq("user_id", (await supabase.auth.getUser()).data.user?.id || "");
