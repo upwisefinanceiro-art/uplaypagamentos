@@ -22,11 +22,11 @@ export default defineConfig(({ mode }) => ({
       manifest: {
         name: "UPLAY Pagamentos",
         short_name: "UPLAY",
-        description: "Sistema de gestão de cobranças para escolas profissionalizantes",
-        start_url: "/app",
+        description: "Sistema de gestão de cobranças e pagamentos - UPLAY Pagamentos",
+        start_url: "/",
         display: "standalone",
         background_color: "#000000",
-        theme_color: "#ff0000",
+        theme_color: "#000000",
         orientation: "portrait-primary",
         categories: ["finance", "education"],
         icons: [
