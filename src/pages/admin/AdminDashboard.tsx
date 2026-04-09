@@ -42,6 +42,7 @@ import DashboardRecentPaid from "@/components/dashboard/DashboardRecentPaid";
 import DashboardUnitSummary from "@/components/dashboard/DashboardUnitSummary";
 import DashboardBirthdays, { type BirthdayPerson } from "@/components/dashboard/DashboardBirthdays";
 import DashboardDeliveries from "@/components/dashboard/DashboardDeliveries";
+import DashboardLowStock from "@/components/dashboard/DashboardLowStock";
 import { useToast } from "@/hooks/use-toast";
 import { resolveWhatsAppChargeData } from "@/lib/asaas-payment";
 
