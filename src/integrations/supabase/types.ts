@@ -1106,33 +1106,47 @@ export type Database = {
           active: boolean | null
           address: string | null
           cnpj: string | null
+          company_id: string | null
           created_at: string | null
           id: string | null
           name: string | null
           phone: string | null
+          status: string | null
           updated_at: string | null
         }
         Insert: {
           active?: boolean | null
           address?: string | null
           cnpj?: string | null
+          company_id?: string | null
           created_at?: string | null
           id?: string | null
           name?: string | null
           phone?: string | null
+          status?: string | null
           updated_at?: string | null
         }
         Update: {
           active?: boolean | null
           address?: string | null
           cnpj?: string | null
+          company_id?: string | null
           created_at?: string | null
           id?: string | null
           name?: string | null
           phone?: string | null
+          status?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "units_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
