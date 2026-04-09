@@ -423,6 +423,8 @@ export type Database = {
           raw_response: Json | null
           responsible_id: string
           status: string
+          stock_item_id: string | null
+          stock_quantity: number
           student_id: string | null
           unit_id: string
           updated_at: string
@@ -451,6 +453,8 @@ export type Database = {
           raw_response?: Json | null
           responsible_id: string
           status?: string
+          stock_item_id?: string | null
+          stock_quantity?: number
           student_id?: string | null
           unit_id: string
           updated_at?: string
@@ -479,6 +483,8 @@ export type Database = {
           raw_response?: Json | null
           responsible_id?: string
           status?: string
+          stock_item_id?: string | null
+          stock_quantity?: number
           student_id?: string | null
           unit_id?: string
           updated_at?: string
@@ -490,6 +496,13 @@ export type Database = {
             columns: ["contract_id"]
             isOneToOne: false
             referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_stock_item_id_fkey"
+            columns: ["stock_item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_items"
             referencedColumns: ["id"]
           },
           {

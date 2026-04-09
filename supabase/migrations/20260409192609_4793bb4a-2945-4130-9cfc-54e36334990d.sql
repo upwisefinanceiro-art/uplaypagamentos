@@ -1,0 +1,1 @@
+DROP TRIGGER IF EXISTS trigger_stock_on_payment_update ON public.payments;

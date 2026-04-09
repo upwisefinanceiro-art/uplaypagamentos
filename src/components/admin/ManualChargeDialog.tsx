@@ -42,6 +42,7 @@ interface UnitRow {
 
 interface ApostilaItem {
   name: string;
+  stock_item_id?: string;
 }
 
 interface ManualChargeDialogProps {
@@ -51,6 +52,7 @@ interface ManualChargeDialogProps {
   units: UnitRow[];
   profiles: Record<string, ResponsibleRow>;
   onSuccess: () => void;
+  stockItems?: { id: string; name: string; unit_id: string; quantity: number }[];
   prefill?: {
     responsibleId?: string;
     contractId?: string;
@@ -130,6 +132,7 @@ const ManualChargeDialog = ({
   units,
   profiles,
   onSuccess,
+  stockItems: propsStockItems,
   prefill,
   externalOpen,
   onExternalOpenChange,
@@ -168,6 +171,10 @@ const ManualChargeDialog = ({
   const [apostilasInterval, setApostilasInterval] = useState("3");
   const [apostilasStartDate, setApostilasStartDate] = useState("");
   const [apostilaItems, setApostilaItems] = useState<ApostilaItem[]>([{ name: "" }]);
+
+  // Stock items for the responsible's unit
+  const currentUnitId = responsibleId ? profiles[responsibleId]?.unit_id || "" : "";
+  const unitStockItems = (propsStockItems || []).filter((si) => si.unit_id === currentUnitId);
 
   // Derived
   const numInstallments = Math.max(1, parseInt(installments) || 1);
@@ -319,6 +326,8 @@ const ManualChargeDialog = ({
             value: apostilaUnitValue,
             due_date: apostilaDates[i],
             payment_method: paymentMethod,
+            stock_item_id: apostilaItems[i]?.stock_item_id || undefined,
+            stock_quantity: 1,
           },
         });
         if (error || data?.error) {
@@ -588,11 +597,13 @@ const ManualChargeDialog = ({
                       value={item.name}
                       onChange={(e) => {
                         const updated = [...apostilaItems];
-                        updated[i] = { name: e.target.value };
+                        updated[i] = { ...updated[i], name: e.target.value };
+                        const match = unitStockItems.find((si) => si.name.toLowerCase() === e.target.value.toLowerCase().trim());
+                        if (match) updated[i].stock_item_id = match.id;
                         setApostilaItems(updated);
                       }}
                       placeholder={`Apostila ${i + 1}`}
-                      className="text-sm"
+                      className="text-sm flex-1"
                     />
                   ))}
                 </div>

@@ -168,6 +168,7 @@ const AdminCharges = () => {
   const [responsibles, setResponsibles] = useState<ResponsibleRow[]>([]);
   const [profiles, setProfiles] = useState<Record<string, ResponsibleRow>>({});
   const [loadingData, setLoadingData] = useState(true);
+  const [stockItems, setStockItems] = useState<{ id: string; name: string; unit_id: string; quantity: number }[]>([]);
 
   const [chargeDialogOpen, setChargeDialogOpen] = useState(false);
   const [manualDialogOpen, setManualDialogOpen] = useState(false);
@@ -206,7 +207,7 @@ const AdminCharges = () => {
   const fetchData = async () => {
     setLoadingData(true);
 
-    const [paymentsRes, studentsRes, unitsRes, profilesRes, rolesRes, contractsRes] = await Promise.all([
+    const [paymentsRes, studentsRes, unitsRes, profilesRes, rolesRes, contractsRes, stockRes] = await Promise.all([
       supabase
         .from("payments")
         .select("id, value, final_value, due_date, status, payment_method, pix_copy_paste, invoice_url, checkout_url, boleto_url, pix_qr_code, asaas_payment_id, responsible_id, unit_id, installment_number, contract_id, student_id, description, payment_type")
@@ -216,12 +217,14 @@ const AdminCharges = () => {
       supabase.from("profiles").select("id, full_name, unit_id, active, phone").order("full_name"),
       supabase.from("user_roles").select("user_id").eq("role", "RESPONSAVEL"),
       supabase.from("contracts").select("id, description, responsible_id, student_id, unit_id, status").order("created_at", { ascending: false }),
+      supabase.from("stock_items").select("id, name, unit_id, quantity").eq("active", true).order("name"),
     ]);
 
     if (paymentsRes.data) setPayments(paymentsRes.data as PaymentRow[]);
     if (studentsRes.data) setStudents(studentsRes.data as StudentRow[]);
     if (unitsRes.data) setUnits(unitsRes.data as UnitRow[]);
     if (contractsRes.data) setContracts(contractsRes.data as ContractRow[]);
+    if (stockRes.data) setStockItems(stockRes.data as { id: string; name: string; unit_id: string; quantity: number }[]);
 
     if (profilesRes.data) {
       const profileMap = Object.fromEntries(
@@ -608,6 +611,7 @@ const AdminCharges = () => {
             units={units}
             profiles={profiles}
             onSuccess={fetchData}
+            stockItems={stockItems}
             externalOpen={manualDialogOpen}
             onExternalOpenChange={(open) => {
               setManualDialogOpen(open);

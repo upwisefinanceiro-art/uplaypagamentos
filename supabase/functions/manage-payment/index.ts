@@ -29,6 +29,8 @@ interface ManagePaymentPayload {
   due_date?: string;
   status?: PaymentStatus;
   payment_method?: string;
+  stock_item_id?: string;
+  stock_quantity?: number;
 }
 
 Deno.serve(async (req) => {
@@ -287,6 +289,8 @@ Deno.serve(async (req) => {
           payment_method: payload.payment_method || null,
           description: payload.description.trim(),
           updated_at: now,
+          stock_item_id: payload.stock_item_id || null,
+          stock_quantity: payload.stock_quantity || 1,
         })
         .select("id")
         .single();
