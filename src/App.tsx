@@ -24,6 +24,7 @@ import AdminUsers from "./pages/admin/AdminUsers";
 import AdminClients from "./pages/admin/AdminClients";
 import AdminContracts from "./pages/admin/AdminContracts";
 import AdminCharges from "./pages/admin/AdminCharges";
+import AdminStock from "./pages/admin/AdminStock";
 import AdminCompanies from "./pages/admin/AdminCompanies";
 import AdminSaasBilling from "./pages/admin/AdminSaasBilling";
 import AdminSaasPlans from "./pages/admin/AdminSaasPlans";
@@ -85,6 +86,7 @@ const App = () => {
                 <Route path="clientes" element={<AdminClients />} />
                 <Route path="contratos" element={<AdminContracts />} />
                 <Route path="cobrancas" element={<AdminCharges />} />
+                <Route path="estoque" element={<AdminStock />} />
                 <Route path="cobrancas-saas" element={<AdminSaasBilling />} />
                 <Route path="planos-saas" element={<AdminSaasPlans />} />
                 <Route path="alterar-senha" element={<AppChangePassword />} />

@@ -41,6 +41,7 @@ import DashboardDueTodayList from "@/components/dashboard/DashboardDueTodayList"
 import DashboardRecentPaid from "@/components/dashboard/DashboardRecentPaid";
 import DashboardUnitSummary from "@/components/dashboard/DashboardUnitSummary";
 import DashboardBirthdays, { type BirthdayPerson } from "@/components/dashboard/DashboardBirthdays";
+import DashboardDeliveries from "@/components/dashboard/DashboardDeliveries";
 import { useToast } from "@/hooks/use-toast";
 import { resolveWhatsAppChargeData } from "@/lib/asaas-payment";
 
@@ -493,6 +494,9 @@ const AdminDashboard = () => {
         birthdays={todayBirthdays}
         onSendGreeting={openBirthdayWhatsApp}
       />
+
+      {/* Delivery notifications */}
+      <DashboardDeliveries unitFilter={unitFilter} />
 
       {/* Main lists grid */}
       <div className="grid lg:grid-cols-2 gap-4">
