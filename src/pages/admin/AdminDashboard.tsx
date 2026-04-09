@@ -499,6 +499,9 @@ const AdminDashboard = () => {
       {/* Delivery notifications */}
       <DashboardDeliveries unitFilter={unitFilter} />
 
+      {/* Low stock alerts */}
+      <DashboardLowStock unitFilter={unitFilter} units={units} />
+
       {/* Main lists grid */}
       <div className="grid lg:grid-cols-2 gap-4">
         {/* Overdue */}
