@@ -306,6 +306,99 @@ export type Database = {
           },
         ]
       }
+      delivery_notifications: {
+        Row: {
+          created_at: string
+          delivered_at: string | null
+          delivered_by: string | null
+          enrollment_id: string | null
+          id: string
+          item_name: string
+          payment_id: string
+          quantity: number
+          responsible_id: string
+          responsible_name: string | null
+          status: string
+          stock_item_id: string | null
+          student_id: string | null
+          student_name: string | null
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          delivered_at?: string | null
+          delivered_by?: string | null
+          enrollment_id?: string | null
+          id?: string
+          item_name: string
+          payment_id: string
+          quantity?: number
+          responsible_id: string
+          responsible_name?: string | null
+          status?: string
+          stock_item_id?: string | null
+          student_id?: string | null
+          student_name?: string | null
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          delivered_at?: string | null
+          delivered_by?: string | null
+          enrollment_id?: string | null
+          id?: string
+          item_name?: string
+          payment_id?: string
+          quantity?: number
+          responsible_id?: string
+          responsible_name?: string | null
+          status?: string
+          stock_item_id?: string | null
+          student_id?: string | null
+          student_name?: string | null
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_notifications_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_notifications_stock_item_id_fkey"
+            columns: ["stock_item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_notifications_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_notifications_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_notifications_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           asaas_payment_id: string | null
@@ -703,6 +796,54 @@ export type Database = {
             foreignKeyName: "saas_subscriptions_unit_id_fkey"
             columns: ["unit_id"]
             isOneToOne: true
+            referencedRelation: "units_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_items: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          quantity: number
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          quantity?: number
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          quantity?: number
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_items_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_items_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
             referencedRelation: "units_public"
             referencedColumns: ["id"]
           },
