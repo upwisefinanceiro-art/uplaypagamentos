@@ -597,11 +597,13 @@ const ManualChargeDialog = ({
                       value={item.name}
                       onChange={(e) => {
                         const updated = [...apostilaItems];
-                        updated[i] = { name: e.target.value };
+                        updated[i] = { ...updated[i], name: e.target.value };
+                        const match = unitStockItems.find((si) => si.name.toLowerCase() === e.target.value.toLowerCase().trim());
+                        if (match) updated[i].stock_item_id = match.id;
                         setApostilaItems(updated);
                       }}
                       placeholder={`Apostila ${i + 1}`}
-                      className="text-sm"
+                      className="text-sm flex-1"
                     />
                   ))}
                 </div>
