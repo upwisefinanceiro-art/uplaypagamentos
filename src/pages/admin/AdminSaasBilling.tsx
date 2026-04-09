@@ -169,13 +169,12 @@ const AdminSaasBilling = () => {
   };
 
   /* ── KPIs ── */
-  const partnersWithSub = units.filter(u => subByUnit.has(u.id));
-  const activePartners = partnersWithSub.filter(u => {
+  const activePartners = units.filter(u => {
     const s = subByUnit.get(u.id);
     return s && (s.status === "ACTIVE" || s.status === "TRIAL");
   }).length;
-  const overduePartners = partnersWithSub.filter(u => subByUnit.get(u.id)?.status === "OVERDUE").length;
-  const blockedPartners = partnersWithSub.filter(u => subByUnit.get(u.id)?.status === "BLOCKED").length;
+  const overduePartners = units.filter(u => subByUnit.get(u.id)?.status === "OVERDUE").length;
+  const blockedPartners = units.filter(u => subByUnit.get(u.id)?.status === "BLOCKED").length;
   const totalReceivable = [...pendingInvoices, ...overdueInvoices].reduce((s, i) => s + i.value, 0);
   const paidThisMonth = (() => {
     const now = new Date();
