@@ -804,9 +804,11 @@ export type Database = {
       stock_items: {
         Row: {
           active: boolean
+          category: string | null
           created_at: string
           description: string | null
           id: string
+          min_quantity: number
           name: string
           quantity: number
           unit_id: string
@@ -814,9 +816,11 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          category?: string | null
           created_at?: string
           description?: string | null
           id?: string
+          min_quantity?: number
           name: string
           quantity?: number
           unit_id: string
@@ -824,9 +828,11 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          category?: string | null
           created_at?: string
           description?: string | null
           id?: string
+          min_quantity?: number
           name?: string
           quantity?: number
           unit_id?: string
@@ -842,6 +848,71 @@ export type Database = {
           },
           {
             foreignKeyName: "stock_items_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_movements: {
+        Row: {
+          created_at: string
+          id: string
+          item_id: string
+          movement_type: string
+          payment_id: string | null
+          quantity: number
+          reason: string | null
+          responsible_id: string | null
+          unit_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          item_id: string
+          movement_type?: string
+          payment_id?: string | null
+          quantity?: number
+          reason?: string | null
+          responsible_id?: string | null
+          unit_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          item_id?: string
+          movement_type?: string
+          payment_id?: string | null
+          quantity?: number
+          reason?: string | null
+          responsible_id?: string | null
+          unit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_movements_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_unit_id_fkey"
             columns: ["unit_id"]
             isOneToOne: false
             referencedRelation: "units_public"
