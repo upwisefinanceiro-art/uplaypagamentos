@@ -78,7 +78,7 @@ export default function ContractCancellationDialog({
     const { data } = await supabase
       .from("payments")
       .select(
-        "id, due_date, value, final_value, status, payment_type, installment_number, description"
+        "id, due_date, value, final_value, original_value, status, payment_type, installment_number, description"
       )
       .eq("contract_id", contract.id)
       .order("due_date", { ascending: true });
