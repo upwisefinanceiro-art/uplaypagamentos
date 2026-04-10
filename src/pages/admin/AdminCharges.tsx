@@ -1189,7 +1189,27 @@ const AdminCharges = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {waPayment && waResponsible && (
+      {/* Bulk action dialog */}
+      <AlertDialog open={!!bulkAction} onOpenChange={(open) => !open && setBulkAction(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{bulkAction === "delete" ? "Excluir parcelas selecionadas" : "Cancelar parcelas selecionadas"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {bulkAction === "delete"
+                ? `Tem certeza que deseja excluir ${selectedIds.size} parcela(s)? Parcelas pagas não serão excluídas.`
+                : `Tem certeza que deseja cancelar ${selectedIds.size} parcela(s)?`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkLoading}>Voltar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkAction} disabled={bulkLoading} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+              {bulkLoading ? <Loader2 size={14} className="animate-spin mr-2" /> : null}
+              {bulkAction === "delete" ? `Excluir ${selectedIds.size}` : `Cancelar ${selectedIds.size}`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
         <WhatsAppDialog
           open={waDialogOpen}
           onOpenChange={setWaDialogOpen}
