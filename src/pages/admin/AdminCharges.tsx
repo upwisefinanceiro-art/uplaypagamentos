@@ -880,6 +880,38 @@ const AdminCharges = () => {
         <div className="text-center py-12 text-muted-foreground text-sm">Nenhuma parcela encontrada.</div>
       ) : (
         <div className="space-y-3">
+          {/* Bulk actions bar */}
+          <div className="flex items-center gap-3 px-1">
+            <Checkbox
+              checked={selectedIds.size === filtered.length && filtered.length > 0}
+              onCheckedChange={toggleSelectAll}
+              aria-label="Selecionar todas"
+            />
+            <span className="text-xs text-muted-foreground">
+              {selectedIds.size > 0 ? `${selectedIds.size} selecionada(s)` : "Selecionar todas"}
+            </span>
+            {selectedIds.size > 0 && (
+              <div className="flex gap-2 ml-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-xs h-7 text-warning border-warning/40 hover:bg-warning/10"
+                  onClick={() => setBulkAction("cancel")}
+                >
+                  <Ban size={12} /> Cancelar selecionadas
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-xs h-7 text-destructive border-destructive/40 hover:bg-destructive/10"
+                  onClick={() => setBulkAction("delete")}
+                >
+                  <Trash2 size={12} /> Excluir selecionadas
+                </Button>
+              </div>
+            )}
+          </div>
+
           {filtered.map((payment) => {
             const responsible = profiles[payment.responsible_id]?.full_name || "—";
             const contract = payment.contract_id ? contractMap[payment.contract_id]?.description || "—" : "Sem contrato";
