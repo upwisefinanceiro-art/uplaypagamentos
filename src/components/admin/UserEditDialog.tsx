@@ -244,25 +244,25 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
                 </>
               )}
 
-              {contractsEdit.length > 0 && (
-                <>
-                  <Separator />
-                  <div className="space-y-3">
-                    <Label className="text-foreground text-sm font-semibold">Contrato(s) — Número</Label>
-                    {contractsEdit.map((contract, index) => (
-                      <div key={contract.id} className="space-y-1">
-                        <p className="text-xs text-muted-foreground truncate">{contract.description}</p>
-                        <Input
-                          className="bg-input border-border text-foreground"
-                          placeholder="Nº do contrato"
-                          value={contract.contract_number || ""}
-                          onChange={(e) => handleContractNumberChange(index, e.target.value)}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
+              <Separator />
+              <div className="space-y-3">
+                <Label className="text-foreground text-sm font-semibold">Contrato(s) — Número</Label>
+                {contractsEdit.length > 0 ? (
+                  contractsEdit.map((contract, index) => (
+                    <div key={contract.id} className="space-y-1">
+                      <p className="text-xs text-muted-foreground truncate">{contract.description}</p>
+                      <Input
+                        className="bg-input border-border text-foreground"
+                        placeholder="Nº do contrato"
+                        value={contract.contract_number || ""}
+                        onChange={(e) => handleContractNumberChange(index, e.target.value)}
+                      />
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-muted-foreground">Nenhum contrato vinculado. Cadastre um contrato na tela de Contratos.</p>
+                )}
+              </div>
             </>
           )}
 
