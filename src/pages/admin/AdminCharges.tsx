@@ -594,6 +594,51 @@ const AdminCharges = () => {
     navigate("/admin/cobrancas");
   };
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map((p) => p.id)));
+    }
+  };
+
+  const handleBulkAction = async () => {
+    if (!bulkAction || selectedIds.size === 0) return;
+    setBulkLoading(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const id of selectedIds) {
+      const { data, error } = await supabase.functions.invoke("manage-payment", {
+        body: { action: bulkAction, payment_id: id },
+      });
+      if (error || data?.error) {
+        errorCount++;
+      } else {
+        successCount++;
+      }
+    }
+
+    setBulkLoading(false);
+    setBulkAction(null);
+    setSelectedIds(new Set());
+
+    toast({
+      title: bulkAction === "delete" ? "Exclusão em lote concluída" : "Cancelamento em lote concluído",
+      description: `${successCount} parcela(s) processada(s)${errorCount > 0 ? `, ${errorCount} erro(s)` : ""}`,
+      variant: errorCount > 0 ? "destructive" : "default",
+    });
+    fetchData();
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
