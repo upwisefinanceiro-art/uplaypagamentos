@@ -926,8 +926,15 @@ const AdminCharges = () => {
             const daysOverdue = isOverdue ? differenceInDays(today, dueDate) : 0;
 
             return (
-              <div key={payment.id} className={`glass-card p-4 space-y-4 ${isOverdue ? "border-destructive/50 bg-destructive/5" : ""}`}>
+              <div key={payment.id} className={`glass-card p-4 space-y-4 ${isOverdue ? "border-destructive/50 bg-destructive/5" : ""} ${selectedIds.has(payment.id) ? "ring-1 ring-primary/50" : ""}`}>
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="flex gap-3 items-start min-w-0">
+                    <Checkbox
+                      checked={selectedIds.has(payment.id)}
+                      onCheckedChange={() => toggleSelect(payment.id)}
+                      className="mt-1 shrink-0"
+                      aria-label={`Selecionar ${payment.description}`}
+                    />
                   <div className="space-y-2 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className={`text-sm font-semibold truncate ${isOverdue ? "text-destructive" : "text-foreground"}`}>{payment.description || `Parcela ${payment.installment_number}`}</h3>
