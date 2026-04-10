@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
-type PaymentType = "MENSALIDADE" | "APOSTILA" | "AVULSA";
+type PaymentType = "MENSALIDADE" | "APOSTILA" | "AVULSA" | "MATRICULA";
 
 interface ResponsibleRow {
   id: string;
@@ -280,7 +280,7 @@ const ManualChargeDialog = ({
     }
 
     // Auto-generate description if empty
-    const finalDescription = description.trim() || (paymentType === "MENSALIDADE" ? "Mensalidade" : paymentType === "APOSTILA" ? "Apostila" : "Cobrança Avulsa");
+    const finalDescription = description.trim() || (paymentType === "MENSALIDADE" ? "Mensalidade" : paymentType === "APOSTILA" ? "Apostila" : paymentType === "MATRICULA" ? "Matrícula" : "Cobrança Avulsa");
     if (numRealValue <= 0) {
       toast({ title: "Valor deve ser maior que zero", variant: "destructive" });
       return;
@@ -447,6 +447,7 @@ const ManualChargeDialog = ({
                 <SelectContent>
                   <SelectItem value="MENSALIDADE">Mensalidade</SelectItem>
                   <SelectItem value="APOSTILA">Apostila</SelectItem>
+                  <SelectItem value="MATRICULA">Matrícula</SelectItem>
                   <SelectItem value="AVULSA">Avulsa</SelectItem>
                 </SelectContent>
               </Select>

@@ -188,6 +188,11 @@ const AdminContracts = () => {
   const [apostilasStartDate, setApostilasStartDate] = useState("");
   const [apostilasInterval, setApostilasInterval] = useState("3");
 
+  // Matrícula state
+  const [includeMatricula, setIncludeMatricula] = useState(false);
+  const [matriculaValue, setMatriculaValue] = useState("");
+  const [matriculaDueDate, setMatriculaDueDate] = useState("");
+
   const selectedResponsible = responsibles.find(r => r.id === responsibleId);
   const selectedStudent = students.find(s => s.id === studentId);
   const resolvedUnitId = responsibleMode === "existing" ? (selectedResponsible?.unit_id || "") : unitId;
@@ -215,6 +220,7 @@ const AdminContracts = () => {
   const apostilasCount = parseInt(apostilasQty) || 0;
   const apostilasIntervalMonths = parseInt(apostilasInterval) || 3;
   const apostilasInstallmentValue = apostilasTotalValue > 0 && apostilasCount > 0 ? apostilasTotalValue / apostilasCount : 0;
+  const matriculaValueParsed = parseMoneyInput(matriculaValue);
 
   useEffect(() => { fetchData(); }, []);
 
@@ -262,6 +268,8 @@ const AdminContracts = () => {
     setPassword(""); setContractNumber(""); setStep("form"); setSaveResponsibleToBase(false);
     setIncludeApostilas(false); setApostilasTotal(""); setApostilasQty("1");
     setApostilasStartDate(""); setApostilasInterval("3");
+    setIncludeMatricula(false); setMatriculaValue(""); setMatriculaDueDate("");
+    setNewStudentName(""); setStudentBirthDate("");
   };
 
   const validateForm = (): string | null => {
@@ -293,6 +301,10 @@ const AdminContracts = () => {
       if (!apostilasTotal || apostilasTotalValue <= 0) return "Valor total das apostilas é obrigatório";
       if (apostilasCount <= 0) return "Quantidade de parcelas de apostilas é obrigatória";
       if (!apostilasStartDate) return "Data do 1º vencimento das apostilas é obrigatória";
+    }
+    if (includeMatricula) {
+      if (!matriculaValue || matriculaValueParsed <= 0) return "Valor da matrícula é obrigatório";
+      if (!matriculaDueDate) return "Data de vencimento da matrícula é obrigatória";
     }
     return null;
   };
@@ -452,6 +464,26 @@ const AdminContracts = () => {
             status: "PENDING",
           });
         }
+      }
+
+      // Generate matrícula payment
+      if (includeMatricula && matriculaValueParsed > 0 && matriculaDueDate) {
+        payments.push({
+          contract_id: contract.id,
+          unit_id: resolvedUnitId,
+          responsible_id: finalResponsibleId,
+          student_id: finalStudentId,
+          installment_number: payments.length + 1,
+          due_date: matriculaDueDate,
+          value: matriculaValueParsed,
+          original_value: matriculaValueParsed,
+          punctuality_discount: 0,
+          final_value: matriculaValueParsed,
+          payment_method: paymentMethod,
+          payment_type: "MATRICULA",
+          description: "Matrícula",
+          status: "PENDING",
+        });
       }
 
       const { error: paymentsErr } = await supabase.from("payments").insert(payments);
@@ -960,6 +992,63 @@ const AdminContracts = () => {
     </div>
   );
 
+  const renderMatriculaSection = () => (
+    <div>
+      <h3 className="text-sm font-semibold text-primary mb-3">F. Matrícula</h3>
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="include-matricula"
+            checked={includeMatricula}
+            onCheckedChange={(checked) => setIncludeMatricula(checked === true)}
+          />
+          <label htmlFor="include-matricula" className="text-xs text-foreground cursor-pointer">
+            Incluir cobrança de matrícula no contrato
+          </label>
+        </div>
+
+        {includeMatricula && (
+          <div className="space-y-3 p-3 rounded-md border border-border bg-muted/30">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-foreground text-xs">Valor da Matrícula *</Label>
+                <Input
+                  className="bg-input border-border text-foreground"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0,00"
+                  value={matriculaValue}
+                  onChange={e => setMatriculaValue(sanitizeMoneyInput(e.target.value))}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-foreground text-xs">Data de Vencimento *</Label>
+                <Input
+                  className="bg-input border-border text-foreground"
+                  type="date"
+                  value={matriculaDueDate}
+                  onChange={e => setMatriculaDueDate(e.target.value)}
+                />
+              </div>
+            </div>
+            {matriculaValueParsed > 0 && matriculaDueDate && (
+              <div className="p-3 rounded-md bg-muted space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Valor:</span>
+                  <span className="font-semibold text-primary">{fmt(matriculaValueParsed)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Vencimento:</span>
+                  <span className="font-semibold text-foreground">{new Date(matriculaDueDate + "T12:00:00").toLocaleDateString("pt-BR")}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   const filteredContracts = useMemo(() => {
     if (!searchTerm.trim()) return contracts;
     const term = searchTerm.toLowerCase().trim();
@@ -1025,8 +1114,10 @@ const AdminContracts = () => {
                 <Separator />
                 {renderApostilasSection()}
                 <Separator />
+                {renderMatriculaSection()}
+                <Separator />
                 <div>
-                  <h3 className="text-sm font-semibold text-primary mb-3">F. Observações</h3>
+                  <h3 className="text-sm font-semibold text-primary mb-3">G. Observações</h3>
                   <Textarea className="bg-input border-border text-foreground" placeholder="Observações do contrato..." value={notes} onChange={e => setNotes(e.target.value)} rows={3} />
                 </div>
                 <Button
@@ -1119,6 +1210,18 @@ const AdminContracts = () => {
                         <span className="text-foreground">A cada {apostilasIntervalMonths} {apostilasIntervalMonths === 1 ? "mês" : "meses"}</span>
                         <span className="text-muted-foreground">1º Vencimento:</span>
                         <span className="text-foreground">{apostilasStartDate ? new Date(apostilasStartDate + "T12:00:00").toLocaleDateString("pt-BR") : ""}</span>
+                      </div>
+                    </>
+                  )}
+                  {includeMatricula && matriculaValueParsed > 0 && matriculaDueDate && (
+                    <>
+                      <Separator />
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Matrícula</p>
+                      <div className="grid grid-cols-2 gap-y-2 text-sm">
+                        <span className="text-muted-foreground">Valor:</span>
+                        <span className="text-foreground">{fmt(matriculaValueParsed)}</span>
+                        <span className="text-muted-foreground">Vencimento:</span>
+                        <span className="text-foreground">{new Date(matriculaDueDate + "T12:00:00").toLocaleDateString("pt-BR")}</span>
                       </div>
                     </>
                   )}

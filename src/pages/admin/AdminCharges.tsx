@@ -37,7 +37,7 @@ import ManualChargeDialog from "@/components/admin/ManualChargeDialog";
 
 type PaymentStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELLED";
 type BillingType = "PIX" | "BOLETO" | "CARD";
-type PaymentType = "MENSALIDADE" | "APOSTILA" | "AVULSA";
+type PaymentType = "MENSALIDADE" | "APOSTILA" | "AVULSA" | "MATRICULA";
 
 type ManagedPaymentAction = "delete" | "cancel";
 
@@ -59,6 +59,7 @@ const typeLabels: Record<PaymentType, string> = {
   MENSALIDADE: "Mensalidade",
   APOSTILA: "Apostila",
   AVULSA: "Avulsa",
+  MATRICULA: "Matrícula",
 };
 
 interface PaymentRow {
@@ -762,6 +763,7 @@ const AdminCharges = () => {
                         <SelectContent>
                           <SelectItem value="MENSALIDADE">Mensalidade</SelectItem>
                           <SelectItem value="APOSTILA">Apostila</SelectItem>
+                          <SelectItem value="MATRICULA">Matrícula</SelectItem>
                           <SelectItem value="AVULSA">Avulsa</SelectItem>
                         </SelectContent>
                       </Select>
@@ -867,6 +869,7 @@ const AdminCharges = () => {
             <SelectItem value="ALL">Todos os tipos</SelectItem>
             <SelectItem value="MENSALIDADE">Mensalidade</SelectItem>
             <SelectItem value="APOSTILA">Apostila</SelectItem>
+            <SelectItem value="MATRICULA">Matrícula</SelectItem>
             <SelectItem value="AVULSA">Avulsa</SelectItem>
           </SelectContent>
         </Select>
