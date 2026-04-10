@@ -466,6 +466,26 @@ const AdminContracts = () => {
         }
       }
 
+      // Generate matrícula payment
+      if (includeMatricula && matriculaValueParsed > 0 && matriculaDueDate) {
+        payments.push({
+          contract_id: contract.id,
+          unit_id: resolvedUnitId,
+          responsible_id: finalResponsibleId,
+          student_id: finalStudentId,
+          installment_number: payments.length + 1,
+          due_date: matriculaDueDate,
+          value: matriculaValueParsed,
+          original_value: matriculaValueParsed,
+          punctuality_discount: 0,
+          final_value: matriculaValueParsed,
+          payment_method: paymentMethod,
+          payment_type: "MATRICULA",
+          description: "Matrícula",
+          status: "PENDING",
+        });
+      }
+
       const { error: paymentsErr } = await supabase.from("payments").insert(payments);
       if (paymentsErr) throw paymentsErr;
 
