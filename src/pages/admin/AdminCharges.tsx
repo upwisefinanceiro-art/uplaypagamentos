@@ -684,7 +684,9 @@ const AdminCharges = () => {
                         <SelectContent>
                           <SelectItem value="NONE">Sem contrato</SelectItem>
                           {chargeContracts.map((contract) => (
-                            <SelectItem key={contract.id} value={contract.id}>{contract.description}</SelectItem>
+                            <SelectItem key={contract.id} value={contract.id}>
+                              {contract.contract_number ? `${contract.contract_number} - ` : ""}{contract.description}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
