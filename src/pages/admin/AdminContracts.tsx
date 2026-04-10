@@ -1213,6 +1213,18 @@ const AdminContracts = () => {
                       </div>
                     </>
                   )}
+                  {includeMatricula && matriculaValueParsed > 0 && matriculaDueDate && (
+                    <>
+                      <Separator />
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Matrícula</p>
+                      <div className="grid grid-cols-2 gap-y-2 text-sm">
+                        <span className="text-muted-foreground">Valor:</span>
+                        <span className="text-foreground">{fmt(matriculaValueParsed)}</span>
+                        <span className="text-muted-foreground">Vencimento:</span>
+                        <span className="text-foreground">{new Date(matriculaDueDate + "T12:00:00").toLocaleDateString("pt-BR")}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <div className="flex gap-3">
