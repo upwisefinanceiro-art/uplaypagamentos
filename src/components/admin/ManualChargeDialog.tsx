@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
-type PaymentType = "MENSALIDADE" | "APOSTILA" | "AVULSA";
+type PaymentType = "MENSALIDADE" | "APOSTILA" | "AVULSA" | "MATRICULA";
 
 interface ResponsibleRow {
   id: string;
