@@ -1210,6 +1210,7 @@ const AdminCharges = () => {
         </AlertDialogContent>
       </AlertDialog>
 
+      {waPayment && waResponsible && (
         <WhatsAppDialog
           open={waDialogOpen}
           onOpenChange={setWaDialogOpen}
