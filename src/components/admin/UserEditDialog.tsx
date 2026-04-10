@@ -1,12 +1,26 @@
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+
+interface StudentEdit {
+  id: string;
+  full_name: string;
+  dirty: boolean;
+}
+
+interface ContractEdit {
+  id: string;
+  contract_number: string | null;
+  description: string;
+  dirty: boolean;
+}
 
 interface UserEditDialogProps {
   open: boolean;
@@ -33,6 +47,9 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
   const [address, setAddress] = useState("");
   const [unitId, setUnitId] = useState("");
   const [saving, setSaving] = useState(false);
+  const [studentsEdit, setStudentsEdit] = useState<StudentEdit[]>([]);
+  const [contractsEdit, setContractsEdit] = useState<ContractEdit[]>([]);
+  const [loadingRelated, setLoadingRelated] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -43,6 +60,7 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
       setEmail(user.email || "");
       setAddress(user.address || "");
       setUnitId(user.unit_id || "");
+      fetchRelatedData(user.id);
       return;
     }
 
@@ -52,7 +70,44 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
     setEmail("");
     setAddress("");
     setUnitId("");
+    setStudentsEdit([]);
+    setContractsEdit([]);
   }, [user]);
+
+  const fetchRelatedData = async (userId: string) => {
+    setLoadingRelated(true);
+    const [studentsRes, contractsRes] = await Promise.all([
+      supabase.from("students").select("id, full_name").eq("responsible_id", userId).order("full_name"),
+      supabase.from("contracts").select("id, contract_number, description").eq("responsible_id", userId).order("created_at"),
+    ]);
+
+    if (studentsRes.data) {
+      setStudentsEdit(studentsRes.data.map((s) => ({ id: s.id, full_name: s.full_name, dirty: false })));
+    }
+    if (contractsRes.data) {
+      setContractsEdit(
+        contractsRes.data.map((c) => ({
+          id: c.id,
+          contract_number: c.contract_number,
+          description: c.description,
+          dirty: false,
+        }))
+      );
+    }
+    setLoadingRelated(false);
+  };
+
+  const handleStudentNameChange = (index: number, value: string) => {
+    setStudentsEdit((prev) =>
+      prev.map((s, i) => (i === index ? { ...s, full_name: value, dirty: true } : s))
+    );
+  };
+
+  const handleContractNumberChange = (index: number, value: string) => {
+    setContractsEdit((prev) =>
+      prev.map((c, i) => (i === index ? { ...c, contract_number: value, dirty: true } : c))
+    );
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,6 +120,7 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
     setSaving(true);
 
     try {
+      // Save profile
       const { data, error } = await supabase.functions.invoke("update-user", {
         body: {
           user_id: user.id,
@@ -84,6 +140,18 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
           variant: "destructive",
         });
         return;
+      }
+
+      // Save dirty students
+      const dirtyStudents = studentsEdit.filter((s) => s.dirty);
+      for (const student of dirtyStudents) {
+        await supabase.from("students").update({ full_name: student.full_name }).eq("id", student.id);
+      }
+
+      // Save dirty contracts
+      const dirtyContracts = contractsEdit.filter((c) => c.dirty);
+      for (const contract of dirtyContracts) {
+        await supabase.from("contracts").update({ contract_number: contract.contract_number || null }).eq("id", contract.id);
       }
 
       await Promise.resolve(onSaved());
@@ -149,6 +217,53 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
                 </SelectContent>
               </Select>
             </div>
+          )}
+
+          {/* Students section */}
+          {loadingRelated ? (
+            <div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
+              <Loader2 size={14} className="animate-spin" /> Carregando alunos e contratos...
+            </div>
+          ) : (
+            <>
+              {studentsEdit.length > 0 && (
+                <>
+                  <Separator />
+                  <div className="space-y-3">
+                    <Label className="text-foreground text-sm font-semibold">Aluno(s)</Label>
+                    {studentsEdit.map((student, index) => (
+                      <Input
+                        key={student.id}
+                        className="bg-input border-border text-foreground"
+                        placeholder="Nome do aluno"
+                        value={student.full_name}
+                        onChange={(e) => handleStudentNameChange(index, e.target.value)}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {contractsEdit.length > 0 && (
+                <>
+                  <Separator />
+                  <div className="space-y-3">
+                    <Label className="text-foreground text-sm font-semibold">Contrato(s) — Número</Label>
+                    {contractsEdit.map((contract, index) => (
+                      <div key={contract.id} className="space-y-1">
+                        <p className="text-xs text-muted-foreground truncate">{contract.description}</p>
+                        <Input
+                          className="bg-input border-border text-foreground"
+                          placeholder="Nº do contrato"
+                          value={contract.contract_number || ""}
+                          onChange={(e) => handleContractNumberChange(index, e.target.value)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
           )}
 
           <Button type="submit" className="w-full" disabled={saving}>
