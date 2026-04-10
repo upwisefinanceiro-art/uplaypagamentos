@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Trash2,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -184,6 +185,9 @@ const AdminCharges = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [syncingPaymentId, setSyncingPaymentId] = useState<string | null>(null);
   const [syncingAll, setSyncingAll] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkAction, setBulkAction] = useState<"delete" | "cancel" | null>(null);
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   const [selectedResponsible, setSelectedResponsible] = useState("");
   const [selectedStudent, setSelectedStudent] = useState("NONE");
@@ -588,6 +592,51 @@ const AdminCharges = () => {
     navigate("/admin/cobrancas");
   };
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map((p) => p.id)));
+    }
+  };
+
+  const handleBulkAction = async () => {
+    if (!bulkAction || selectedIds.size === 0) return;
+    setBulkLoading(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const id of selectedIds) {
+      const { data, error } = await supabase.functions.invoke("manage-payment", {
+        body: { action: bulkAction, payment_id: id },
+      });
+      if (error || data?.error) {
+        errorCount++;
+      } else {
+        successCount++;
+      }
+    }
+
+    setBulkLoading(false);
+    setBulkAction(null);
+    setSelectedIds(new Set());
+
+    toast({
+      title: bulkAction === "delete" ? "Exclusão em lote concluída" : "Cancelamento em lote concluído",
+      description: `${successCount} parcela(s) processada(s)${errorCount > 0 ? `, ${errorCount} erro(s)` : ""}`,
+      variant: errorCount > 0 ? "destructive" : "default",
+    });
+    fetchData();
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -829,6 +878,38 @@ const AdminCharges = () => {
         <div className="text-center py-12 text-muted-foreground text-sm">Nenhuma parcela encontrada.</div>
       ) : (
         <div className="space-y-3">
+          {/* Bulk actions bar */}
+          <div className="flex items-center gap-3 px-1">
+            <Checkbox
+              checked={selectedIds.size === filtered.length && filtered.length > 0}
+              onCheckedChange={toggleSelectAll}
+              aria-label="Selecionar todas"
+            />
+            <span className="text-xs text-muted-foreground">
+              {selectedIds.size > 0 ? `${selectedIds.size} selecionada(s)` : "Selecionar todas"}
+            </span>
+            {selectedIds.size > 0 && (
+              <div className="flex gap-2 ml-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-xs h-7 text-warning border-warning/40 hover:bg-warning/10"
+                  onClick={() => setBulkAction("cancel")}
+                >
+                  <Ban size={12} /> Cancelar selecionadas
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-xs h-7 text-destructive border-destructive/40 hover:bg-destructive/10"
+                  onClick={() => setBulkAction("delete")}
+                >
+                  <Trash2 size={12} /> Excluir selecionadas
+                </Button>
+              </div>
+            )}
+          </div>
+
           {filtered.map((payment) => {
             const responsible = profiles[payment.responsible_id]?.full_name || "—";
             const contract = payment.contract_id ? contractMap[payment.contract_id]?.description || "—" : "Sem contrato";
@@ -843,8 +924,15 @@ const AdminCharges = () => {
             const daysOverdue = isOverdue ? differenceInDays(today, dueDate) : 0;
 
             return (
-              <div key={payment.id} className={`glass-card p-4 space-y-4 ${isOverdue ? "border-destructive/50 bg-destructive/5" : ""}`}>
+              <div key={payment.id} className={`glass-card p-4 space-y-4 ${isOverdue ? "border-destructive/50 bg-destructive/5" : ""} ${selectedIds.has(payment.id) ? "ring-1 ring-primary/50" : ""}`}>
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="flex gap-3 items-start min-w-0">
+                    <Checkbox
+                      checked={selectedIds.has(payment.id)}
+                      onCheckedChange={() => toggleSelect(payment.id)}
+                      className="mt-1 shrink-0"
+                      aria-label={`Selecionar ${payment.description}`}
+                    />
                   <div className="space-y-2 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className={`text-sm font-semibold truncate ${isOverdue ? "text-destructive" : "text-foreground"}`}>{payment.description || `Parcela ${payment.installment_number}`}</h3>
@@ -865,6 +953,7 @@ const AdminCharges = () => {
                       <p><span className="font-medium text-foreground">Parcela:</span> #{payment.installment_number}</p>
                       <p><span className={`font-medium ${isOverdue ? "text-destructive" : "text-foreground"}`}>Vencimento:</span> {new Date(`${payment.due_date}T12:00:00`).toLocaleDateString("pt-BR")}</p>
                       <p><span className="font-medium text-foreground">Unidade:</span> {unit}</p>
+                    </div>
                     </div>
                   </div>
 
@@ -1093,6 +1182,27 @@ const AdminCharges = () => {
             <AlertDialogAction onClick={handleAction} disabled={actionLoading} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
               {actionLoading ? <Loader2 size={14} className="animate-spin mr-2" /> : null}
               {actionTarget?.action === "delete" ? "Excluir" : "Cancelar parcela"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk action dialog */}
+      <AlertDialog open={!!bulkAction} onOpenChange={(open) => !open && setBulkAction(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{bulkAction === "delete" ? "Excluir parcelas selecionadas" : "Cancelar parcelas selecionadas"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {bulkAction === "delete"
+                ? `Tem certeza que deseja excluir ${selectedIds.size} parcela(s)? Parcelas pagas não serão excluídas.`
+                : `Tem certeza que deseja cancelar ${selectedIds.size} parcela(s)?`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkLoading}>Voltar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkAction} disabled={bulkLoading} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+              {bulkLoading ? <Loader2 size={14} className="animate-spin mr-2" /> : null}
+              {bulkAction === "delete" ? `Excluir ${selectedIds.size}` : `Cancelar ${selectedIds.size}`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
