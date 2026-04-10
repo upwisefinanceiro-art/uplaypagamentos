@@ -37,7 +37,7 @@ import ManualChargeDialog from "@/components/admin/ManualChargeDialog";
 
 type PaymentStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELLED";
 type BillingType = "PIX" | "BOLETO" | "CARD";
-type PaymentType = "MENSALIDADE" | "APOSTILA" | "AVULSA";
+type PaymentType = "MENSALIDADE" | "APOSTILA" | "AVULSA" | "MATRICULA";
 
 type ManagedPaymentAction = "delete" | "cancel";
 
