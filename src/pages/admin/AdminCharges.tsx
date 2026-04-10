@@ -3,6 +3,7 @@ import { startOfDay, isBefore, differenceInDays } from "date-fns";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Ban,
+  CheckSquare,
   Copy,
   ExternalLink,
   Loader2,
@@ -10,8 +11,10 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  Square,
   Trash2,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
