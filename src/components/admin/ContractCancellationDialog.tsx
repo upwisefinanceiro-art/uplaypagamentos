@@ -31,6 +31,7 @@ interface PaymentRow {
   due_date: string;
   value: number;
   final_value: number | null;
+  original_value: number | null;
   status: string;
   payment_type: string;
   installment_number: number;
