@@ -956,6 +956,7 @@ const AdminCharges = () => {
                       <p><span className={`font-medium ${isOverdue ? "text-destructive" : "text-foreground"}`}>Vencimento:</span> {new Date(`${payment.due_date}T12:00:00`).toLocaleDateString("pt-BR")}</p>
                       <p><span className="font-medium text-foreground">Unidade:</span> {unit}</p>
                     </div>
+                    </div>
                   </div>
 
                   <div className="flex flex-col items-start gap-3 lg:items-end">
