@@ -31,6 +31,7 @@ interface PaymentRow {
   due_date: string;
   value: number;
   final_value: number | null;
+  original_value: number | null;
   status: string;
   payment_type: string;
   installment_number: number;
@@ -77,7 +78,7 @@ export default function ContractCancellationDialog({
     const { data } = await supabase
       .from("payments")
       .select(
-        "id, due_date, value, final_value, status, payment_type, installment_number, description"
+        "id, due_date, value, final_value, original_value, status, payment_type, installment_number, description"
       )
       .eq("contract_id", contract.id)
       .order("due_date", { ascending: true });
@@ -130,7 +131,7 @@ export default function ContractCancellationDialog({
     }).length;
 
     const baseValue = futurePayments.reduce(
-      (sum, p) => sum + p.value,
+      (sum, p) => sum + (p.original_value ?? p.value),
       0
     );
     const percent = parseFloat(penaltyPercent) || 0;
@@ -440,7 +441,7 @@ export default function ContractCancellationDialog({
                             )}
                           </span>
                           <span className="text-right font-medium text-primary">
-                            {fmt(p.value)}
+                            {fmt(p.original_value ?? p.value)}
                           </span>
                         </div>
                       ))}
