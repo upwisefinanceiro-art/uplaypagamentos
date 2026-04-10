@@ -302,6 +302,10 @@ const AdminContracts = () => {
       if (apostilasCount <= 0) return "Quantidade de parcelas de apostilas é obrigatória";
       if (!apostilasStartDate) return "Data do 1º vencimento das apostilas é obrigatória";
     }
+    if (includeMatricula) {
+      if (!matriculaValue || matriculaValueParsed <= 0) return "Valor da matrícula é obrigatório";
+      if (!matriculaDueDate) return "Data de vencimento da matrícula é obrigatória";
+    }
     return null;
   };
 
