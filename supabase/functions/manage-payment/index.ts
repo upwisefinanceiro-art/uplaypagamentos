@@ -288,7 +288,7 @@ Deno.serve(async (req) => {
           status: "PENDING",
           payment_type: payload.payment_type,
           payment_method: payload.payment_method || null,
-          description: payload.description.trim(),
+          description: resolvedDescription,
           updated_at: now,
           stock_item_id: payload.stock_item_id || null,
           stock_quantity: payload.stock_quantity || 1,
