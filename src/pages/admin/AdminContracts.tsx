@@ -220,6 +220,7 @@ const AdminContracts = () => {
   const apostilasCount = parseInt(apostilasQty) || 0;
   const apostilasIntervalMonths = parseInt(apostilasInterval) || 3;
   const apostilasInstallmentValue = apostilasTotalValue > 0 && apostilasCount > 0 ? apostilasTotalValue / apostilasCount : 0;
+  const matriculaValueParsed = parseMoneyInput(matriculaValue);
 
   useEffect(() => { fetchData(); }, []);
 
@@ -267,6 +268,8 @@ const AdminContracts = () => {
     setPassword(""); setContractNumber(""); setStep("form"); setSaveResponsibleToBase(false);
     setIncludeApostilas(false); setApostilasTotal(""); setApostilasQty("1");
     setApostilasStartDate(""); setApostilasInterval("3");
+    setIncludeMatricula(false); setMatriculaValue(""); setMatriculaDueDate("");
+    setNewStudentName(""); setStudentBirthDate("");
   };
 
   const validateForm = (): string | null => {
