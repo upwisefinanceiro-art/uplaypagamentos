@@ -187,6 +187,9 @@ const AdminCharges = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [syncingPaymentId, setSyncingPaymentId] = useState<string | null>(null);
   const [syncingAll, setSyncingAll] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkAction, setBulkAction] = useState<"delete" | "cancel" | null>(null);
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   const [selectedResponsible, setSelectedResponsible] = useState("");
   const [selectedStudent, setSelectedStudent] = useState("NONE");
