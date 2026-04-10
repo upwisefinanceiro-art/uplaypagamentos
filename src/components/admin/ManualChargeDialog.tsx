@@ -280,7 +280,7 @@ const ManualChargeDialog = ({
     }
 
     // Auto-generate description if empty
-    const finalDescription = description.trim() || (paymentType === "MENSALIDADE" ? "Mensalidade" : paymentType === "APOSTILA" ? "Apostila" : "Cobrança Avulsa");
+    const finalDescription = description.trim() || (paymentType === "MENSALIDADE" ? "Mensalidade" : paymentType === "APOSTILA" ? "Apostila" : paymentType === "MATRICULA" ? "Matrícula" : "Cobrança Avulsa");
     if (numRealValue <= 0) {
       toast({ title: "Valor deve ser maior que zero", variant: "destructive" });
       return;
