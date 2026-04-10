@@ -447,6 +447,7 @@ const ManualChargeDialog = ({
                 <SelectContent>
                   <SelectItem value="MENSALIDADE">Mensalidade</SelectItem>
                   <SelectItem value="APOSTILA">Apostila</SelectItem>
+                  <SelectItem value="MATRICULA">Matrícula</SelectItem>
                   <SelectItem value="AVULSA">Avulsa</SelectItem>
                 </SelectContent>
               </Select>

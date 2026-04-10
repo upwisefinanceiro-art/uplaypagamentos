@@ -763,6 +763,7 @@ const AdminCharges = () => {
                         <SelectContent>
                           <SelectItem value="MENSALIDADE">Mensalidade</SelectItem>
                           <SelectItem value="APOSTILA">Apostila</SelectItem>
+                          <SelectItem value="MATRICULA">Matrícula</SelectItem>
                           <SelectItem value="AVULSA">Avulsa</SelectItem>
                         </SelectContent>
                       </Select>
@@ -868,6 +869,7 @@ const AdminCharges = () => {
             <SelectItem value="ALL">Todos os tipos</SelectItem>
             <SelectItem value="MENSALIDADE">Mensalidade</SelectItem>
             <SelectItem value="APOSTILA">Apostila</SelectItem>
+            <SelectItem value="MATRICULA">Matrícula</SelectItem>
             <SelectItem value="AVULSA">Avulsa</SelectItem>
           </SelectContent>
         </Select>
