@@ -59,6 +59,7 @@ const typeLabels: Record<PaymentType, string> = {
   MENSALIDADE: "Mensalidade",
   APOSTILA: "Apostila",
   AVULSA: "Avulsa",
+  MATRICULA: "Matrícula",
 };
 
 interface PaymentRow {
