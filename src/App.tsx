@@ -35,6 +35,7 @@ import SuperSettings from "./pages/super/SuperSettings";
 import SuperBilling from "./pages/super/SuperBilling";
 import { CompanyBrandingProvider } from "./contexts/CompanyBrandingContext";
 import NotFound from "./pages/NotFound";
+import Instalar from "./pages/Instalar";
 import SplashScreen from "./components/SplashScreen";
 
 const queryClient = new QueryClient();
