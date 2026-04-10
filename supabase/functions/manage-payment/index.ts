@@ -213,7 +213,7 @@ Deno.serve(async (req) => {
       if (!payload.responsible_id || !payload.value || !payload.due_date || !payload.payment_type) {
         return jsonResponse({ error: "responsible_id, value, due_date e payment_type são obrigatórios" });
       }
-      const resolvedDescription = payload.description?.trim() || (payload.payment_type === "MENSALIDADE" ? "Mensalidade" : payload.payment_type === "APOSTILA" ? "Apostila" : "Cobrança Avulsa");
+      const resolvedDescription = payload.description?.trim() || (payload.payment_type === "MENSALIDADE" ? "Mensalidade" : payload.payment_type === "APOSTILA" ? "Apostila" : payload.payment_type === "MATRICULA" ? "Matrícula" : "Cobrança Avulsa");
 
       let resolvedUnitId: string | null = null;
       let resolvedStudentId = payload.student_id || null;
