@@ -274,10 +274,13 @@ const ManualChargeDialog = ({
   };
 
   const handleSave = async () => {
-    if (!responsibleId || !realValue || !firstDueDate || !description.trim()) {
+    if (!responsibleId || !realValue || !firstDueDate) {
       toast({ title: "Preencha os campos obrigatórios", variant: "destructive" });
       return;
     }
+
+    // Auto-generate description if empty
+    const finalDescription = description.trim() || (paymentType === "MENSALIDADE" ? "Mensalidade" : paymentType === "APOSTILA" ? "Apostila" : "Cobrança Avulsa");
     if (numRealValue <= 0) {
       toast({ title: "Valor deve ser maior que zero", variant: "destructive" });
       return;
@@ -295,7 +298,7 @@ const ManualChargeDialog = ({
           student_id: studentId !== "NONE" ? studentId : null,
           contract_id: contractId !== "NONE" ? contractId : null,
           payment_type: paymentType,
-          description: `${description.trim()} - Parcela ${i + 1}/${dueDates.length}`,
+          description: `${finalDescription} - Parcela ${i + 1}/${dueDates.length}`,
           value: finalValue,
           due_date: dueDates[i],
           payment_method: paymentMethod,

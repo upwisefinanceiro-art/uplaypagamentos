@@ -210,9 +210,10 @@ Deno.serve(async (req) => {
     }
 
     if (payload.action === "create_manual") {
-      if (!payload.responsible_id || !payload.value || !payload.due_date || !payload.description?.trim() || !payload.payment_type) {
-        return jsonResponse({ error: "responsible_id, value, due_date, description e payment_type são obrigatórios" });
+      if (!payload.responsible_id || !payload.value || !payload.due_date || !payload.payment_type) {
+        return jsonResponse({ error: "responsible_id, value, due_date e payment_type são obrigatórios" });
       }
+      const resolvedDescription = payload.description?.trim() || (payload.payment_type === "MENSALIDADE" ? "Mensalidade" : payload.payment_type === "APOSTILA" ? "Apostila" : "Cobrança Avulsa");
 
       let resolvedUnitId: string | null = null;
       let resolvedStudentId = payload.student_id || null;
@@ -287,7 +288,7 @@ Deno.serve(async (req) => {
           status: "PENDING",
           payment_type: payload.payment_type,
           payment_method: payload.payment_method || null,
-          description: payload.description.trim(),
+          description: resolvedDescription,
           updated_at: now,
           stock_item_id: payload.stock_item_id || null,
           stock_quantity: payload.stock_quantity || 1,
