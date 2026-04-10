@@ -13,7 +13,7 @@ const jsonResponse = (body: Record<string, unknown>) =>
 
 type AppRole = "ADMIN_MASTER" | "ADMIN_UNIDADE" | "RESPONSAVEL";
 type PaymentStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELLED";
-type PaymentType = "MENSALIDADE" | "APOSTILA" | "AVULSA";
+type PaymentType = "MENSALIDADE" | "APOSTILA" | "AVULSA" | "MATRICULA";
 
 type Action = "update" | "delete" | "cancel" | "create_manual" | "delete_contract";
 
