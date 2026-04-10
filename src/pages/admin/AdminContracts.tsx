@@ -188,6 +188,11 @@ const AdminContracts = () => {
   const [apostilasStartDate, setApostilasStartDate] = useState("");
   const [apostilasInterval, setApostilasInterval] = useState("3");
 
+  // Matrícula state
+  const [includeMatricula, setIncludeMatricula] = useState(false);
+  const [matriculaValue, setMatriculaValue] = useState("");
+  const [matriculaDueDate, setMatriculaDueDate] = useState("");
+
   const selectedResponsible = responsibles.find(r => r.id === responsibleId);
   const selectedStudent = students.find(s => s.id === studentId);
   const resolvedUnitId = responsibleMode === "existing" ? (selectedResponsible?.unit_id || "") : unitId;
