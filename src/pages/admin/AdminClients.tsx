@@ -76,6 +76,7 @@ interface ContractLinkRow {
   student_id: string | null;
   description: string;
   status: string;
+  contract_number: string | null;
 }
 
 type ActionType = "deactivate" | "reactivate" | "permanent_delete";
