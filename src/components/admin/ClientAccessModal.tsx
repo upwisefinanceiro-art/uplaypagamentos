@@ -19,6 +19,7 @@ interface ClientAccessModalProps {
 }
 
 const APP_URL = "https://uplaypagamento.com.br/login";
+const INSTALL_URL = "https://uplaypagamento.com.br/instalar";
 const DEFAULT_PASSWORD = "12345678";
 
 const ClientAccessModal = ({ open, onOpenChange, data }: ClientAccessModalProps) => {
@@ -31,9 +32,9 @@ const ClientAccessModal = ({ open, onOpenChange, data }: ClientAccessModalProps)
     ? data.cpf.replace(/\D/g, "").replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")
     : data.email || "";
 
-  const copyText = `Olá! Seu acesso ao aplicativo da UPLAY foi criado:\n\nLogin: ${login}\nSenha: ${DEFAULT_PASSWORD}\n\nAcesse aqui: ${APP_URL}`;
+  const copyText = `Olá! Seu acesso ao aplicativo da UPLAY foi criado:\n\nLogin: ${login}\nSenha: ${DEFAULT_PASSWORD}\n\nAcesse aqui: ${APP_URL}\n\n📲 Instale o app no celular: ${INSTALL_URL}`;
 
-  const whatsappMessage = `Olá! Seu acesso ao app da UPLAY foi liberado.\n\nLogin: ${login}\nSenha: ${DEFAULT_PASSWORD}\n\nAcesse aqui: ${APP_URL}\n\nEm caso de dúvidas, estamos à disposição.`;
+  const whatsappMessage = `Olá! Seu acesso ao app da UPLAY foi liberado.\n\nLogin: ${login}\nSenha: ${DEFAULT_PASSWORD}\n\nAcesse aqui: ${APP_URL}\n\n📲 *Instale o app no celular:*\n${INSTALL_URL}\n\nEm caso de dúvidas, estamos à disposição.`;
 
   const handleCopy = async () => {
     try {
