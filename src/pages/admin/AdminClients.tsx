@@ -142,7 +142,7 @@ const AdminClients = () => {
         .from("payments")
         .select("id, responsible_id, contract_id, student_id, description, payment_type, installment_number, due_date, status, value, final_value, unit_id")
         .order("due_date", { ascending: false }),
-      supabase.from("contracts").select("id, responsible_id, responsible_name, cpf, email, phone, address, unit_id, student_id, description, status"),
+      supabase.from("contracts").select("id, responsible_id, responsible_name, cpf, email, phone, address, unit_id, student_id, description, status, contract_number"),
     ]);
 
     if (profilesRes.data && rolesRes.data && studentsRes.data && contractsRes.data) {
