@@ -992,6 +992,63 @@ const AdminContracts = () => {
     </div>
   );
 
+  const renderMatriculaSection = () => (
+    <div>
+      <h3 className="text-sm font-semibold text-primary mb-3">F. Matrícula</h3>
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="include-matricula"
+            checked={includeMatricula}
+            onCheckedChange={(checked) => setIncludeMatricula(checked === true)}
+          />
+          <label htmlFor="include-matricula" className="text-xs text-foreground cursor-pointer">
+            Incluir cobrança de matrícula no contrato
+          </label>
+        </div>
+
+        {includeMatricula && (
+          <div className="space-y-3 p-3 rounded-md border border-border bg-muted/30">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-foreground text-xs">Valor da Matrícula *</Label>
+                <Input
+                  className="bg-input border-border text-foreground"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0,00"
+                  value={matriculaValue}
+                  onChange={e => setMatriculaValue(sanitizeMoneyInput(e.target.value))}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-foreground text-xs">Data de Vencimento *</Label>
+                <Input
+                  className="bg-input border-border text-foreground"
+                  type="date"
+                  value={matriculaDueDate}
+                  onChange={e => setMatriculaDueDate(e.target.value)}
+                />
+              </div>
+            </div>
+            {matriculaValueParsed > 0 && matriculaDueDate && (
+              <div className="p-3 rounded-md bg-muted space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Valor:</span>
+                  <span className="font-semibold text-primary">{fmt(matriculaValueParsed)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Vencimento:</span>
+                  <span className="font-semibold text-foreground">{new Date(matriculaDueDate + "T12:00:00").toLocaleDateString("pt-BR")}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   const filteredContracts = useMemo(() => {
     if (!searchTerm.trim()) return contracts;
     const term = searchTerm.toLowerCase().trim();
