@@ -18,8 +18,8 @@ interface ClientAccessModalProps {
   data: ClientAccessData | null;
 }
 
-const APP_URL = "https://uplaypagamento.com.br/login";
-const INSTALL_URL = "https://uplaypagamento.com.br/instalar";
+const APP_URL = "https://uplaypagamentos.lovable.app/login";
+const INSTALL_URL = "https://uplaypagamentos.lovable.app/instalar";
 const DEFAULT_PASSWORD = "12345678";
 
 const ClientAccessModal = ({ open, onOpenChange, data }: ClientAccessModalProps) => {
