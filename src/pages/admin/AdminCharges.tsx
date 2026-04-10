@@ -85,6 +85,7 @@ interface PaymentRow {
 interface ContractRow {
   id: string;
   description: string;
+  contract_number: string | null;
   responsible_id: string;
   student_id: string;
   unit_id: string;
@@ -216,7 +217,7 @@ const AdminCharges = () => {
       supabase.from("units").select("id, name").order("name"),
       supabase.from("profiles").select("id, full_name, unit_id, active, phone").order("full_name"),
       supabase.from("user_roles").select("user_id").eq("role", "RESPONSAVEL"),
-      supabase.from("contracts").select("id, description, responsible_id, student_id, unit_id, status").order("created_at", { ascending: false }),
+      supabase.from("contracts").select("id, description, contract_number, responsible_id, student_id, unit_id, status").order("created_at", { ascending: false }),
       supabase.from("stock_items").select("id, name, unit_id, quantity").eq("active", true).order("name"),
     ]);
 
@@ -683,7 +684,9 @@ const AdminCharges = () => {
                         <SelectContent>
                           <SelectItem value="NONE">Sem contrato</SelectItem>
                           {chargeContracts.map((contract) => (
-                            <SelectItem key={contract.id} value={contract.id}>{contract.description}</SelectItem>
+                            <SelectItem key={contract.id} value={contract.id}>
+                              {contract.contract_number ? `${contract.contract_number} - ` : ""}{contract.description}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>

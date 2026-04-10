@@ -29,6 +29,7 @@ interface StudentRow {
 interface ContractRow {
   id: string;
   description: string;
+  contract_number: string | null;
   responsible_id: string;
   student_id: string;
   unit_id: string;
@@ -414,7 +415,9 @@ const ManualChargeDialog = ({
                 <SelectContent>
                   <SelectItem value="NONE">Sem contrato</SelectItem>
                   {filteredContracts.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.description}</SelectItem>
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.contract_number ? `${c.contract_number} - ` : ""}{c.description}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
