@@ -968,6 +968,7 @@ const AdminContracts = () => {
                 </SelectContent>
               </Select>
               <p className="text-[10px] text-muted-foreground">Vincular para baixa automática no estoque ao pagar</p>
+            </div>
             <p className="text-xs text-muted-foreground">
               Parcelas das apostilas geradas a cada {apostilasIntervalMonths} {apostilasIntervalMonths === 1 ? "mês" : "meses"}
             </p>
