@@ -272,7 +272,7 @@ const AdminContracts = () => {
     setInstallments("1"); setPaymentMethod(""); setNotes("");
     setPassword(""); setContractNumber(""); setStep("form"); setSaveResponsibleToBase(false);
     setIncludeApostilas(false); setApostilasTotal(""); setApostilasQty("1");
-    setApostilasStartDate(""); setApostilasInterval("3");
+    setApostilasStartDate(""); setApostilasInterval("3"); setApostilaStockItemId("");
     setIncludeMatricula(false); setMatriculaValue(""); setMatriculaDueDate(""); setMatriculaDescription("Matrícula");
     setNewStudentName(""); setStudentBirthDate("");
   };
