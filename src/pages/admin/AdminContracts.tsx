@@ -192,6 +192,7 @@ const AdminContracts = () => {
   const [includeMatricula, setIncludeMatricula] = useState(false);
   const [matriculaValue, setMatriculaValue] = useState("");
   const [matriculaDueDate, setMatriculaDueDate] = useState("");
+  const [matriculaDescription, setMatriculaDescription] = useState("Matrícula");
 
   const selectedResponsible = responsibles.find(r => r.id === responsibleId);
   const selectedStudent = students.find(s => s.id === studentId);
@@ -268,7 +269,7 @@ const AdminContracts = () => {
     setPassword(""); setContractNumber(""); setStep("form"); setSaveResponsibleToBase(false);
     setIncludeApostilas(false); setApostilasTotal(""); setApostilasQty("1");
     setApostilasStartDate(""); setApostilasInterval("3");
-    setIncludeMatricula(false); setMatriculaValue(""); setMatriculaDueDate("");
+    setIncludeMatricula(false); setMatriculaValue(""); setMatriculaDueDate(""); setMatriculaDescription("Matrícula");
     setNewStudentName(""); setStudentBirthDate("");
   };
 
@@ -481,7 +482,7 @@ const AdminContracts = () => {
           final_value: matriculaValueParsed,
           payment_method: paymentMethod,
           payment_type: "MATRICULA",
-          description: "Matrícula",
+          description: matriculaDescription || "Matrícula",
           status: "PENDING",
         });
       }
@@ -1009,6 +1010,16 @@ const AdminContracts = () => {
 
         {includeMatricula && (
           <div className="space-y-3 p-3 rounded-md border border-border bg-muted/30">
+            <div className="space-y-1">
+              <Label className="text-foreground text-xs">Descrição</Label>
+              <Input
+                className="bg-input border-border text-foreground"
+                type="text"
+                placeholder="Matrícula"
+                value={matriculaDescription}
+                onChange={e => setMatriculaDescription(e.target.value)}
+              />
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-foreground text-xs">Valor da Matrícula *</Label>
