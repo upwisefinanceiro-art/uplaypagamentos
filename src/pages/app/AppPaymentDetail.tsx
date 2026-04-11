@@ -197,7 +197,9 @@ const AppPaymentDetail = () => {
   };
   const chargeType = getChargeType();
 
-  const description = contract?.description || `Parcela ${payment.installment_number}${!payment.contract_id ? " - Avulsa" : ""}`;
+  const description = (payment.payment_type === "APOSTILA" || payment.payment_type === "MATRICULA")
+    ? (payment.description || (payment.payment_type === "MATRICULA" ? "Matrícula" : "Apostila"))
+    : (contract?.description || `Parcela ${payment.installment_number}${!payment.contract_id ? " - Avulsa" : ""}`);
 
   // History timeline
   const timeline = [
