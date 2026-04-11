@@ -97,7 +97,7 @@ const Instalar = () => {
           </div>
         )}
 
-        {/* Instructions */}
+        {/* Instructions - always visible */}
         <div className="w-full max-w-sm">
           <button
             onClick={() => setShowSteps(!showSteps)}
@@ -132,42 +132,32 @@ const Instalar = () => {
                 </>
               ) : platform === "android" ? (
                 <>
-                  {!deferredPrompt && (
-                    <>
-                      <Step number={1} icon={<MoreVertical className="h-5 w-5" />}
-                        title="Toque nos 3 pontos"
-                        description="No canto superior direito do Chrome"
-                      />
-                      <Step number={2} icon={<Download className="h-5 w-5" />}
-                        title='Toque em "Instalar aplicativo"'
-                        description='Ou "Adicionar à tela inicial"'
-                      />
-                      <Step number={3} icon={<CheckCircle2 className="h-5 w-5" />}
-                        title='Confirme tocando "Instalar"'
-                        description="O app UPLAY aparecerá na sua tela inicial"
-                      />
-                    </>
-                  )}
-                  {deferredPrompt && (
-                    <p className="text-white/50 text-sm text-center">
-                      Ou use o botão acima para instalar diretamente!
-                    </p>
-                  )}
+                  <Step number={1} icon={<MoreVertical className="h-5 w-5" />}
+                    title="Toque nos 3 pontos ⋮"
+                    description="No canto superior direito do Chrome"
+                  />
+                  <Step number={2} icon={<Download className="h-5 w-5" />}
+                    title='Procure "Instalar aplicativo"'
+                    description='Ou "Adicionar à tela inicial" — role o menu para baixo se necessário'
+                  />
+                  <Step number={3} icon={<CheckCircle2 className="h-5 w-5" />}
+                    title='Confirme tocando "Instalar"'
+                    description="O app UPLAY aparecerá na sua tela inicial"
+                  />
+                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-sm text-blue-200/80">
+                    <strong className="text-blue-300">Dica:</strong> Se não encontrar a opção, tente atualizar a página (puxe para baixo) e abra o menu novamente. Use o <strong>Chrome</strong> para melhor compatibilidade.
+                  </div>
                 </>
               ) : (
                 <>
-                  {!deferredPrompt && (
-                    <>
-                      <Step number={1} icon={<ArrowUp className="h-5 w-5" />}
-                        title="Clique no ícone de instalar"
-                        description="Na barra de endereço do navegador, procure o ícone de instalação"
-                      />
-                      <Step number={2} icon={<CheckCircle2 className="h-5 w-5" />}
-                        title='Confirme clicando "Instalar"'
-                        description="O app abrirá em uma janela própria"
-                      />
-                    </>
-                  )}
+                  <Step number={1} icon={<ArrowUp className="h-5 w-5" />}
+                    title="Clique no ícone de instalar"
+                    description="Na barra de endereço do navegador, procure o ícone de instalação"
+                  />
+                  <Step number={2} icon={<CheckCircle2 className="h-5 w-5" />}
+                    title='Confirme clicando "Instalar"'
+                    description="O app abrirá em uma janela própria"
+                  />
                 </>
               )}
             </div>
