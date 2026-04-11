@@ -90,7 +90,7 @@ const AppPayments = () => {
     setLoading(true);
     const { data } = await supabase
       .from("payments")
-      .select("id, value, due_date, status, payment_method, installment_number, pix_copy_paste, invoice_url, boleto_url, checkout_url, contract_id, responsible_id, final_value")
+      .select("id, value, due_date, status, payment_method, installment_number, pix_copy_paste, invoice_url, boleto_url, checkout_url, contract_id, responsible_id, final_value, description, payment_type")
       .order("due_date", { ascending: false });
     if (data) setPayments(data);
     setLoading(false);
@@ -399,7 +399,10 @@ const AppPayments = () => {
                   )}
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm font-medium truncate ${isOverdue ? "text-destructive" : "text-foreground"}`}>
-                      Parcela {payment.installment_number} {payment.payment_method ? `• ${payment.payment_method}` : ""}
+                      {payment.payment_type === "APOSTILA" || payment.payment_type === "MATRICULA"
+                        ? (payment.description || (payment.payment_type === "MATRICULA" ? "Matrícula" : "Apostila"))
+                        : `Parcela ${payment.installment_number}`}
+                      {payment.payment_method ? ` • ${payment.payment_method}` : ""}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {dueDate.toLocaleDateString("pt-BR")}
