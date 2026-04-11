@@ -187,6 +187,8 @@ const AdminContracts = () => {
   const [apostilasQty, setApostilasQty] = useState("1");
   const [apostilasStartDate, setApostilasStartDate] = useState("");
   const [apostilasInterval, setApostilasInterval] = useState("3");
+  const [apostilaStockItemId, setApostilaStockItemId] = useState("");
+  const [stockItems, setStockItems] = useState<{ id: string; name: string; unit_id: string; quantity: number }[]>([]);
 
   // Matrícula state
   const [includeMatricula, setIncludeMatricula] = useState(false);
@@ -227,13 +229,14 @@ const AdminContracts = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const [contractsRes, studentsRes, responsiblesRes, unitsRes, adminRolesRes, paymentsRes] = await Promise.all([
+    const [contractsRes, studentsRes, responsiblesRes, unitsRes, adminRolesRes, paymentsRes, stockItemsRes] = await Promise.all([
       supabase.from("contracts").select("*, units(name), students(full_name)").order("created_at", { ascending: false }),
       supabase.from("students").select("id, full_name, responsible_id, unit_id").eq("active", true),
       supabase.from("profiles").select("id, full_name, cpf, phone, email, unit_id, asaas_customer_id").eq("active", true),
       supabase.from("units").select("id, name").eq("active", true),
       supabase.from("user_roles").select("user_id").in("role", ["ADMIN_MASTER", "ADMIN_UNIDADE"]),
       supabase.from("payments").select("id, contract_id, status, due_date").not("contract_id", "is", null),
+      supabase.from("stock_items").select("id, name, unit_id, quantity").eq("active", true),
     ]);
     if (contractsRes.data) setContracts(contractsRes.data as any);
     if (studentsRes.data) setStudents(studentsRes.data);
@@ -243,6 +246,7 @@ const AdminContracts = () => {
     }
     if (unitsRes.data) setUnits(unitsRes.data);
     if (paymentsRes.data) setContractPayments(paymentsRes.data as any);
+    if (stockItemsRes.data) setStockItems(stockItemsRes.data as any);
     setLoading(false);
   };
 
