@@ -467,6 +467,8 @@ const AdminContracts = () => {
             payment_type: "APOSTILA",
             description: `Apostila ${i + 1}/${apostilasCount}`,
             status: "PENDING",
+            stock_item_id: apostilaStockItemId || null,
+            stock_quantity: 1,
           });
         }
       }
