@@ -951,6 +951,23 @@ const AdminContracts = () => {
                 <Input className="bg-input border-border text-foreground" type="number" min="1" max="12" value={apostilasInterval} onChange={e => setApostilasInterval(e.target.value)} />
               </div>
             </div>
+            <div className="space-y-1">
+              <Label className="text-foreground text-xs">Item de Estoque vinculado</Label>
+              <Select value={apostilaStockItemId} onValueChange={setApostilaStockItemId}>
+                <SelectTrigger className="bg-input border-border text-foreground">
+                  <SelectValue placeholder="Selecione o item do estoque" />
+                </SelectTrigger>
+                <SelectContent>
+                  {stockItems
+                    .filter(si => si.unit_id === resolvedUnitId)
+                    .map(si => (
+                      <SelectItem key={si.id} value={si.id}>
+                        {si.name} (Qtd: {si.quantity})
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-muted-foreground">Vincular para baixa automática no estoque ao pagar</p>
             <p className="text-xs text-muted-foreground">
               Parcelas das apostilas geradas a cada {apostilasIntervalMonths} {apostilasIntervalMonths === 1 ? "mês" : "meses"}
             </p>
