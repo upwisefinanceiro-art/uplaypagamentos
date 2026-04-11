@@ -187,6 +187,8 @@ const AdminContracts = () => {
   const [apostilasQty, setApostilasQty] = useState("1");
   const [apostilasStartDate, setApostilasStartDate] = useState("");
   const [apostilasInterval, setApostilasInterval] = useState("3");
+  const [apostilaStockItemId, setApostilaStockItemId] = useState("");
+  const [stockItems, setStockItems] = useState<{ id: string; name: string; unit_id: string; quantity: number }[]>([]);
 
   // Matrícula state
   const [includeMatricula, setIncludeMatricula] = useState(false);
@@ -227,13 +229,14 @@ const AdminContracts = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const [contractsRes, studentsRes, responsiblesRes, unitsRes, adminRolesRes, paymentsRes] = await Promise.all([
+    const [contractsRes, studentsRes, responsiblesRes, unitsRes, adminRolesRes, paymentsRes, stockItemsRes] = await Promise.all([
       supabase.from("contracts").select("*, units(name), students(full_name)").order("created_at", { ascending: false }),
       supabase.from("students").select("id, full_name, responsible_id, unit_id").eq("active", true),
       supabase.from("profiles").select("id, full_name, cpf, phone, email, unit_id, asaas_customer_id").eq("active", true),
       supabase.from("units").select("id, name").eq("active", true),
       supabase.from("user_roles").select("user_id").in("role", ["ADMIN_MASTER", "ADMIN_UNIDADE"]),
       supabase.from("payments").select("id, contract_id, status, due_date").not("contract_id", "is", null),
+      supabase.from("stock_items").select("id, name, unit_id, quantity").eq("active", true),
     ]);
     if (contractsRes.data) setContracts(contractsRes.data as any);
     if (studentsRes.data) setStudents(studentsRes.data);
@@ -243,6 +246,7 @@ const AdminContracts = () => {
     }
     if (unitsRes.data) setUnits(unitsRes.data);
     if (paymentsRes.data) setContractPayments(paymentsRes.data as any);
+    if (stockItemsRes.data) setStockItems(stockItemsRes.data as any);
     setLoading(false);
   };
 
@@ -268,7 +272,7 @@ const AdminContracts = () => {
     setInstallments("1"); setPaymentMethod(""); setNotes("");
     setPassword(""); setContractNumber(""); setStep("form"); setSaveResponsibleToBase(false);
     setIncludeApostilas(false); setApostilasTotal(""); setApostilasQty("1");
-    setApostilasStartDate(""); setApostilasInterval("3");
+    setApostilasStartDate(""); setApostilasInterval("3"); setApostilaStockItemId("");
     setIncludeMatricula(false); setMatriculaValue(""); setMatriculaDueDate(""); setMatriculaDescription("Matrícula");
     setNewStudentName(""); setStudentBirthDate("");
   };
@@ -463,6 +467,8 @@ const AdminContracts = () => {
             payment_type: "APOSTILA",
             description: `Apostila ${i + 1}/${apostilasCount}`,
             status: "PENDING",
+            stock_item_id: apostilaStockItemId || null,
+            stock_quantity: 1,
           });
         }
       }
@@ -944,6 +950,24 @@ const AdminContracts = () => {
                 <Label className="text-foreground text-xs">Intervalo entre parcelas (meses)</Label>
                 <Input className="bg-input border-border text-foreground" type="number" min="1" max="12" value={apostilasInterval} onChange={e => setApostilasInterval(e.target.value)} />
               </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-foreground text-xs">Item de Estoque vinculado</Label>
+              <Select value={apostilaStockItemId} onValueChange={setApostilaStockItemId}>
+                <SelectTrigger className="bg-input border-border text-foreground">
+                  <SelectValue placeholder="Selecione o item do estoque" />
+                </SelectTrigger>
+                <SelectContent>
+                  {stockItems
+                    .filter(si => si.unit_id === resolvedUnitId)
+                    .map(si => (
+                      <SelectItem key={si.id} value={si.id}>
+                        {si.name} (Qtd: {si.quantity})
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-muted-foreground">Vincular para baixa automática no estoque ao pagar</p>
             </div>
             <p className="text-xs text-muted-foreground">
               Parcelas das apostilas geradas a cada {apostilasIntervalMonths} {apostilasIntervalMonths === 1 ? "mês" : "meses"}
