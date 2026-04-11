@@ -18,6 +18,7 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
+      manifestFilename: "app.webmanifest",
       includeAssets: ["favicon.ico", "logo.png", "icons/icon-192x192.png", "icons/icon-512x512.png", ".well-known/assetlinks.json"],
       manifest: {
         name: "UPLAY Pagamentos",
