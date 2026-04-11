@@ -192,6 +192,7 @@ const AdminContracts = () => {
   const [includeMatricula, setIncludeMatricula] = useState(false);
   const [matriculaValue, setMatriculaValue] = useState("");
   const [matriculaDueDate, setMatriculaDueDate] = useState("");
+  const [matriculaDescription, setMatriculaDescription] = useState("Matrícula");
 
   const selectedResponsible = responsibles.find(r => r.id === responsibleId);
   const selectedStudent = students.find(s => s.id === studentId);
