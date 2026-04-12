@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => ({
       registerType: "autoUpdate",
       manifestFilename: "app.webmanifest",
       includeAssets: ["favicon.ico", "logo.png", "icons/icon-192x192.png", "icons/icon-512x512.png", ".well-known/assetlinks.json"],
-      manifest: {
+        manifest: {
         name: "UPLAY Pagamentos",
         short_name: "UPLAY",
         description: "Sistema de gestão de cobranças e pagamentos - UPLAY Pagamentos",
@@ -29,7 +29,9 @@ export default defineConfig(({ mode }) => ({
         display: "standalone",
         background_color: "#000000",
         theme_color: "#000000",
+          lang: "pt-BR",
         orientation: "portrait-primary",
+          scope: "/",
         categories: ["finance", "education"],
         prefer_related_applications: false,
         icons: [
