@@ -2,11 +2,16 @@
   "name": "UPLAY Pagamentos",
   "short_name": "UPLAY",
   "description": "Sistema de gestão de cobranças e pagamentos - UPLAY Pagamentos",
+  "id": "/",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#000000",
+  "lang": "pt-BR",
+  "scope": "/",
   "orientation": "portrait-primary",
+  "categories": ["finance", "education"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icons/icon-192x192.png",
@@ -31,6 +36,29 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/screenshot-mobile-1.jpg",
+      "sizes": "1080x1920",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "Tela de pagamentos - UPLAY"
+    },
+    {
+      "src": "/screenshots/screenshot-mobile-2.jpg",
+      "sizes": "1080x1920",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "Detalhes de pagamento - UPLAY"
+    },
+    {
+      "src": "/screenshots/screenshot-desktop-1.jpg",
+      "sizes": "1920x1080",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "Dashboard administrativo - UPLAY"
     }
   ]
 }
