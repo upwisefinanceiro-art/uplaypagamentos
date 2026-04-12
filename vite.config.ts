@@ -19,8 +19,17 @@ export default defineConfig(({ mode }) => ({
     VitePWA({
       registerType: "autoUpdate",
       manifestFilename: "app.webmanifest",
-      includeAssets: ["favicon.ico", "logo.png", "icons/icon-192x192.png", "icons/icon-512x512.png", ".well-known/assetlinks.json"],
-        manifest: {
+      includeAssets: [
+        "favicon.ico",
+        "logo.png",
+        "icons/icon-192x192.png",
+        "icons/icon-512x512.png",
+        ".well-known/assetlinks.json",
+      ],
+      devOptions: {
+        enabled: false,
+      },
+      manifest: {
         name: "UPLAY Pagamentos",
         short_name: "UPLAY",
         description: "Sistema de gestão de cobranças e pagamentos - UPLAY Pagamentos",
@@ -29,9 +38,9 @@ export default defineConfig(({ mode }) => ({
         display: "standalone",
         background_color: "#000000",
         theme_color: "#000000",
-          lang: "pt-BR",
+        lang: "pt-BR",
         orientation: "portrait-primary",
-          scope: "/",
+        scope: "/",
         categories: ["finance", "education"],
         prefer_related_applications: false,
         icons: [
@@ -87,8 +96,10 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
+        cleanupOutdatedCaches: true,
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-        navigateFallbackDenylist: [/^\/~oauth/],
+        navigateFallback: "/index.html",
+        navigateFallbackDenylist: [/^\/~oauth/, /^\/api\//],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -106,6 +117,16 @@ export default defineConfig(({ mode }) => ({
               cacheName: "gstatic-fonts-cache",
               expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
               cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "supabase-api-cache",
+              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 5 },
+              cacheableResponse: { statuses: [0, 200] },
+              networkTimeoutSeconds: 10,
             },
           },
         ],
