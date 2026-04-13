@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import BrandName from "@/components/BrandName";
 
 const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
   const [fadeOut, setFadeOut] = useState(false);

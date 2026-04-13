@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import BrandName from "@/components/BrandName";
 
 const formatCpfInput = (value: string): string => {
   const digits = value.replace(/\D/g, "").slice(0, 11);
