@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import BrandName from "@/components/BrandName";
 
 const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
   const [fadeOut, setFadeOut] = useState(false);
@@ -24,7 +25,7 @@ const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
         className="w-28 h-28 mb-6 animate-pulse"
       />
       <h1 className="text-2xl font-bold text-foreground tracking-wide">
-        UPLAY Pagamentos
+        <BrandName />
       </h1>
       <p className="text-sm text-muted-foreground mt-2">Carregando...</p>
     </div>

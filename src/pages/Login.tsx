@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import BrandName from "@/components/BrandName";
 
 const formatCpfInput = (value: string): string => {
   const digits = value.replace(/\D/g, "").slice(0, 11);
@@ -162,7 +163,7 @@ const Login = () => {
         </div>
 
         <div className="text-center mb-8">
-          <h1 className="text-xl font-bold text-foreground">UPLAY Pagamentos</h1>
+          <h1 className="text-xl font-bold text-foreground"><BrandName /></h1>
           <p className="text-sm text-muted-foreground mt-1">Acesse sua conta para continuar</p>
         </div>
 
@@ -222,7 +223,7 @@ const Login = () => {
           </Link>
         </form>
 
-        <p className="text-center text-xs text-muted-foreground mt-8">© {new Date().getFullYear()} UPLAY Pagamentos</p>
+        <p className="text-center text-xs text-muted-foreground mt-8">© {new Date().getFullYear()} <BrandName /></p>
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import BrandName from "@/components/BrandName";
 
 const ForgotPassword = () => {
   const [credential, setCredential] = useState("");
@@ -117,7 +118,7 @@ const ForgotPassword = () => {
           <ArrowLeft size={16} /> Voltar ao login
         </Link>
 
-        <p className="text-center text-xs text-muted-foreground mt-8">© {new Date().getFullYear()} UPLAY Pagamentos</p>
+        <p className="text-center text-xs text-muted-foreground mt-8">© {new Date().getFullYear()} <BrandName /></p>
       </div>
     </div>
   );
