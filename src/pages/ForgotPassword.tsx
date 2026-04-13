@@ -117,7 +117,7 @@ const ForgotPassword = () => {
           <ArrowLeft size={16} /> Voltar ao login
         </Link>
 
-        <p className="text-center text-xs text-muted-foreground mt-8">© {new Date().getFullYear()} UPLAY Pagamentos</p>
+        <p className="text-center text-xs text-muted-foreground mt-8">© {new Date().getFullYear()} <BrandName /></p>
       </div>
     </div>
   );
