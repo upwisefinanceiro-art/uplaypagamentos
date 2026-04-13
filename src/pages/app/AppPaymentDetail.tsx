@@ -53,8 +53,8 @@ const AppPaymentDetail = () => {
     if (!p) return false;
     if (p.status === "PAID" || p.status === "CANCELLED") return false;
     if (p.payment_method === "DINHEIRO") return false;
-    // Has asaas_payment_id but missing links
-    if (p.asaas_payment_id && !(p.invoice_url || p.checkout_url || p.boleto_url)) return true;
+    // Missing links - either has asaas_payment_id but no links, or no asaas_payment_id at all
+    if (!(p.invoice_url || p.checkout_url || p.boleto_url)) return true;
     return false;
   }, []);
 
