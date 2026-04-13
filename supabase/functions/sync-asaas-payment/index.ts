@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
 
     if (!payment_id) return respond({ error: "payment_id é obrigatório" }, 400);
 
-    // Check caller is admin
+    // Check caller roles
     const { data: callerRoles } = await supabaseAdmin
       .from("user_roles")
       .select("role")
@@ -102,7 +102,11 @@ Deno.serve(async (req) => {
     const isAdmin = callerRoles?.some((r: { role: string }) =>
       r.role === "ADMIN_MASTER" || r.role === "ADMIN_UNIDADE"
     );
-    if (!isAdmin) return respond({ error: "Sem permissão" }, 403);
+    const isResponsavel = callerRoles?.some((r: { role: string }) =>
+      r.role === "RESPONSAVEL"
+    );
+
+    if (!isAdmin && !isResponsavel) return respond({ error: "Sem permissão" }, 403);
 
     // Get payment
     const { data: payment, error: payErr } = await supabaseAdmin
@@ -113,12 +117,26 @@ Deno.serve(async (req) => {
 
     if (payErr || !payment) return respond({ error: "Pagamento não encontrado" }, 404);
 
+    // RESPONSAVEL can only sync their own payments
+    if (isResponsavel && !isAdmin) {
+      if (payment.responsible_id !== caller.id) {
+        return respond({ error: "Sem permissão para esta cobrança" }, 403);
+      }
+      // RESPONSAVEL can only refresh existing asaas payments, not create new ones
+      if (!payment.asaas_payment_id) {
+        return respond({ error: "Esta cobrança ainda não foi enviada ao Asaas. Entre em contato com o financeiro." }, 400);
+      }
+    }
+
     console.log("[sync-asaas-payment] cobrança carregada do banco", JSON.stringify({
       payment_id,
+      caller_id: caller.id,
+      caller_role: isAdmin ? "ADMIN" : "RESPONSAVEL",
       asaas_payment_id: payment.asaas_payment_id,
       payment_method: payment.payment_method,
       status: payment.status,
       due_date: payment.due_date,
+      unit_id: payment.unit_id,
       invoice_url: Boolean(payment.invoice_url),
       boleto_url: Boolean(payment.boleto_url),
       pix_copy_paste: Boolean(payment.pix_copy_paste),
@@ -127,13 +145,19 @@ Deno.serve(async (req) => {
     // Get unit with Asaas credentials
     const { data: unit, error: unitErr } = await supabaseAdmin
       .from("units")
-      .select("asaas_api_key, asaas_base_url")
+      .select("id, name, asaas_api_key, asaas_base_url")
       .eq("id", payment.unit_id)
       .single();
 
     if (unitErr || !unit?.asaas_api_key) {
       return respond({ error: "Unidade sem credenciais Asaas configuradas" }, 400);
     }
+
+    console.log("[sync-asaas-payment] unidade identificada", JSON.stringify({
+      unit_id: unit.id,
+      unit_name: unit.name,
+      base_url: unit.asaas_base_url || "https://api.asaas.com/v3",
+    }));
 
     const baseUrl = unit.asaas_base_url || "https://api.asaas.com/v3";
 
@@ -226,6 +250,10 @@ Deno.serve(async (req) => {
     }
 
     // ── CREATE: payment has no asaas_payment_id ──
+    // Only admins can create charges in Asaas
+    if (!isAdmin) {
+      return respond({ error: "Esta cobrança ainda não foi enviada ao Asaas. Entre em contato com o financeiro." }, 400);
+    }
 
     // Skip DINHEIRO
     if (payment.payment_method === "DINHEIRO") {
