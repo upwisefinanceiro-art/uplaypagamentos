@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import BrandName from "@/components/BrandName";
 
 const ResetPassword = () => {
   const [password, setPassword] = useState("");
@@ -201,7 +202,7 @@ const ResetPassword = () => {
             {loading ? <Loader2 size={18} className="animate-spin" /> : <span className="flex items-center gap-2"><Lock size={18} /> Salvar nova senha</span>}
           </Button>
         </form>
-        <p className="text-center text-xs text-muted-foreground mt-8">© {new Date().getFullYear()} UPLAY Pagamentos</p>
+        <p className="text-center text-xs text-muted-foreground mt-8">© {new Date().getFullYear()} <BrandName /></p>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Download, Smartphone, Share, MoreVertical, Plus, ArrowUp, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import BrandName from "@/components/BrandName";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -75,7 +76,7 @@ const Instalar = () => {
       {/* Header */}
       <div className="flex flex-col items-center pt-12 pb-6 px-6">
         <img src="/icons/icon-192x192.png" alt="UPLAY" className="h-24 w-24 rounded-2xl shadow-2xl mb-6" />
-        <h1 className="text-2xl font-bold mb-1">UPLAY Pagamentos</h1>
+        <h1 className="text-2xl font-bold mb-1"><BrandName /></h1>
         <p className="text-white/60 text-sm">Gestão de cobranças e pagamentos</p>
       </div>
 
