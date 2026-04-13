@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft, Copy, ExternalLink, QrCode, CreditCard, Loader2,
@@ -43,10 +43,56 @@ const AppPaymentDetail = () => {
   const [student, setStudent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const [waDialogOpen, setWaDialogOpen] = useState(false);
   const [unitWhatsAppNumber, setUnitWhatsAppNumber] = useState(DEFAULT_WHATSAPP_FINANCEIRO);
 
   const isAdmin = hasRole("ADMIN_MASTER");
+
+  const needsSync = useCallback((p: any) => {
+    if (!p) return false;
+    if (p.status === "PAID" || p.status === "CANCELLED") return false;
+    if (p.payment_method === "DINHEIRO") return false;
+    // Has asaas_payment_id but missing links
+    if (p.asaas_payment_id && !(p.invoice_url || p.checkout_url || p.boleto_url)) return true;
+    return false;
+  }, []);
+
+  const syncPayment = useCallback(async (paymentId: string) => {
+    setSyncing(true);
+    setSyncError(null);
+    console.info("[app-payment-detail] auto-sync iniciado", { paymentId });
+
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-asaas-payment", {
+        body: { payment_id: paymentId },
+      });
+
+      if (error || data?.error) {
+        const msg = error?.message || data?.error || "Erro ao sincronizar";
+        console.error("[app-payment-detail] erro na sincronização", { paymentId, msg });
+        setSyncError(msg);
+        return null;
+      }
+
+      console.info("[app-payment-detail] sincronização concluída", {
+        paymentId,
+        action: data?.action,
+        invoice_url: Boolean(data?.invoice_url),
+        boleto_url: Boolean(data?.boleto_url),
+        pix_copy_paste: Boolean(data?.pix_copy_paste),
+      });
+
+      return data;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro ao sincronizar";
+      console.error("[app-payment-detail] exceção na sincronização", { paymentId, msg });
+      setSyncError(msg);
+      return null;
+    } finally {
+      setSyncing(false);
+    }
+  }, []);
 
   useEffect(() => {
     const fetchPayment = async () => {
@@ -82,18 +128,49 @@ const AppPaymentDetail = () => {
             }
           }
         }
-        // Pre-load WhatsApp number for the unit (uses profile's unit_id for RLS compatibility)
         try {
           const whatsNum = await getUnitWhatsAppNumber(profile?.unit_id || data.unit_id);
           setUnitWhatsAppNumber(whatsNum);
         } catch {
           // fallback already set
         }
+
+        // Auto-sync if payment has asaas_payment_id but missing links
+        if (needsSync(data)) {
+          const syncResult = await syncPayment(data.id);
+          if (syncResult) {
+            // Reload payment data after sync
+            const { data: refreshed } = await supabase
+              .from("payments")
+              .select("*")
+              .eq("id", id)
+              .single();
+            if (refreshed) setPayment(refreshed);
+          }
+        }
       }
       setLoading(false);
     };
     fetchPayment();
-  }, [id, profile?.unit_id]);
+  }, [id, profile?.unit_id, needsSync, syncPayment]);
+
+  const handleManualSync = async () => {
+    if (!payment?.id) return;
+    const syncResult = await syncPayment(payment.id);
+    if (syncResult) {
+      const { data: refreshed } = await supabase
+        .from("payments")
+        .select("*")
+        .eq("id", payment.id)
+        .single();
+      if (refreshed) {
+        setPayment(refreshed);
+        toast({ title: "Dados atualizados!" });
+      }
+    } else {
+      toast({ title: "Erro ao sincronizar", description: syncError || "Tente novamente.", variant: "destructive" });
+    }
+  };
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -103,7 +180,6 @@ const AppPaymentDetail = () => {
   const handleOpenWhatsApp = async () => {
     if (!payment?.id) return;
 
-    // For admin: sync with Asaas and open billing WhatsApp dialog
     if (isAdmin) {
       try {
         toast({ title: "Sincronizando cobrança no Asaas antes do envio..." });
@@ -122,7 +198,6 @@ const AppPaymentDetail = () => {
       return;
     }
 
-    // For client: open WhatsApp to contact financeiro (synchronous - no await to avoid popup blocker)
     const responsibleName = responsible?.full_name || "Responsável";
     const studentFullName = student?.full_name || "";
     const unitFullName = unit?.name || "";
@@ -152,6 +227,20 @@ const AppPaymentDetail = () => {
 
   const formatCurrency = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
   const formatDate = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("pt-BR");
+
+  // Get the best payment URL
+  const getPayNowUrl = () => {
+    if (payment?.invoice_url) return payment.invoice_url;
+    if (payment?.checkout_url) return payment.checkout_url;
+    if (payment?.boleto_url) return payment.boleto_url;
+    return null;
+  };
+
+  const getBoletoUrl = () => {
+    if (payment?.boleto_url) return payment.boleto_url;
+    if (payment?.invoice_url) return payment.invoice_url;
+    return null;
+  };
 
   if (loading) {
     return (
@@ -188,7 +277,6 @@ const AppPaymentDetail = () => {
   const finalValue = payment.final_value ?? payment.value;
   const hasDiscount = discount > 0;
 
-  // Determine charge type
   const getChargeType = () => {
     if (!payment.contract_id) return { label: "Avulsa", color: "bg-accent text-accent-foreground" };
     const desc = contract?.description?.toLowerCase() || "";
@@ -201,12 +289,15 @@ const AppPaymentDetail = () => {
     ? (payment.description || (payment.payment_type === "MATRICULA" ? "Matrícula" : "Apostila"))
     : (contract?.description || `Parcela ${payment.installment_number}${!payment.contract_id ? " - Avulsa" : ""}`);
 
-  // History timeline
   const timeline = [
     { label: "Cobrança criada", date: payment.created_at, icon: Receipt },
     ...(payment.updated_at !== payment.created_at ? [{ label: "Última atualização", date: payment.updated_at, icon: Clock }] : []),
     ...(payment.paid_at ? [{ label: "Pagamento confirmado", date: payment.paid_at, icon: CheckCircle2 }] : []),
   ];
+
+  const payNowUrl = getPayNowUrl();
+  const boletoUrl = getBoletoUrl();
+  const hasAnyLink = Boolean(payment.invoice_url || payment.checkout_url || payment.boleto_url);
 
   return (
     <div className="p-4 space-y-5 animate-fade-in max-w-2xl mx-auto pb-8">
@@ -230,6 +321,14 @@ const AppPaymentDetail = () => {
           <Badge className={`${chargeType.color} border-0 text-xs`}>{chargeType.label}</Badge>
         </div>
       </div>
+
+      {/* ─── SYNCING INDICATOR ─── */}
+      {syncing && (
+        <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-center gap-3">
+          <Loader2 size={16} className="animate-spin text-primary" />
+          <p className="text-sm text-primary">Buscando dados de pagamento no Asaas...</p>
+        </div>
+      )}
 
       {/* ─── IDENTIFICATION ─── */}
       <div className="glass-card p-4 space-y-3">
@@ -276,13 +375,11 @@ const AppPaymentDetail = () => {
         </h3>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {/* Valor original */}
           <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-1">
             <p className="text-[11px] text-muted-foreground font-medium">Valor original</p>
             <p className="text-lg font-bold text-foreground">{formatCurrency(originalValue)}</p>
           </div>
 
-          {/* Desconto */}
           <div className={`rounded-lg border p-3 space-y-1 ${hasDiscount ? "border-success/40 bg-success/5" : "border-border bg-secondary/30"}`}>
             <p className="text-[11px] text-muted-foreground font-medium">Desconto pontualidade</p>
             <p className={`text-lg font-bold ${hasDiscount ? "text-success" : "text-muted-foreground"}`}>
@@ -290,7 +387,6 @@ const AppPaymentDetail = () => {
             </p>
           </div>
 
-          {/* Valor final */}
           <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 space-y-1">
             <p className="text-[11px] text-muted-foreground font-medium">Valor a pagar</p>
             <p className="text-lg font-bold text-primary">{formatCurrency(finalValue)}</p>
@@ -299,7 +395,6 @@ const AppPaymentDetail = () => {
             )}
           </div>
 
-          {/* Vencimento */}
           <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-1">
             <p className="text-[11px] text-muted-foreground font-medium">Vencimento</p>
             <p className="text-lg font-bold text-foreground">{dueDateStr}</p>
@@ -327,6 +422,15 @@ const AppPaymentDetail = () => {
         </div>
       )}
 
+      {/* ─── PAGAR AGORA (prominent CTA) ─── */}
+      {(status === "PENDING" || status === "OVERDUE") && payNowUrl && !syncing && (
+        <Button className="w-full gap-2 h-12 text-base font-bold" asChild>
+          <a href={payNowUrl} target="_blank" rel="noopener noreferrer">
+            <ExternalLink size={18} /> Pagar Agora
+          </a>
+        </Button>
+      )}
+
       {/* ─── PAYMENT METHODS ─── */}
       {(status === "PENDING" || status === "OVERDUE") && (
         <div className="glass-card p-4 space-y-4">
@@ -335,11 +439,11 @@ const AppPaymentDetail = () => {
             Meios de Pagamento
           </h3>
 
-          {(payment.invoice_url || payment.checkout_url) ? (
+          {hasAnyLink ? (
             <>
               {/* Invoice / Checkout link */}
               {payment.invoice_url && (
-                <Button className="w-full gap-2" asChild>
+                <Button className="w-full gap-2" variant="outline" asChild>
                   <a href={payment.invoice_url} target="_blank" rel="noopener noreferrer">
                     <ExternalLink size={16} /> Abrir Fatura / Pagar Online
                   </a>
@@ -347,14 +451,14 @@ const AppPaymentDetail = () => {
               )}
 
               {/* Boleto */}
-              {payment.boleto_url && (
+              {(payment.boleto_url || (method === "BOLETO" && payment.invoice_url)) && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <FileText size={14} />
                     <span className="font-medium">Boleto Bancário</span>
                   </div>
                   <Button variant="outline" className="w-full gap-2" asChild>
-                    <a href={payment.boleto_url} target="_blank" rel="noopener noreferrer">
+                    <a href={boletoUrl!} target="_blank" rel="noopener noreferrer">
                       <ExternalLink size={16} /> Abrir Boleto
                     </a>
                   </Button>
@@ -423,21 +527,47 @@ const AppPaymentDetail = () => {
             </>
           ) : (
             <div className="text-center py-4 space-y-2">
-              <AlertTriangle size={20} className="text-warning mx-auto" />
-              <p className="text-sm text-muted-foreground">
-                Esta cobrança ainda não possui link de pagamento.
-              </p>
+              {syncError ? (
+                <>
+                  <AlertTriangle size={20} className="text-destructive mx-auto" />
+                  <p className="text-sm text-destructive font-medium">
+                    Não foi possível carregar o link de pagamento desta cobrança.
+                  </p>
+                  <p className="text-xs text-muted-foreground">{syncError}</p>
+                </>
+              ) : (
+                <>
+                  <AlertTriangle size={20} className="text-warning mx-auto" />
+                  <p className="text-sm text-muted-foreground">
+                    Esta cobrança ainda não possui link de pagamento.
+                  </p>
+                </>
+              )}
               <p className="text-xs text-muted-foreground">
                 Entre em contato com o financeiro pelo WhatsApp para solicitar o boleto ou link de pagamento.
               </p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2 text-xs border-success/30 text-success hover:bg-success/10 hover:text-success mt-2"
-                onClick={handleOpenWhatsApp}
-              >
-                <MessageCircle size={14} /> Solicitar link de pagamento
-              </Button>
+              <div className="flex gap-2 justify-center mt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 text-xs border-success/30 text-success hover:bg-success/10 hover:text-success"
+                  onClick={handleOpenWhatsApp}
+                >
+                  <MessageCircle size={14} /> Solicitar link
+                </Button>
+                {payment.asaas_payment_id && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 text-xs"
+                    disabled={syncing}
+                    onClick={handleManualSync}
+                  >
+                    {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                    Tentar novamente
+                  </Button>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -447,14 +577,14 @@ const AppPaymentDetail = () => {
       <div className="glass-card p-4 space-y-3">
         <h3 className="text-sm font-bold text-foreground">Ações Rápidas</h3>
         <div className="grid grid-cols-2 gap-2">
-          {payment.pix_copy_paste && status === "PENDING" && (
+          {payment.pix_copy_paste && (status === "PENDING" || status === "OVERDUE") && (
             <Button
               variant="outline"
               size="sm"
               className="gap-2 text-xs"
               onClick={() => copyToClipboard(payment.pix_copy_paste, "PIX")}
             >
-              <Copy size={14} /> Copiar PIX
+              <Copy size={14} /> PIX Copia e Cola
             </Button>
           )}
 
@@ -466,9 +596,9 @@ const AppPaymentDetail = () => {
             </Button>
           )}
 
-          {payment.boleto_url && (status === "PENDING" || status === "OVERDUE") && (
+          {boletoUrl && (status === "PENDING" || status === "OVERDUE") && (
             <Button variant="outline" size="sm" className="gap-2 text-xs" asChild>
-              <a href={payment.boleto_url} target="_blank" rel="noopener noreferrer">
+              <a href={boletoUrl} target="_blank" rel="noopener noreferrer">
                 <FileText size={14} /> Abrir Boleto
               </a>
             </Button>
@@ -515,17 +645,15 @@ const AppPaymentDetail = () => {
               className="gap-2 text-xs border-warning/30 text-warning hover:bg-warning/10"
               disabled={syncing}
               onClick={async () => {
-                setSyncing(true);
-                const { data, error } = await supabase.functions.invoke("sync-asaas-payment", {
-                  body: { payment_id: payment.id },
-                });
-                setSyncing(false);
-                if (error || data?.error) {
-                  toast({ title: "Erro ao sincronizar", description: error?.message || data?.error, variant: "destructive" });
-                } else {
-                  toast({ title: data?.action === "created" ? "Cobrança criada no Asaas!" : "Dados atualizados!" });
-                  // Reload page data
-                  window.location.reload();
+                const syncResult = await syncPayment(payment.id);
+                if (syncResult) {
+                  const { data: refreshed } = await supabase
+                    .from("payments")
+                    .select("*")
+                    .eq("id", payment.id)
+                    .single();
+                  if (refreshed) setPayment(refreshed);
+                  toast({ title: syncResult.action === "created" ? "Cobrança criada no Asaas!" : "Dados atualizados!" });
                 }
               }}
             >
@@ -540,19 +668,7 @@ const AppPaymentDetail = () => {
               size="sm"
               className="gap-2 text-xs"
               disabled={syncing}
-              onClick={async () => {
-                setSyncing(true);
-                const { data, error } = await supabase.functions.invoke("sync-asaas-payment", {
-                  body: { payment_id: payment.id },
-                });
-                setSyncing(false);
-                if (error || data?.error) {
-                  toast({ title: "Erro ao sincronizar", description: error?.message || data?.error, variant: "destructive" });
-                } else {
-                  toast({ title: "Dados atualizados do Asaas!" });
-                  window.location.reload();
-                }
-              }}
+              onClick={handleManualSync}
             >
               {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
               Sincronizar
@@ -568,7 +684,6 @@ const AppPaymentDetail = () => {
           Histórico
         </h3>
         <div className="relative pl-6 space-y-4">
-          {/* vertical line */}
           <div className="absolute left-[9px] top-1 bottom-1 w-px bg-border" />
 
           {timeline.map((item, i) => {
