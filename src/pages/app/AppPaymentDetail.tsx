@@ -555,18 +555,16 @@ const AppPaymentDetail = () => {
                 >
                   <MessageCircle size={14} /> Solicitar link
                 </Button>
-                {payment.asaas_payment_id && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 text-xs"
-                    disabled={syncing}
-                    onClick={handleManualSync}
-                  >
-                    {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                    Tentar novamente
-                  </Button>
-                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 text-xs"
+                  disabled={syncing}
+                  onClick={handleManualSync}
+                >
+                  {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                  Tentar novamente
+                </Button>
               </div>
             </div>
           )}
