@@ -40,6 +40,24 @@ function getPunctualityDiscount(p: {
   return Math.max(cd, id);
 }
 
+async function sleep(ms: number) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+async function fetchWithRetry(url: string, headers: Record<string, string>, retries = 3): Promise<Response> {
+  for (let i = 0; i < retries; i++) {
+    const res = await fetch(url, { headers });
+    if (res.status === 429) {
+      const waitMs = Math.min(2000 * (i + 1), 10000);
+      console.log(`[fix] Rate limited, waiting ${waitMs}ms...`);
+      await sleep(waitMs);
+      continue;
+    }
+    return res;
+  }
+  return fetch(url, { headers });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -52,8 +70,9 @@ Deno.serve(async (req) => {
   let body: Record<string, unknown> = {};
   try { body = await req.json(); } catch { /* */ }
   const unitId = typeof body.unit_id === "string" ? body.unit_id : null;
+  const batchSize = typeof body.batch_size === "number" ? body.batch_size : 50;
+  const startOffset = typeof body.offset === "number" ? body.offset : 0;
 
-  // Get unit config
   let unitsQuery = supabase.from("units").select("id, asaas_api_key, asaas_base_url").not("asaas_api_key", "is", null);
   if (unitId) unitsQuery = unitsQuery.eq("id", unitId);
   const { data: units } = await unitsQuery;
@@ -64,30 +83,32 @@ Deno.serve(async (req) => {
 
   let fixed = 0;
   let errCount = 0;
-  const limit = 1000;
+  let totalProcessed = 0;
 
   for (const unit of units) {
     const baseUrl = unit.asaas_base_url || "https://api.asaas.com/v3";
     const apiKey = unit.asaas_api_key;
 
-    // Get all payments with asaas_payment_id for this unit
-    let offset = 0;
+    let offset = startOffset;
     while (true) {
       const { data: payments } = await supabase
         .from("payments")
         .select("id, asaas_payment_id, status, value, final_value, original_value, punctuality_discount, paid_at")
         .eq("unit_id", unit.id)
         .not("asaas_payment_id", "is", null)
-        .range(offset, offset + limit - 1);
+        .order("created_at", { ascending: true })
+        .range(offset, offset + batchSize - 1);
 
       if (!payments || payments.length === 0) break;
 
       for (const payment of payments) {
         try {
-          const res = await fetch(`${baseUrl}/payments/${payment.asaas_payment_id}`, {
-            headers: { access_token: apiKey },
-          });
-          if (!res.ok) { errCount++; continue; }
+          const res = await fetchWithRetry(`${baseUrl}/payments/${payment.asaas_payment_id}`, { access_token: apiKey });
+          if (!res.ok) {
+            console.log(`[fix] Failed ${payment.asaas_payment_id}: ${res.status}`);
+            errCount++;
+            continue;
+          }
 
           const asaas = await res.json();
           const newStatus = statusMap[asaas.status] || payment.status;
@@ -112,17 +133,24 @@ Deno.serve(async (req) => {
 
           await supabase.from("payments").update(updateData).eq("id", payment.id);
           fixed++;
-        } catch {
+        } catch (e) {
+          console.log(`[fix] Error ${payment.asaas_payment_id}: ${e}`);
           errCount++;
+        }
+        totalProcessed++;
+
+        // Rate limit: ~10 requests per second
+        if (totalProcessed % 10 === 0) {
+          await sleep(1100);
         }
       }
 
-      if (payments.length < limit) break;
-      offset += limit;
+      if (payments.length < batchSize) break;
+      offset += batchSize;
     }
   }
 
-  return new Response(JSON.stringify({ success: true, fixed, errors: errCount }), {
+  return new Response(JSON.stringify({ success: true, fixed, errors: errCount, processed: totalProcessed }), {
     status: 200,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
