@@ -574,6 +574,7 @@ const AdminClients = () => {
       ) : (
         <div className="space-y-3">
           {filtered.map((client) => {
+            const paymentCount = getClientPaymentCount(client);
             const linkedPayments = getClientPayments(client);
             const linkedContracts = getClientContracts(client);
             const isExpanded = expandedClientId === client.id;
