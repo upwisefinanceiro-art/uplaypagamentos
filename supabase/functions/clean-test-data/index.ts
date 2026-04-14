@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Não autorizado" });
     }
 
-    const callerId = authData.user.id;
+    // callerId already set above from JWT
 
     const { data: callerRoles } = await supabaseAdmin
       .from("user_roles")
