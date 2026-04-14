@@ -31,14 +31,15 @@ Deno.serve(async (req) => {
     }
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
-    const callerClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
 
-    const { data: { user: callerUser }, error: userError } = await callerClient.auth.getUser();
-    const callerId = callerUser?.id;
+    const token = authHeader.replace("Bearer ", "");
+    let callerId: string | null = null;
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      callerId = payload.sub || null;
+    } catch { /* invalid token */ }
 
-    if (userError || !callerId) {
+    if (!callerId) {
       return jsonResponse({ error: "Não autorizado" }, 401);
     }
 

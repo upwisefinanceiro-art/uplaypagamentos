@@ -53,16 +53,18 @@ Deno.serve(async (req) => {
     }
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
-    const callerClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
 
-    const { data: authData, error: authError } = await callerClient.auth.getUser();
-    const caller = authData.user;
+    const token = authHeader.replace("Bearer ", "");
+    let callerId: string | null = null;
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      callerId = payload.sub || null;
+    } catch { /* invalid token */ }
 
-    if (authError || !caller) {
+    if (!callerId) {
       return jsonResponse({ error: "Não autorizado" });
     }
+    const caller = { id: callerId };
 
     const [{ data: callerRoles }, { data: callerProfile }] = await Promise.all([
       supabaseAdmin.from("user_roles").select("role").eq("user_id", caller.id),

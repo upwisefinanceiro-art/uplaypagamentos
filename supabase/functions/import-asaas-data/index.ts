@@ -269,15 +269,15 @@ Deno.serve(async (req) => {
     }
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
-    const callerClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await callerClient.auth.getClaims(token);
-    const callerId = claimsData?.claims?.sub;
+    let callerId: string | null = null;
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      callerId = payload.sub || null;
+    } catch { /* invalid token */ }
 
-    if (claimsError || !callerId) {
+    if (!callerId) {
       return jsonResponse({ success: false, error: "Não autorizado" }, 401);
     }
 

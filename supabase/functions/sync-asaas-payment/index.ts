@@ -80,12 +80,15 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    const supabaseUser = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    const token = authHeader.replace("Bearer ", "");
+    let callerId: string | null = null;
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      callerId = payload.sub || null;
+    } catch { /* invalid token */ }
 
-    const { data: { user: caller } } = await supabaseUser.auth.getUser();
-    if (!caller) return respond({ error: "Não autorizado" }, 401);
+    if (!callerId) return respond({ error: "Não autorizado" }, 401);
+    const caller = { id: callerId };
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
     const body = await req.json();
