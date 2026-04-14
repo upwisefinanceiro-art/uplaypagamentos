@@ -58,6 +58,12 @@ interface AsaasPayment {
   clientPaymentDate?: string;
   installmentNumber?: number;
   externalReference?: string;
+  discount?: {
+    value: number;
+    type: string;
+    limitDate?: string | null;
+    dueDateLimitDays?: number;
+  };
 }
 
 interface ProfileRow {
