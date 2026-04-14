@@ -622,7 +622,7 @@ const AdminClients = () => {
                       </div>
                     )}
                     <div className="flex flex-wrap gap-2 pt-1">
-                      <Button variant="outline" size="sm" onClick={() => setExpandedClientId(isExpanded ? null : client.id)}>
+                      <Button variant="outline" size="sm" onClick={() => handleExpandClient(client.id, client.contract_ids || [])}>
                         {isExpanded ? <ChevronUp size={14} className="mr-1" /> : <ChevronDown size={14} className="mr-1" />}
                         Parcelas vinculadas
                       </Button>
