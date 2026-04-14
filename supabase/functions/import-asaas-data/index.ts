@@ -770,7 +770,7 @@ Deno.serve(async (req) => {
 
       const { data, error } = await supabaseAdmin
         .from("payments")
-        .insert(chunk)
+        .upsert(chunk, { onConflict: "asaas_payment_id,unit_id", ignoreDuplicates: true })
         .select("id, asaas_payment_id, payment_method, status");
 
       if (!error) {
