@@ -88,6 +88,11 @@ interface UnitConfig {
   asaas_base_url: string | null;
 }
 
+interface MergedCustomer {
+  primary: AsaasCustomer;
+  aliases: AsaasCustomer[];
+}
+
 const jsonResponse = (body: Record<string, unknown>, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
@@ -101,6 +106,24 @@ function normalizeCpf(value?: string | null) {
 function normalizeEmail(value?: string | null) {
   const normalized = value?.trim().toLowerCase() || "";
   return normalized || null;
+}
+
+function isImportedPlaceholderEmail(value?: string | null) {
+  return /@imported\.uplay\.app$/i.test(value || "");
+}
+
+function pickBestNonEmptyValue(values: Array<string | null | undefined>) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+
+  return null;
+}
+
+function pickBestEmail(values: Array<string | null | undefined>) {
+  const normalized = values.map((value) => normalizeEmail(value)).filter(Boolean) as string[];
+  const realEmail = normalized.find((value) => !isImportedPlaceholderEmail(value));
+  return realEmail || normalized[0] || null;
 }
 
 function buildImportedLoginEmail(cpf: string, unitId: string, customerId: string) {
@@ -158,6 +181,18 @@ async function fetchAllPages<T>(baseUrl: string, path: string, apiKey: string): 
   }
 
   return all;
+}
+
+async function fetchAsaasCustomerById(baseUrl: string, customerId: string, apiKey: string): Promise<AsaasCustomer | null> {
+  const response = await fetch(`${baseUrl}/customers/${customerId}`, {
+    headers: { access_token: apiKey },
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  return (await response.json()) as AsaasCustomer;
 }
 
 async function fetchAllAuthUsers(supabaseAdmin: any) {
@@ -349,6 +384,13 @@ Deno.serve(async (req) => {
         .filter((value): value is string => Boolean(value)),
     );
 
+    const paymentsByCustomerId = new Map<string, AsaasPayment[]>();
+    for (const payment of asaasPayments) {
+      const list = paymentsByCustomerId.get(payment.customer) || [];
+      list.push(payment);
+      paymentsByCustomerId.set(payment.customer, list);
+    }
+
     const studentByResponsibleId = new Map<string, StudentRow>();
     for (const student of localStudents) {
       if (!studentByResponsibleId.has(student.responsible_id)) {
@@ -358,6 +400,53 @@ Deno.serve(async (req) => {
 
     const customerToProfile = new Map<string, string>();
     const customerInfoById = new Map(asaasCustomers.map((customer) => [customer.id, customer]));
+
+    const customersByCpf = new Map<string, AsaasCustomer[]>();
+    const customersWithoutCpf: AsaasCustomer[] = [];
+
+    for (const customer of asaasCustomers) {
+      const cpf = normalizeCpf(customer.cpfCnpj);
+      if (!cpf) {
+        customersWithoutCpf.push(customer);
+        continue;
+      }
+
+      const list = customersByCpf.get(cpf) || [];
+      list.push(customer);
+      customersByCpf.set(cpf, list);
+    }
+
+    const mergedCustomers: MergedCustomer[] = Array.from(customersByCpf.entries()).map(([, group]) => {
+      const sorted = [...group].sort((left, right) => {
+        const paymentDelta = (paymentsByCustomerId.get(right.id)?.length || 0) - (paymentsByCustomerId.get(left.id)?.length || 0);
+        if (paymentDelta !== 0) return paymentDelta;
+
+        const emailDelta = Number(Boolean(pickBestEmail([right.email]))) - Number(Boolean(pickBestEmail([left.email])));
+        if (emailDelta !== 0) return emailDelta;
+
+        return left.id.localeCompare(right.id);
+      });
+
+      const primary = sorted[0];
+      const aliases = sorted;
+
+      return {
+        primary: {
+          ...primary,
+          email: pickBestEmail(aliases.map((customer) => customer.email)),
+          phone: pickBestNonEmptyValue(aliases.map((customer) => customer.phone)),
+          mobilePhone: pickBestNonEmptyValue(aliases.map((customer) => customer.mobilePhone)),
+          address: pickBestNonEmptyValue(aliases.map((customer) => customer.address)),
+          addressNumber: pickBestNonEmptyValue(aliases.map((customer) => customer.addressNumber)),
+          complement: pickBestNonEmptyValue(aliases.map((customer) => customer.complement)),
+          province: pickBestNonEmptyValue(aliases.map((customer) => customer.province)),
+          postalCode: pickBestNonEmptyValue(aliases.map((customer) => customer.postalCode)),
+          city: pickBestNonEmptyValue(aliases.map((customer) => customer.city)),
+          state: pickBestNonEmptyValue(aliases.map((customer) => customer.state)),
+        },
+        aliases,
+      };
+    });
 
     const upsertResponsibleRole = async (userId: string) => {
       if (existingResponsibleRoleIds.has(userId)) return;
@@ -370,7 +459,7 @@ Deno.serve(async (req) => {
       existingResponsibleRoleIds.add(userId);
     };
 
-    for (const customer of asaasCustomers) {
+    for (const { primary: customer, aliases } of mergedCustomers) {
       try {
         const cpf = normalizeCpf(customer.cpfCnpj);
         if (!cpf) {
@@ -434,7 +523,10 @@ Deno.serve(async (req) => {
             ...matchingProfiles.filter((profile) => profile.id !== mergedProfile.id),
           ]);
 
-          customerToProfile.set(customer.id, existingProfile.id);
+          for (const alias of aliases) {
+            customerToProfile.set(alias.id, existingProfile.id);
+            profilesByAsaasCustomerId.set(alias.id, mergedProfile);
+          }
           stats.customersUpdated += 1;
           continue;
         }
@@ -513,14 +605,28 @@ Deno.serve(async (req) => {
         };
 
         profilesById.set(userId, profileRow);
-        profilesByAsaasCustomerId.set(customer.id, profileRow);
+        for (const alias of aliases) {
+          profilesByAsaasCustomerId.set(alias.id, profileRow);
+          customerToProfile.set(alias.id, userId);
+        }
         profilesByCpf.set(cpf, [...(profilesByCpf.get(cpf) || []), profileRow]);
-        customerToProfile.set(customer.id, userId);
         stats.customersImported += 1;
       } catch (error) {
         console.error("[import] customer error", customer.id, error);
         diagnostics.push(`responsável ${customer.name}: ${error instanceof Error ? error.message : "erro inesperado"}`);
         stats.errors += 1;
+      }
+    }
+
+    for (const customer of customersWithoutCpf) {
+      const customerEmail = normalizeEmail(customer.email);
+      const matchedProfile = customerEmail
+        ? Array.from(profilesById.values()).find((profile) => profile.unit_id === unitId && normalizeEmail(profile.email) === customerEmail)
+        : null;
+
+      if (matchedProfile) {
+        customerToProfile.set(customer.id, matchedProfile.id);
+        profilesByAsaasCustomerId.set(customer.id, matchedProfile);
       }
     }
 
@@ -557,15 +663,47 @@ Deno.serve(async (req) => {
       }
     }
 
-    const paymentRows = [] as Array<Record<string, unknown>>;
+    const paymentRowsByAsaasId = new Map<string, Record<string, unknown>>();
 
     for (const payment of asaasPayments) {
-      if (existingPaymentIds.has(payment.id)) {
+      if (existingPaymentIds.has(payment.id) || paymentRowsByAsaasId.has(payment.id)) {
         stats.paymentsSkipped += 1;
         continue;
       }
 
-      const responsibleId = customerToProfile.get(payment.customer);
+      let responsibleId = customerToProfile.get(payment.customer) || null;
+
+      if (!responsibleId) {
+        let paymentCustomer = customerInfoById.get(payment.customer) || null;
+
+        if (!paymentCustomer) {
+          paymentCustomer = await fetchAsaasCustomerById(baseUrl, payment.customer, apiKey);
+          if (paymentCustomer) {
+            customerInfoById.set(payment.customer, paymentCustomer);
+          }
+        }
+
+        const customerCpf = normalizeCpf(paymentCustomer?.cpfCnpj);
+        if (customerCpf) {
+          const matchedProfile = (profilesByCpf.get(customerCpf) || []).find((profile) => profile.unit_id === unitId) || null;
+          if (matchedProfile) {
+            responsibleId = matchedProfile.id;
+            customerToProfile.set(payment.customer, matchedProfile.id);
+          }
+        }
+
+        if (!responsibleId && paymentCustomer?.email) {
+          const matchedProfile = Array.from(profilesById.values()).find(
+            (profile) => profile.unit_id === unitId && normalizeEmail(profile.email) === normalizeEmail(paymentCustomer?.email),
+          );
+
+          if (matchedProfile) {
+            responsibleId = matchedProfile.id;
+            customerToProfile.set(payment.customer, matchedProfile.id);
+          }
+        }
+      }
+
       if (!responsibleId) {
         stats.paymentsSkipped += 1;
         diagnostics.push(`cobrança ${payment.id}: responsável não localizado`);
@@ -580,7 +718,7 @@ Deno.serve(async (req) => {
           ? payment.paymentDate || payment.confirmedDate || payment.clientPaymentDate || null
           : null;
 
-      paymentRows.push({
+      paymentRowsByAsaasId.set(payment.id, {
         asaas_payment_id: payment.id,
         responsible_id: responsibleId,
         student_id: studentId,
@@ -601,6 +739,8 @@ Deno.serve(async (req) => {
         paid_at: paidAt,
       });
     }
+
+    const paymentRows = Array.from(paymentRowsByAsaasId.values());
 
     const insertedPayments: Array<{ id: string; asaas_payment_id: string; payment_method: string | null; status: string }> = [];
 
