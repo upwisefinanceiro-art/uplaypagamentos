@@ -591,6 +591,34 @@ const AdminCharges = () => {
     }
   };
 
+  const handleImportAsaas = async () => {
+    setImportingAsaas(true);
+    try {
+      const body: Record<string, string> = {};
+      if (unitFilter !== "ALL") body.unit_id = unitFilter;
+
+      const { data, error } = await supabase.functions.invoke("import-asaas-data", { body });
+
+      if (error) {
+        toast({ title: "Erro na importação", description: error.message, variant: "destructive" });
+        return;
+      }
+
+      const result = data as { success?: boolean; message?: string; error?: string };
+      if (result?.error) {
+        toast({ title: "Erro", description: result.error, variant: "destructive" });
+        return;
+      }
+
+      toast({ title: "Importação concluída", description: result?.message || "Dados importados com sucesso." });
+      fetchData();
+    } catch (err) {
+      toast({ title: "Erro inesperado", description: err instanceof Error ? err.message : "Erro desconhecido", variant: "destructive" });
+    } finally {
+      setImportingAsaas(false);
+    }
+  };
+
   const clearScopedFilters = () => {
     navigate("/admin/cobrancas");
   };
