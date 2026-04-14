@@ -15,6 +15,41 @@ const statusMap: Record<string, string> = {
   RECEIVED_IN_CASH: "PAID",
 };
 
+function roundCurrency(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
+function getFaceValue(payment: { value?: number | null; originalValue?: number | null }) {
+  return roundCurrency(Number(payment.originalValue ?? payment.value ?? 0));
+}
+
+function getPaidAmount(payment: { value?: number | null; originalValue?: number | null; receivedValue?: number | null }) {
+  return roundCurrency(Number(payment.receivedValue ?? payment.value ?? payment.originalValue ?? 0));
+}
+
+function getPunctualityDiscount(payment: {
+  value?: number | null;
+  originalValue?: number | null;
+  receivedValue?: number | null;
+  discount?: { value?: number | null; type?: string | null } | null;
+}) {
+  const faceValue = getFaceValue(payment);
+  const configuredDiscountValue = Number(payment.discount?.value ?? 0);
+  const configuredDiscount = payment.discount?.type === "PERCENTAGE"
+    ? roundCurrency(faceValue * configuredDiscountValue / 100)
+    : roundCurrency(configuredDiscountValue);
+  const inferredDiscount = roundCurrency(Math.max(faceValue - getPaidAmount(payment), 0));
+  return Math.max(configuredDiscount, inferredDiscount);
+}
+
+function resolveNextStatus(event: string, currentStatus: string, incomingStatus: string) {
+  if (currentStatus === "PAID" && incomingStatus !== "PAID" && !["PAYMENT_REFUNDED", "PAYMENT_DELETED", "PAYMENT_RECEIVED_IN_CASH_UNDONE"].includes(event)) {
+    return currentStatus;
+  }
+
+  return incomingStatus;
+}
+
 async function logWebhook(
   supabase: ReturnType<typeof createClient>,
   data: {
@@ -79,6 +114,7 @@ Deno.serve(async (req) => {
     const paymentEvents = [
       "PAYMENT_RECEIVED",
       "PAYMENT_CONFIRMED",
+      "PAYMENT_RECEIVED_IN_CASH_UNDONE",
       "PAYMENT_OVERDUE",
       "PAYMENT_DELETED",
       "PAYMENT_REFUNDED",
@@ -246,9 +282,15 @@ Deno.serve(async (req) => {
 
     // Map Asaas status
     const oldStatus = localPayment.status;
-    const newStatus = statusMap[payment.status] || localPayment.status;
+    const incomingStatus = statusMap[payment.status] || localPayment.status;
+    const newStatus = resolveNextStatus(event, localPayment.status, incomingStatus);
+    const faceValue = getFaceValue(payment);
 
     const updateData: Record<string, unknown> = {
+      value: faceValue,
+      original_value: faceValue,
+      final_value: newStatus === "PAID" ? getPaidAmount(payment) : faceValue,
+      punctuality_discount: getPunctualityDiscount(payment),
       status: newStatus,
       invoice_url: payment.invoiceUrl || undefined,
       boleto_url: payment.bankSlipUrl || undefined,
@@ -257,6 +299,8 @@ Deno.serve(async (req) => {
     // Set paid_at if status changed to PAID
     if (newStatus === "PAID" && !localPayment.paid_at) {
       updateData.paid_at = payment.paymentDate || new Date().toISOString();
+    } else if (newStatus !== "PAID" && localPayment.paid_at && event === "PAYMENT_RECEIVED_IN_CASH_UNDONE") {
+      updateData.paid_at = null;
     }
 
     // Save billing type from Asaas if we don't have a payment_method yet
