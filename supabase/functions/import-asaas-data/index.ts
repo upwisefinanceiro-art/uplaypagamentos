@@ -278,18 +278,22 @@ Deno.serve(async (req) => {
 
     console.log(`[import] Starting import for unit ${unitId}`);
 
-    const [asaasCustomers, asaasPayments, profilesRes, studentsRes, paymentsRes, authUsers] = await Promise.all([
+    const [asaasCustomers, asaasPayments, profilesRes, studentsRes, paymentsRes, authUsers, responsibleRolesRes] = await Promise.all([
       fetchAllPages<AsaasCustomer>(baseUrl, "/customers", apiKey),
       fetchAllPages<AsaasPayment>(baseUrl, "/payments", apiKey),
       supabaseAdmin.from("profiles").select("id, cpf, full_name, phone, email, address, unit_id, asaas_customer_id"),
       supabaseAdmin.from("students").select("id, full_name, responsible_id").eq("unit_id", unitId),
       supabaseAdmin.from("payments").select("id, asaas_payment_id"),
       fetchAllAuthUsers(supabaseAdmin),
+      supabaseAdmin.from("user_roles").select("user_id").eq("role", "RESPONSAVEL"),
     ]);
 
     const allProfiles = (profilesRes.data || []) as ProfileRow[];
     const localStudents = (studentsRes.data || []) as StudentRow[];
     const existingPayments = (paymentsRes.data || []) as PaymentRow[];
+    const existingResponsibleRoleIds = new Set(
+      ((responsibleRolesRes.data || []) as Array<{ user_id: string }>).map((entry) => entry.user_id),
+    );
 
     console.log(`[import] Found ${asaasCustomers.length} customers and ${asaasPayments.length} payments in Asaas`);
 
@@ -342,11 +346,14 @@ Deno.serve(async (req) => {
     const customerInfoById = new Map(asaasCustomers.map((customer) => [customer.id, customer]));
 
     const upsertResponsibleRole = async (userId: string) => {
+      if (existingResponsibleRoleIds.has(userId)) return;
+
       const { error } = await supabaseAdmin
         .from("user_roles")
         .upsert({ user_id: userId, role: "RESPONSAVEL" }, { onConflict: "user_id,role" });
 
       if (error) throw error;
+      existingResponsibleRoleIds.add(userId);
     };
 
     for (const customer of asaasCustomers) {
@@ -380,8 +387,18 @@ Deno.serve(async (req) => {
             active: true,
           };
 
-          const { error: profileError } = await supabaseAdmin.from("profiles").upsert(profilePayload);
-          if (profileError) throw profileError;
+          const shouldUpdateProfile =
+            existingProfile.full_name !== profilePayload.full_name ||
+            existingProfile.phone !== profilePayload.phone ||
+            existingProfile.email !== profilePayload.email ||
+            existingProfile.address !== profilePayload.address ||
+            existingProfile.asaas_customer_id !== profilePayload.asaas_customer_id ||
+            existingProfile.unit_id !== profilePayload.unit_id;
+
+          if (shouldUpdateProfile) {
+            const { error: profileError } = await supabaseAdmin.from("profiles").upsert(profilePayload);
+            if (profileError) throw profileError;
+          }
 
           await upsertResponsibleRole(existingProfile.id);
 
@@ -612,7 +629,7 @@ Deno.serve(async (req) => {
       (payment) => payment.payment_method === "PIX" && payment.status !== "PAID" && payment.status !== "CANCELLED",
     );
 
-    await runWithConcurrency(pixCandidates, 5, async (payment) => {
+    await runWithConcurrency(pixCandidates, 20, async (payment) => {
       try {
         const response = await fetch(`${baseUrl}/payments/${payment.asaas_payment_id}/pixQrCode`, {
           headers: { access_token: apiKey },

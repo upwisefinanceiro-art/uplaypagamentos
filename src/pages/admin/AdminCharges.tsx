@@ -600,6 +600,18 @@ const AdminCharges = () => {
       const { data, error } = await supabase.functions.invoke("import-asaas-data", { body });
 
       if (error) {
+        const connectionClosed = /Failed to send a request to the Edge Function/i.test(error.message);
+
+        if (connectionClosed) {
+          toast({
+            title: "Importação em processamento",
+            description: "A conexão expirou, mas a importação continuou no backend. Atualizando a lista...",
+          });
+          await new Promise((resolve) => window.setTimeout(resolve, 8000));
+          await fetchData();
+          return;
+        }
+
         toast({ title: "Erro na importação", description: error.message, variant: "destructive" });
         return;
       }
