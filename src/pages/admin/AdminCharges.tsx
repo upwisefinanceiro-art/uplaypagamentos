@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import {
   Ban,
   Copy,
+  Download,
   ExternalLink,
   Loader2,
   MessageCircle,
