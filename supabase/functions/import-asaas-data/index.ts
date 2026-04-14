@@ -157,7 +157,7 @@ async function fetchAllAuthUsers(supabaseAdmin: any) {
     if (error) throw error;
 
     const current = data?.users ?? [];
-    users.push(...current.map((user) => ({ id: user.id, email: user.email })));
+    users.push(...current.map((user: { id: string; email?: string | null }) => ({ id: user.id, email: user.email })));
 
     if (current.length < perPage) break;
     page += 1;
