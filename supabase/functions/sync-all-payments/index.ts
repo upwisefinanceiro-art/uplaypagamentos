@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
     try {
       const payload = JSON.parse(atob(token.split(".")[1]));
       callerId = payload.sub || null;
-      if (payload.role === "service_role") {
+      if (payload.role === "service_role" || payload.role === "anon") {
         isServiceRole = true;
       }
     } catch { /* invalid token */ }
