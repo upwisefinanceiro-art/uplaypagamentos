@@ -115,7 +115,8 @@ const AdminClients = () => {
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [units, setUnits] = useState<UnitRow[]>([]);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
-  const [contracts, setContracts] = useState<ContractLinkRow[]>([]);
+  const [paymentCounts, setPaymentCounts] = useState<Map<string, number>>(new Map());
+  const [expandedPayments, setExpandedPayments] = useState<Map<string, PaymentRow[]>>(new Map());
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState("");
