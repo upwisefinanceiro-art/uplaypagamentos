@@ -69,32 +69,58 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
+    const internalKey = req.headers.get("x-internal-key");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const isInternalCall = internalKey === serviceRoleKey;
+
+    if (!authHeader && !isInternalCall) {
       return new Response(JSON.stringify({ error: "Não autorizado" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    const token = authHeader.replace("Bearer ", "");
-    let callerId: string | null = null;
-    let isServiceRole = false;
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      callerId = payload.sub || null;
-      if (payload.role === "service_role" || payload.role === "anon") {
-        isServiceRole = true;
+    if (!isInternalCall) {
+      const token = (authHeader || "").replace("Bearer ", "");
+      let callerId: string | null = null;
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        callerId = payload.sub || null;
+      } catch { /* invalid token */ }
+
+      if (!callerId) {
+        return new Response(JSON.stringify({ error: "Não autorizado" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
-    } catch { /* invalid token */ }
 
-    if (!callerId && !isServiceRole) {
-      return new Response(JSON.stringify({ error: "Não autorizado" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      const { data: callerRoles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", callerId);
+
+      const isAdmin = callerRoles?.some((r: { role: string }) =>
+        r.role === "ADMIN_MASTER" || r.role === "ADMIN_UNIDADE"
+      );
+      if (!isAdmin) {
+        return new Response(JSON.stringify({ error: "Sem permissão" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // Get optional unit_id filter
+    let unitFilter: string | null = null;
+    try {
+      const body = await req.json();
+      unitFilter = body.unit_id || null;
+    } catch { /* no body */ }
       });
     }
 
