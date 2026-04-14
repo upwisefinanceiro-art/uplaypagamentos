@@ -64,6 +64,11 @@ interface PaymentRow {
   unit_id: string;
 }
 
+interface PaymentCountRow {
+  responsible_id: string;
+  count: number;
+}
+
 interface ContractLinkRow {
   id: string;
   responsible_id: string;
