@@ -147,7 +147,7 @@ async function fetchAllPages<T>(baseUrl: string, path: string, apiKey: string): 
   return all;
 }
 
-async function fetchAllAuthUsers(supabaseAdmin: ReturnType<typeof createClient>) {
+async function fetchAllAuthUsers(supabaseAdmin: any) {
   const users: Array<{ id: string; email?: string | null }> = [];
   let page = 1;
   const perPage = 1000;
