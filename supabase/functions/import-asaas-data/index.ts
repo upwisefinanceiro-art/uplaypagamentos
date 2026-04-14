@@ -58,6 +58,12 @@ interface AsaasPayment {
   clientPaymentDate?: string;
   installmentNumber?: number;
   externalReference?: string;
+  discount?: {
+    value: number;
+    type: string;
+    limitDate?: string | null;
+    dueDateLimitDays?: number;
+  };
 }
 
 interface ProfileRow {
@@ -718,6 +724,20 @@ Deno.serve(async (req) => {
           ? payment.paymentDate || payment.confirmedDate || payment.clientPaymentDate || null
           : null;
 
+      // Calculate discount from Asaas
+      const discountValue = payment.discount?.value || 0;
+      const discountType = payment.discount?.type || "FIXED";
+      const punctualityDiscount = discountType === "PERCENTAGE"
+        ? Math.round((payment.value || 0) * discountValue / 100 * 100) / 100
+        : discountValue;
+
+      // For PAID: final_value = netValue (what merchant received after Asaas fees)
+      // For unpaid: final_value = value (face value, discount NOT pre-applied)
+      const isPaid = status === "PAID";
+      const finalValue = isPaid
+        ? (payment.netValue || payment.value || 0)
+        : (payment.value || 0);
+
       paymentRowsByAsaasId.set(payment.id, {
         asaas_payment_id: payment.id,
         responsible_id: responsibleId,
@@ -725,7 +745,8 @@ Deno.serve(async (req) => {
         unit_id: unitId,
         value: payment.value || 0,
         original_value: payment.value || 0,
-        final_value: payment.netValue || payment.value || 0,
+        final_value: finalValue,
+        punctuality_discount: punctualityDiscount,
         due_date: payment.dueDate,
         status,
         payment_method: paymentMethod,
@@ -749,7 +770,7 @@ Deno.serve(async (req) => {
 
       const { data, error } = await supabaseAdmin
         .from("payments")
-        .insert(chunk)
+        .upsert(chunk, { onConflict: "asaas_payment_id,unit_id", ignoreDuplicates: true })
         .select("id, asaas_payment_id, payment_method, status");
 
       if (!error) {
