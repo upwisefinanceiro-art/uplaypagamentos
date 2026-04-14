@@ -140,17 +140,34 @@ const AdminClients = () => {
   const fetchData = async () => {
     setLoading(true);
 
-    const [profilesRes, rolesRes, studentsRes, unitsRes, paymentsRes, contractsRes] = await Promise.all([
+    const [profilesRes, rolesRes, studentsRes, unitsRes, contractsRes] = await Promise.all([
       supabase.from("profiles").select("id, full_name, cpf, phone, unit_id, active, email, address").order("full_name"),
       supabase.from("user_roles").select("user_id").eq("role", "RESPONSAVEL"),
       supabase.from("students").select("id, full_name, responsible_id").order("full_name"),
       supabase.from("units").select("id, name").order("name"),
-      supabase
-        .from("payments")
-        .select("id, responsible_id, contract_id, student_id, description, payment_type, installment_number, due_date, status, value, final_value, unit_id")
-        .order("due_date", { ascending: false }),
       supabase.from("contracts").select("id, responsible_id, responsible_name, cpf, email, phone, address, unit_id, student_id, description, status, contract_number"),
     ]);
+
+    // Fetch ALL payment counts using pagination to avoid 1000 row limit
+    const allPaymentRows: Array<{ responsible_id: string }> = [];
+    let from = 0;
+    const pageSize = 1000;
+    while (true) {
+      const { data: batch } = await supabase
+        .from("payments")
+        .select("responsible_id")
+        .range(from, from + pageSize - 1);
+      if (!batch || batch.length === 0) break;
+      allPaymentRows.push(...(batch as Array<{ responsible_id: string }>));
+      if (batch.length < pageSize) break;
+      from += pageSize;
+    }
+
+    const countMap = new Map<string, number>();
+    for (const row of allPaymentRows) {
+      countMap.set(row.responsible_id, (countMap.get(row.responsible_id) || 0) + 1);
+    }
+    setPaymentCounts(countMap);
 
     if (profilesRes.data && rolesRes.data && studentsRes.data && contractsRes.data) {
       const responsibleIds = new Set(rolesRes.data.map((row: { user_id: string }) => row.user_id));
@@ -206,9 +223,46 @@ const AdminClients = () => {
 
     if (studentsRes.data) setStudents(studentsRes.data as StudentRow[]);
     if (unitsRes.data) setUnits(unitsRes.data as UnitRow[]);
-    if (paymentsRes.data) setPayments(paymentsRes.data as PaymentRow[]);
     if (contractsRes.data) setContracts(contractsRes.data as ContractLinkRow[]);
     setLoading(false);
+  };
+
+  const fetchClientPayments = async (clientId: string, contractIds: string[]) => {
+    // Fetch all payments for this specific client with pagination
+    const allRows: PaymentRow[] = [];
+    let from = 0;
+    const pageSize = 1000;
+    while (true) {
+      const { data: batch } = await supabase
+        .from("payments")
+        .select("id, responsible_id, contract_id, student_id, description, payment_type, installment_number, due_date, status, value, final_value, unit_id")
+        .eq("responsible_id", clientId)
+        .order("due_date", { ascending: false })
+        .range(from, from + pageSize - 1);
+      if (!batch || batch.length === 0) break;
+      allRows.push(...(batch as PaymentRow[]));
+      if (batch.length < pageSize) break;
+      from += pageSize;
+    }
+
+    // Also fetch payments linked to contracts if any
+    if (contractIds.length > 0) {
+      for (const contractId of contractIds) {
+        const { data: contractPayments } = await supabase
+          .from("payments")
+          .select("id, responsible_id, contract_id, student_id, description, payment_type, installment_number, due_date, status, value, final_value, unit_id")
+          .eq("contract_id", contractId)
+          .order("due_date", { ascending: false });
+        if (contractPayments) {
+          const existingIds = new Set(allRows.map(r => r.id));
+          for (const p of contractPayments as PaymentRow[]) {
+            if (!existingIds.has(p.id)) allRows.push(p);
+          }
+        }
+      }
+    }
+
+    return allRows;
   };
 
   useEffect(() => {
