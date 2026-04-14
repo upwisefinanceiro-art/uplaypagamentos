@@ -29,16 +29,16 @@ interface AsaasCustomer {
   id: string;
   name: string;
   cpfCnpj?: string;
-  email?: string;
-  phone?: string;
-  mobilePhone?: string;
-  address?: string;
-  addressNumber?: string;
-  complement?: string;
-  province?: string;
-  postalCode?: string;
-  city?: string;
-  state?: string;
+  email?: string | null;
+  phone?: string | null;
+  mobilePhone?: string | null;
+  address?: string | null;
+  addressNumber?: string | null;
+  complement?: string | null;
+  province?: string | null;
+  postalCode?: string | null;
+  city?: string | null;
+  state?: string | null;
 }
 
 interface AsaasPayment {
