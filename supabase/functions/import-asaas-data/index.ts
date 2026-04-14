@@ -23,6 +23,8 @@ const METHOD_MAP: Record<string, string> = {
   UNDEFINED: "BOLETO",
 };
 
+STATUS_MAP.DUNNING_REQUESTED = "PENDING";
+
 interface AsaasCustomer {
   id: string;
   name: string;
@@ -94,6 +96,17 @@ const jsonResponse = (body: Record<string, unknown>, status = 200) =>
 
 function normalizeCpf(value?: string | null) {
   return (value || "").replace(/\D/g, "");
+}
+
+function normalizeEmail(value?: string | null) {
+  const normalized = value?.trim().toLowerCase() || "";
+  return normalized || null;
+}
+
+function buildImportedLoginEmail(cpf: string, unitId: string, customerId: string) {
+  const safeUnit = unitId.replace(/\W/g, "").slice(0, 8).toLowerCase();
+  const safeCustomer = customerId.replace(/\W/g, "").slice(-8).toLowerCase();
+  return `${cpf}.${safeUnit}.${safeCustomer}@imported.uplay.app`;
 }
 
 function buildAddress(customer: AsaasCustomer) {
@@ -283,7 +296,7 @@ Deno.serve(async (req) => {
       fetchAllPages<AsaasPayment>(baseUrl, "/payments", apiKey),
       supabaseAdmin.from("profiles").select("id, cpf, full_name, phone, email, address, unit_id, asaas_customer_id"),
       supabaseAdmin.from("students").select("id, full_name, responsible_id").eq("unit_id", unitId),
-      supabaseAdmin.from("payments").select("id, asaas_payment_id"),
+      supabaseAdmin.from("payments").select("id, asaas_payment_id").eq("unit_id", unitId),
       fetchAllAuthUsers(supabaseAdmin),
       supabaseAdmin.from("user_roles").select("user_id").eq("role", "RESPONSAVEL"),
     ]);
@@ -321,6 +334,7 @@ Deno.serve(async (req) => {
     for (const profile of allProfiles) {
       profilesById.set(profile.id, profile);
       if (profile.asaas_customer_id) profilesByAsaasCustomerId.set(profile.asaas_customer_id, profile);
+      if (profile.unit_id !== unitId) continue;
 
       const cpf = normalizeCpf(profile.cpf);
       if (!cpf) continue;
@@ -366,12 +380,12 @@ Deno.serve(async (req) => {
 
         const phone = customer.mobilePhone || customer.phone || null;
         const fullAddress = buildAddress(customer);
+        const customerEmail = normalizeEmail(customer.email);
 
         const matchingProfiles = profilesByCpf.get(cpf) || [];
         const existingProfile =
           profilesByAsaasCustomerId.get(customer.id) ||
           matchingProfiles.find((profile) => profile.unit_id === unitId) ||
-          matchingProfiles[0] ||
           null;
 
         if (existingProfile) {
@@ -380,7 +394,7 @@ Deno.serve(async (req) => {
             cpf,
             full_name: customer.name || existingProfile.full_name,
             phone: phone || existingProfile.phone,
-            email: customer.email || existingProfile.email,
+            email: customerEmail || existingProfile.email,
             address: fullAddress || existingProfile.address,
             asaas_customer_id: customer.id,
             unit_id: existingProfile.unit_id || unitId,
@@ -425,15 +439,19 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        const fallbackEmail = `${cpf}@imported.uplay.app`;
-        let desiredEmail = (customer.email || fallbackEmail).trim().toLowerCase();
-        let authUser = authUserByEmail.get(desiredEmail) || null;
+        const profileEmail = customerEmail;
+        const generatedLoginEmail = buildImportedLoginEmail(cpf, unitId, customer.id);
+        let loginEmail = profileEmail || generatedLoginEmail;
+        let authUser = authUserByEmail.get(loginEmail) || null;
 
         if (authUser) {
           const authUserProfile = profilesById.get(authUser.id) || null;
-          if (authUserProfile && normalizeCpf(authUserProfile.cpf) !== cpf) {
-            desiredEmail = fallbackEmail;
-            authUser = authUserByEmail.get(desiredEmail) || null;
+          const sameCpf = authUserProfile && normalizeCpf(authUserProfile.cpf) === cpf;
+          const sameUnit = authUserProfile && authUserProfile.unit_id === unitId;
+
+          if (!sameCpf || (authUserProfile && !sameUnit)) {
+            loginEmail = generatedLoginEmail;
+            authUser = authUserByEmail.get(loginEmail) || null;
           }
         }
 
@@ -441,7 +459,7 @@ Deno.serve(async (req) => {
 
         if (authUser) {
           const { error: updateUserError } = await supabaseAdmin.auth.admin.updateUserById(authUser.id, {
-            email: desiredEmail,
+            email: loginEmail,
             password: "12345678",
             email_confirm: true,
             ban_duration: "none",
@@ -452,7 +470,7 @@ Deno.serve(async (req) => {
           userId = authUser.id;
         } else {
           const { data: createdUser, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
-            email: desiredEmail,
+            email: loginEmail,
             password: "12345678",
             email_confirm: true,
             user_metadata: { cpf, full_name: customer.name || "Importado" },
@@ -463,7 +481,7 @@ Deno.serve(async (req) => {
           }
 
           userId = createdUser.user.id;
-          authUserByEmail.set(desiredEmail, { id: userId, email: desiredEmail });
+          authUserByEmail.set(loginEmail, { id: userId, email: loginEmail });
         }
 
         const newProfile = {
@@ -471,7 +489,7 @@ Deno.serve(async (req) => {
           cpf,
           full_name: customer.name || "Importado",
           phone,
-          email: desiredEmail,
+          email: profileEmail || loginEmail,
           address: fullAddress,
           asaas_customer_id: customer.id,
           unit_id: unitId,
