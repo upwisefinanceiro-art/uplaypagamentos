@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.create-saas-charge]
 verify_jwt = false
+
+[functions.import-asaas-data]
+verify_jwt = false
