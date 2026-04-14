@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import {
   Ban,
   Copy,
+  Download,
   ExternalLink,
   Loader2,
   MessageCircle,
@@ -186,6 +187,7 @@ const AdminCharges = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [syncingPaymentId, setSyncingPaymentId] = useState<string | null>(null);
   const [syncingAll, setSyncingAll] = useState(false);
+  const [importingAsaas, setImportingAsaas] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkAction, setBulkAction] = useState<"delete" | "cancel" | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
@@ -589,6 +591,34 @@ const AdminCharges = () => {
     }
   };
 
+  const handleImportAsaas = async () => {
+    setImportingAsaas(true);
+    try {
+      const body: Record<string, string> = {};
+      if (unitFilter !== "ALL") body.unit_id = unitFilter;
+
+      const { data, error } = await supabase.functions.invoke("import-asaas-data", { body });
+
+      if (error) {
+        toast({ title: "Erro na importação", description: error.message, variant: "destructive" });
+        return;
+      }
+
+      const result = data as { success?: boolean; message?: string; error?: string };
+      if (result?.error) {
+        toast({ title: "Erro", description: result.error, variant: "destructive" });
+        return;
+      }
+
+      toast({ title: "Importação concluída", description: result?.message || "Dados importados com sucesso." });
+      fetchData();
+    } catch (err) {
+      toast({ title: "Erro inesperado", description: err instanceof Error ? err.message : "Erro desconhecido", variant: "destructive" });
+    } finally {
+      setImportingAsaas(false);
+    }
+  };
+
   const clearScopedFilters = () => {
     navigate("/admin/cobrancas");
   };
@@ -654,6 +684,15 @@ const AdminCharges = () => {
           >
             {syncingAll ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
             Sincronizar Todos
+           </Button>
+          <Button
+            variant="outline"
+            className="gap-1.5"
+            disabled={importingAsaas}
+            onClick={handleImportAsaas}
+          >
+            {importingAsaas ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+            Importar do Asaas
           </Button>
           <ManualChargeDialog
             responsibles={responsibles}
