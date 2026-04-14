@@ -121,35 +121,6 @@ Deno.serve(async (req) => {
       const body = await req.json();
       unitFilter = body.unit_id || null;
     } catch { /* no body */ }
-      });
-    }
-
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
-
-    if (!isServiceRole) {
-      // Check admin
-      const { data: callerRoles } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", callerId);
-
-      const isAdmin = callerRoles?.some((r: { role: string }) =>
-        r.role === "ADMIN_MASTER" || r.role === "ADMIN_UNIDADE"
-      );
-      if (!isAdmin) {
-        return new Response(JSON.stringify({ error: "Sem permissão" }), {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-    }
-
-    // Get optional unit_id filter
-    let unitFilter: string | null = null;
-    try {
-      const body = await req.json();
-      unitFilter = body.unit_id || null;
-    } catch { /* no body */ }
 
     // ── PHASE 1: Refresh existing Asaas payments ──
     let refreshQuery = supabase
