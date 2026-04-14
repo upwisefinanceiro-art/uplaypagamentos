@@ -684,6 +684,15 @@ const AdminCharges = () => {
           >
             {syncingAll ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
             Sincronizar Todos
+           </Button>
+          <Button
+            variant="outline"
+            className="gap-1.5"
+            disabled={importingAsaas}
+            onClick={handleImportAsaas}
+          >
+            {importingAsaas ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+            Importar do Asaas
           </Button>
           <ManualChargeDialog
             responsibles={responsibles}
