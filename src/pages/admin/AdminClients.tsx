@@ -64,6 +64,11 @@ interface PaymentRow {
   unit_id: string;
 }
 
+interface PaymentCountRow {
+  responsible_id: string;
+  count: number;
+}
+
 interface ContractLinkRow {
   id: string;
   responsible_id: string;
@@ -110,6 +115,8 @@ const AdminClients = () => {
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [units, setUnits] = useState<UnitRow[]>([]);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
+  const [paymentCounts, setPaymentCounts] = useState<Map<string, number>>(new Map());
+  const [expandedPayments, setExpandedPayments] = useState<Map<string, PaymentRow[]>>(new Map());
   const [contracts, setContracts] = useState<ContractLinkRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -133,17 +140,34 @@ const AdminClients = () => {
   const fetchData = async () => {
     setLoading(true);
 
-    const [profilesRes, rolesRes, studentsRes, unitsRes, paymentsRes, contractsRes] = await Promise.all([
+    const [profilesRes, rolesRes, studentsRes, unitsRes, contractsRes] = await Promise.all([
       supabase.from("profiles").select("id, full_name, cpf, phone, unit_id, active, email, address").order("full_name"),
       supabase.from("user_roles").select("user_id").eq("role", "RESPONSAVEL"),
       supabase.from("students").select("id, full_name, responsible_id").order("full_name"),
       supabase.from("units").select("id, name").order("name"),
-      supabase
-        .from("payments")
-        .select("id, responsible_id, contract_id, student_id, description, payment_type, installment_number, due_date, status, value, final_value, unit_id")
-        .order("due_date", { ascending: false }),
       supabase.from("contracts").select("id, responsible_id, responsible_name, cpf, email, phone, address, unit_id, student_id, description, status, contract_number"),
     ]);
+
+    // Fetch ALL payment counts using pagination to avoid 1000 row limit
+    const allPaymentRows: Array<{ responsible_id: string }> = [];
+    let from = 0;
+    const pageSize = 1000;
+    while (true) {
+      const { data: batch } = await supabase
+        .from("payments")
+        .select("responsible_id")
+        .range(from, from + pageSize - 1);
+      if (!batch || batch.length === 0) break;
+      allPaymentRows.push(...(batch as Array<{ responsible_id: string }>));
+      if (batch.length < pageSize) break;
+      from += pageSize;
+    }
+
+    const countMap = new Map<string, number>();
+    for (const row of allPaymentRows) {
+      countMap.set(row.responsible_id, (countMap.get(row.responsible_id) || 0) + 1);
+    }
+    setPaymentCounts(countMap);
 
     if (profilesRes.data && rolesRes.data && studentsRes.data && contractsRes.data) {
       const responsibleIds = new Set(rolesRes.data.map((row: { user_id: string }) => row.user_id));
@@ -199,9 +223,46 @@ const AdminClients = () => {
 
     if (studentsRes.data) setStudents(studentsRes.data as StudentRow[]);
     if (unitsRes.data) setUnits(unitsRes.data as UnitRow[]);
-    if (paymentsRes.data) setPayments(paymentsRes.data as PaymentRow[]);
     if (contractsRes.data) setContracts(contractsRes.data as ContractLinkRow[]);
     setLoading(false);
+  };
+
+  const fetchClientPayments = async (clientId: string, contractIds: string[]) => {
+    // Fetch all payments for this specific client with pagination
+    const allRows: PaymentRow[] = [];
+    let from = 0;
+    const pageSize = 1000;
+    while (true) {
+      const { data: batch } = await supabase
+        .from("payments")
+        .select("id, responsible_id, contract_id, student_id, description, payment_type, installment_number, due_date, status, value, final_value, unit_id")
+        .eq("responsible_id", clientId)
+        .order("due_date", { ascending: false })
+        .range(from, from + pageSize - 1);
+      if (!batch || batch.length === 0) break;
+      allRows.push(...(batch as PaymentRow[]));
+      if (batch.length < pageSize) break;
+      from += pageSize;
+    }
+
+    // Also fetch payments linked to contracts if any
+    if (contractIds.length > 0) {
+      for (const contractId of contractIds) {
+        const { data: contractPayments } = await supabase
+          .from("payments")
+          .select("id, responsible_id, contract_id, student_id, description, payment_type, installment_number, due_date, status, value, final_value, unit_id")
+          .eq("contract_id", contractId)
+          .order("due_date", { ascending: false });
+        if (contractPayments) {
+          const existingIds = new Set(allRows.map(r => r.id));
+          for (const p of contractPayments as PaymentRow[]) {
+            if (!existingIds.has(p.id)) allRows.push(p);
+          }
+        }
+      }
+    }
+
+    return allRows;
   };
 
   useEffect(() => {
@@ -352,13 +413,23 @@ const AdminClients = () => {
   };
 
   const getClientPayments = (client: ClientRow) => {
-    const contractIds = new Set(client.contract_ids || []);
+    return expandedPayments.get(client.id) || [];
+  };
 
-    return payments.filter((payment) => {
-      if (payment.responsible_id === client.id) return true;
-      if (payment.contract_id && contractIds.has(payment.contract_id)) return true;
-      return false;
-    });
+  const getClientPaymentCount = (client: ClientRow) => {
+    return paymentCounts.get(client.id) || 0;
+  };
+
+  const handleExpandClient = async (clientId: string, contractIds: string[]) => {
+    if (expandedClientId === clientId) {
+      setExpandedClientId(null);
+      return;
+    }
+    setExpandedClientId(clientId);
+    if (!expandedPayments.has(clientId)) {
+      const clientPayments = await fetchClientPayments(clientId, contractIds);
+      setExpandedPayments(prev => new Map(prev).set(clientId, clientPayments));
+    }
   };
 
   const getClientContracts = (client: ClientRow) => {
@@ -503,6 +574,7 @@ const AdminClients = () => {
       ) : (
         <div className="space-y-3">
           {filtered.map((client) => {
+            const paymentCount = getClientPaymentCount(client);
             const linkedPayments = getClientPayments(client);
             const linkedContracts = getClientContracts(client);
             const isExpanded = expandedClientId === client.id;
@@ -524,7 +596,7 @@ const AdminClients = () => {
                         </Badge>
                       )}
                       <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                        {linkedPayments.length} parcelas
+                        {paymentCount} parcelas
                       </Badge>
                       {client.source === "contract_snapshot" && (
                         <Badge variant="outline" className="text-[10px] px-1.5 py-0">
@@ -550,7 +622,7 @@ const AdminClients = () => {
                       </div>
                     )}
                     <div className="flex flex-wrap gap-2 pt-1">
-                      <Button variant="outline" size="sm" onClick={() => setExpandedClientId(isExpanded ? null : client.id)}>
+                      <Button variant="outline" size="sm" onClick={() => handleExpandClient(client.id, client.contract_ids || [])}>
                         {isExpanded ? <ChevronUp size={14} className="mr-1" /> : <ChevronDown size={14} className="mr-1" />}
                         Parcelas vinculadas
                       </Button>
