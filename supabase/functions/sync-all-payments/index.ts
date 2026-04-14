@@ -75,21 +75,27 @@ Deno.serve(async (req) => {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const isInternalCall = internalKey === serviceRoleKey;
 
-    if (!authHeader && !isInternalCall) {
+    if (!authHeader) {
       return new Response(JSON.stringify({ error: "Não autorizado" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    const token = (authHeader || "").replace("Bearer ", "");
+    let isServiceRole = false;
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      if (payload.role === "service_role") isServiceRole = true;
+    } catch { /* */ }
+
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    if (!isInternalCall) {
-      const token = (authHeader || "").replace("Bearer ", "");
+    if (!isServiceRole && !isInternalCall) {
       let callerId: string | null = null;
       try {
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        callerId = payload.sub || null;
+        const p = JSON.parse(atob(token.split(".")[1]));
+        callerId = p.sub || null;
       } catch { /* invalid token */ }
 
       if (!callerId) {
