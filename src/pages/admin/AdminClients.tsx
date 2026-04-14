@@ -598,7 +598,6 @@ const AdminClients = () => {
                       <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                         {paymentCount} parcelas
                       </Badge>
-                      </Badge>
                       {client.source === "contract_snapshot" && (
                         <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                           Snapshot do contrato
