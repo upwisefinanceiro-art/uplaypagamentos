@@ -413,13 +413,23 @@ const AdminClients = () => {
   };
 
   const getClientPayments = (client: ClientRow) => {
-    const contractIds = new Set(client.contract_ids || []);
+    return expandedPayments.get(client.id) || [];
+  };
 
-    return payments.filter((payment) => {
-      if (payment.responsible_id === client.id) return true;
-      if (payment.contract_id && contractIds.has(payment.contract_id)) return true;
-      return false;
-    });
+  const getClientPaymentCount = (client: ClientRow) => {
+    return paymentCounts.get(client.id) || 0;
+  };
+
+  const handleExpandClient = async (clientId: string, contractIds: string[]) => {
+    if (expandedClientId === clientId) {
+      setExpandedClientId(null);
+      return;
+    }
+    setExpandedClientId(clientId);
+    if (!expandedPayments.has(clientId)) {
+      const clientPayments = await fetchClientPayments(clientId, contractIds);
+      setExpandedPayments(prev => new Map(prev).set(clientId, clientPayments));
+    }
   };
 
   const getClientContracts = (client: ClientRow) => {
