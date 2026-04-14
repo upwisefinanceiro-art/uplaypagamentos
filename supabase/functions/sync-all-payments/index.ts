@@ -57,13 +57,16 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { data: { user: caller } } = await supabaseUser.auth.getUser();
-    if (!caller) {
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await supabaseUser.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims?.sub) {
+      console.error("[sync-all] auth error:", claimsError);
       return new Response(JSON.stringify({ error: "Não autorizado" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    const caller = { id: claimsData.claims.sub as string };
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
