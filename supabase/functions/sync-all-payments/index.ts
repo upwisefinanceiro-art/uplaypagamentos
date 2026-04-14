@@ -82,35 +82,40 @@ Deno.serve(async (req) => {
 
     const token = authHeader.replace("Bearer ", "");
     let callerId: string | null = null;
+    let isServiceRole = false;
     try {
       const payload = JSON.parse(atob(token.split(".")[1]));
       callerId = payload.sub || null;
+      if (payload.role === "service_role") {
+        isServiceRole = true;
+      }
     } catch { /* invalid token */ }
 
-    if (!callerId) {
+    if (!callerId && !isServiceRole) {
       return new Response(JSON.stringify({ error: "Não autorizado" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const caller = { id: callerId };
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Check admin
-    const { data: callerRoles } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", caller.id);
+    if (!isServiceRole) {
+      // Check admin
+      const { data: callerRoles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", callerId);
 
-    const isAdmin = callerRoles?.some((r: { role: string }) =>
-      r.role === "ADMIN_MASTER" || r.role === "ADMIN_UNIDADE"
-    );
-    if (!isAdmin) {
-      return new Response(JSON.stringify({ error: "Sem permissão" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      const isAdmin = callerRoles?.some((r: { role: string }) =>
+        r.role === "ADMIN_MASTER" || r.role === "ADMIN_UNIDADE"
+      );
+      if (!isAdmin) {
+        return new Response(JSON.stringify({ error: "Sem permissão" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     // Get optional unit_id filter
