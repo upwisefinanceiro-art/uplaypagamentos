@@ -47,6 +47,8 @@ interface AsaasPayment {
   billingType: string;
   value: number;
   netValue?: number;
+  originalValue?: number | null;
+  receivedValue?: number | null;
   dueDate: string;
   status: string;
   description?: string;
@@ -162,6 +164,18 @@ function chunkArray<T>(items: T[], size: number) {
     chunks.push(items.slice(index, index + size));
   }
   return chunks;
+}
+
+function roundCurrency(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
+function getFaceValue(payment: Pick<AsaasPayment, "value" | "originalValue">) {
+  return roundCurrency(Number(payment.originalValue ?? payment.value ?? 0));
+}
+
+function getPaidAmount(payment: Pick<AsaasPayment, "value" | "originalValue" | "receivedValue">) {
+  return roundCurrency(Number(payment.receivedValue ?? payment.value ?? payment.originalValue ?? 0));
 }
 
 async function fetchAllPages<T>(baseUrl: string, path: string, apiKey: string): Promise<T[]> {
@@ -724,27 +738,32 @@ Deno.serve(async (req) => {
           ? payment.paymentDate || payment.confirmedDate || payment.clientPaymentDate || null
           : null;
 
+      const faceValue = getFaceValue(payment);
+      const paidAmount = getPaidAmount(payment);
+
       // Calculate discount from Asaas
       const discountValue = payment.discount?.value || 0;
       const discountType = payment.discount?.type || "FIXED";
-      const punctualityDiscount = discountType === "PERCENTAGE"
-        ? Math.round((payment.value || 0) * discountValue / 100 * 100) / 100
-        : discountValue;
+      const configuredDiscount = discountType === "PERCENTAGE"
+        ? roundCurrency(faceValue * discountValue / 100)
+        : roundCurrency(discountValue);
+      const inferredDiscount = roundCurrency(Math.max(faceValue - paidAmount, 0));
+      const punctualityDiscount = Math.max(configuredDiscount, inferredDiscount);
 
-      // For PAID: final_value = netValue (what merchant received after Asaas fees)
-      // For unpaid: final_value = value (face value, discount NOT pre-applied)
+      // For PAID: final_value = amount actually paid by the client
+      // For unpaid: final_value = face value, keeping the discount metadata separate
       const isPaid = status === "PAID";
       const finalValue = isPaid
-        ? (payment.netValue || payment.value || 0)
-        : (payment.value || 0);
+        ? paidAmount
+        : faceValue;
 
       paymentRowsByAsaasId.set(payment.id, {
         asaas_payment_id: payment.id,
         responsible_id: responsibleId,
         student_id: studentId,
         unit_id: unitId,
-        value: payment.value || 0,
-        original_value: payment.value || 0,
+        value: faceValue,
+        original_value: faceValue,
         final_value: finalValue,
         punctuality_discount: punctualityDiscount,
         due_date: payment.dueDate,
