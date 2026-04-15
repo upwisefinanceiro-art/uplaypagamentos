@@ -658,7 +658,25 @@ const AdminClients = () => {
                       <Button variant="outline" size="sm" onClick={() => navigate(`/admin/cobrancas?responsible=${client.id}&create=manual`)}>
                         Adicionar parcela
                       </Button>
-                    </div>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1.5 text-green-700 border-green-500/30 hover:bg-green-500/10"
+                              onClick={() => handleSendAccess(client)}
+                              disabled={!client.phone}
+                            >
+                              <MessageCircle size={14} />
+                              Enviar acesso
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {client.phone ? "Enviar credenciais via WhatsApp" : "Sem telefone cadastrado"}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                   </div>
                   {client.source === "profile" ? (
                     <UserActionButtons
