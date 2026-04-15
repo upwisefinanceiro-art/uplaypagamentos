@@ -43,6 +43,7 @@ import DashboardUnitSummary from "@/components/dashboard/DashboardUnitSummary";
 import DashboardBirthdays, { type BirthdayPerson } from "@/components/dashboard/DashboardBirthdays";
 import DashboardDeliveries from "@/components/dashboard/DashboardDeliveries";
 import DashboardLowStock from "@/components/dashboard/DashboardLowStock";
+import DashboardWhatsAppBatch from "@/components/dashboard/DashboardWhatsAppBatch";
 import { useToast } from "@/hooks/use-toast";
 import { resolveWhatsAppChargeData } from "@/lib/asaas-payment";
 
@@ -501,6 +502,9 @@ const AdminDashboard = () => {
 
       {/* Low stock alerts */}
       <DashboardLowStock unitFilter={unitFilter} units={units} />
+
+      {/* WhatsApp batch notifications */}
+      <DashboardWhatsAppBatch unitFilter={unitFilter} />
 
       {/* Main lists grid */}
       <div className="grid lg:grid-cols-2 gap-4">
