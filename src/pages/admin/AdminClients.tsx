@@ -677,7 +677,7 @@ const AdminClients = () => {
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
-                  </div>
+                    </div>
                   {client.source === "profile" ? (
                     <UserActionButtons
                       active={client.active}
