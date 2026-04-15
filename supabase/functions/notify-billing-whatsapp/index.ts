@@ -42,6 +42,8 @@ Deno.serve(async (req) => {
       unitFilter = body?.unit_id || null;
     } catch { /* no body */ }
 
+    const SCHOOL_HEADER = "📚 *Upwise / EnsinUp — Cursos Profissionalizantes* 📚";
+
     const today = new Date();
     const todayStr = today.toISOString().split("T")[0];
 
