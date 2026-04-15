@@ -669,7 +669,7 @@ const AdminClients = () => {
                               disabled={!client.phone}
                             >
                               <MessageCircle size={14} />
-                              Enviar acesso
+                              Notificar APP
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>
