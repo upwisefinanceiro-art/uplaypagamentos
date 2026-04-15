@@ -90,7 +90,7 @@ const AppPayments = () => {
     setLoading(true);
     const { data } = await supabase
       .from("payments")
-      .select("id, value, due_date, status, payment_method, installment_number, pix_copy_paste, invoice_url, boleto_url, checkout_url, contract_id, responsible_id, final_value, description, payment_type")
+      .select("id, value, due_date, status, payment_method, installment_number, pix_copy_paste, invoice_url, boleto_url, checkout_url, contract_id, responsible_id, final_value, original_value, punctuality_discount, description, payment_type")
       .order("due_date", { ascending: false });
     if (data) setPayments(data);
     setLoading(false);
@@ -414,9 +414,19 @@ const AppPayments = () => {
                     )}
                   </div>
                   <div className="flex flex-col items-end gap-1">
+                    {(payment.punctuality_discount ?? 0) > 0 && (
+                      <span className="text-[10px] text-muted-foreground line-through">
+                        R$ {Number(payment.original_value ?? payment.value).toFixed(2).replace(".", ",")}
+                      </span>
+                    )}
                     <span className={`text-sm font-semibold ${isOverdue ? "text-destructive" : "text-foreground"}`}>
                       R$ {Number(payment.final_value ?? payment.value).toFixed(2).replace(".", ",")}
                     </span>
+                    {(payment.punctuality_discount ?? 0) > 0 && (
+                      <span className="text-[10px] text-success font-medium">
+                        -{`R$ ${Number(payment.punctuality_discount).toFixed(2).replace(".", ",")}`} desc.
+                      </span>
+                    )}
                     <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${statusClasses[payment.status as PaymentStatus] || ""}`}>
                       {isOverdue ? "Vencido" : (statusLabels[payment.status as PaymentStatus] || payment.status)}
                     </span>

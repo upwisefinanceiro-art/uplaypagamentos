@@ -15,6 +15,8 @@ interface Payment {
   id: string;
   value: number;
   final_value: number | null;
+  original_value: number | null;
+  punctuality_discount: number | null;
   due_date: string;
   status: string;
   description: string;
@@ -39,7 +41,7 @@ const AppHome = () => {
     const fetch = async () => {
       const [studentsRes, paymentsRes] = await Promise.all([
         supabase.from("students").select("id, full_name, enrollment_id").eq("responsible_id", user.id).eq("active", true),
-        supabase.from("payments").select("id, value, final_value, due_date, status, description, payment_type, installment_number, invoice_url, checkout_url").eq("responsible_id", user.id).order("due_date", { ascending: true }),
+        supabase.from("payments").select("id, value, final_value, original_value, punctuality_discount, due_date, status, description, payment_type, installment_number, invoice_url, checkout_url").eq("responsible_id", user.id).order("due_date", { ascending: true }),
       ]);
       if (studentsRes.data) setStudents(studentsRes.data);
       if (paymentsRes.data) setPayments(paymentsRes.data as Payment[]);
@@ -172,9 +174,19 @@ const AppHome = () => {
                     </p>
                   </div>
                   <div className="text-right flex-shrink-0">
+                    {(p.punctuality_discount ?? 0) > 0 && (
+                      <p className="text-[10px] text-muted-foreground line-through">
+                        {formatCurrency(p.original_value ?? p.value)}
+                      </p>
+                    )}
                     <p className="text-sm font-bold text-destructive">
                       {formatCurrency(p.final_value ?? p.value)}
                     </p>
+                    {(p.punctuality_discount ?? 0) > 0 && (
+                      <p className="text-[10px] text-success font-medium">
+                        -{formatCurrency(p.punctuality_discount!)} desc.
+                      </p>
+                    )}
                   </div>
                   <ChevronRight size={16} className="text-muted-foreground flex-shrink-0" />
                 </button>
@@ -209,9 +221,19 @@ const AppHome = () => {
                   <p className="text-xs text-warning">Vence hoje</p>
                 </div>
                 <div className="text-right flex-shrink-0">
+                  {(p.punctuality_discount ?? 0) > 0 && (
+                    <p className="text-[10px] text-muted-foreground line-through">
+                      {formatCurrency(p.original_value ?? p.value)}
+                    </p>
+                  )}
                   <p className="text-sm font-bold text-foreground">
                     {formatCurrency(p.final_value ?? p.value)}
                   </p>
+                  {(p.punctuality_discount ?? 0) > 0 && (
+                    <p className="text-[10px] text-success font-medium">
+                      -{formatCurrency(p.punctuality_discount!)} desc.
+                    </p>
+                  )}
                 </div>
                 <ChevronRight size={16} className="text-muted-foreground flex-shrink-0" />
               </button>
@@ -258,9 +280,19 @@ const AppHome = () => {
                     </p>
                   </div>
                   <div className="text-right flex-shrink-0">
+                    {(p.punctuality_discount ?? 0) > 0 && (
+                      <p className="text-[10px] text-muted-foreground line-through">
+                        {formatCurrency(p.original_value ?? p.value)}
+                      </p>
+                    )}
                     <p className="text-sm font-semibold text-foreground">
                       {formatCurrency(p.final_value ?? p.value)}
                     </p>
+                    {(p.punctuality_discount ?? 0) > 0 && (
+                      <p className="text-[10px] text-success font-medium">
+                        -{formatCurrency(p.punctuality_discount!)} desc.
+                      </p>
+                    )}
                   </div>
                   <ChevronRight size={16} className="text-muted-foreground flex-shrink-0" />
                 </button>
