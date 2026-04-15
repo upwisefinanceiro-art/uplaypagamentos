@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, ChevronUp, Loader2, Plus, Search } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2, MessageCircle, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import UserEditDialog from "@/components/admin/UserEditDialog";
@@ -459,6 +460,31 @@ const AdminClients = () => {
     );
   });
 
+  const handleSendAccess = (client: ClientRow) => {
+    if (!client.phone) {
+      toast({ title: "Cliente sem telefone cadastrado", description: "Edite o cliente e adicione um telefone.", variant: "destructive" });
+      return;
+    }
+
+    const cpfFormatted = client.cpf
+      ? client.cpf.replace(/\D/g, "").replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")
+      : "";
+    const login = client.email || cpfFormatted;
+
+    if (!login) {
+      toast({ title: "Cliente sem login definido", description: "É necessário CPF ou e-mail.", variant: "destructive" });
+      return;
+    }
+
+    const APP_URL = "https://uplaypagamentos.lovable.app/login";
+    const INSTALL_URL = "https://uplaypagamentos.lovable.app/instalar";
+    const message = `Olá, ${client.full_name}! 👋\n\nSeu acesso ao app da *UPLAY Pagamentos* está disponível:\n\n🔑 *Login:* ${login}\n🔒 *Senha:* 12345678\n\n📲 Acesse aqui: ${APP_URL}\n\n📱 *Instale o app no celular:*\n${INSTALL_URL}\n\nEm caso de dúvidas, estamos à disposição! 😊`;
+
+    const cleanPhone = client.phone.replace(/\D/g, "");
+    const fullPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
+    window.open(`https://wa.me/${fullPhone}?text=${encodeURIComponent(message)}`, "_blank");
+  };
+
   const getAlertContent = () => {
     if (!actionTarget) return { title: "", description: "" };
 
@@ -632,6 +658,25 @@ const AdminClients = () => {
                       <Button variant="outline" size="sm" onClick={() => navigate(`/admin/cobrancas?responsible=${client.id}&create=manual`)}>
                         Adicionar parcela
                       </Button>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1.5 text-green-700 border-green-500/30 hover:bg-green-500/10"
+                              onClick={() => handleSendAccess(client)}
+                              disabled={!client.phone}
+                            >
+                              <MessageCircle size={14} />
+                              Enviar acesso
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {client.phone ? "Enviar credenciais via WhatsApp" : "Sem telefone cadastrado"}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
                   </div>
                   {client.source === "profile" ? (
