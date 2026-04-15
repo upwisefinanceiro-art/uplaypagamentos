@@ -36,6 +36,7 @@ import SuperBilling from "./pages/super/SuperBilling";
 import { CompanyBrandingProvider } from "./contexts/CompanyBrandingContext";
 import NotFound from "./pages/NotFound";
 import Instalar from "./pages/Instalar";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 import SplashScreen from "./components/SplashScreen";
 
 const queryClient = new QueryClient();
@@ -57,6 +58,7 @@ const App = () => {
               <Route path="/" element={<Navigate to="/login" replace />} />
               <Route path="/login" element={<Login />} />
               <Route path="/instalar" element={<Instalar />} />
+              <Route path="/privacidade" element={<PrivacyPolicy />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
 
