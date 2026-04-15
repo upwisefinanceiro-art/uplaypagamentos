@@ -42,25 +42,29 @@ const buildMessage = (item: NotificationItem): string => {
   const paymentLink = item.invoice_url || item.boleto_url || "";
 
   if (item.type === "REMINDER") {
-    let msg = `Olá, ${item.responsible_name}.\n\n`;
-    msg += `Aqui é do financeiro da *UPLAY Pagamentos*.\n\n`;
+    let msg = `📚 *Upwise / EnsinUp — Cursos Profissionalizantes* 📚\n\n`;
+    msg += `Olá, ${item.responsible_name}.\n\n`;
+    msg += `Aqui é do *setor financeiro*.\n\n`;
     msg += `Estamos passando para lembrar que sua mensalidade vence em breve.\n\n`;
     if (item.student_name) msg += `👤 Aluno: ${item.student_name}\n`;
     msg += `💰 Valor: *${formatCurrency(item.value)}*\n`;
     msg += `📅 Vencimento: *${fmtDate}*\n\n`;
     if (paymentLink) msg += `Segue o link para pagamento:\n${paymentLink}\n\n`;
-    msg += `Em caso de dúvidas, estamos à disposição. 😊`;
+    msg += `Em caso de dúvidas, estamos à disposição. 😊\n\n`;
+    msg += `Atenciosamente,\n*Setor Financeiro*`;
     return msg;
   }
 
   // OVERDUE
-  let msg = `Olá, ${item.responsible_name}.\n\n`;
+  let msg = `📚 *Upwise / EnsinUp — Cursos Profissionalizantes* 📚\n\n`;
+  msg += `Olá, ${item.responsible_name}.\n\n`;
   msg += `Identificamos que existe uma mensalidade em aberto.\n\n`;
   if (item.student_name) msg += `👤 Aluno: ${item.student_name}\n`;
   msg += `💰 Valor: *${formatCurrency(item.value)}*\n`;
   msg += `📅 Vencimento: *${fmtDate}*\n\n`;
   if (paymentLink) msg += `Segue o link para regularização:\n${paymentLink}\n\n`;
-  msg += `Por favor, realize o pagamento o quanto antes.`;
+  msg += `Por favor, realize o pagamento o quanto antes.\n\n`;
+  msg += `Atenciosamente,\n*Setor Financeiro*`;
   return msg;
 };
 

@@ -64,9 +64,9 @@ const buildDefaultMessage = ({
     return "BOLETO";
   })();
 
-  let msg = `📚 *UPLAY - Gestão de Pagamentos* 📚\n\n`;
+  let msg = `📚 *Upwise / EnsinUp — Cursos Profissionalizantes* 📚\n\n`;
   msg += `Olá, ${responsibleName}! 👋\n\n`;
-  msg += `Aqui é do *financeiro da UPLAY*.\n\n`;
+  msg += `Aqui é do *setor financeiro*.\n\n`;
   if (studentName) msg += `👤 Aluno: ${studentName}\n`;
   msg += `📋 Referência: ${description}\n`;
   msg += `💰 Valor: *${formatCurrency(value)}*\n`;
@@ -93,7 +93,8 @@ const buildDefaultMessage = ({
     }
   }
 
-  msg += `Se tiver qualquer dúvida, estamos à disposição. 😊`;
+  msg += `Se tiver qualquer dúvida, estamos à disposição. 😊\n\n`;
+  msg += `Atenciosamente,\n*Setor Financeiro*`;
 
   return msg;
 };
