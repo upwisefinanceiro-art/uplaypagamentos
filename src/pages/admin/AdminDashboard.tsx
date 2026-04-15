@@ -503,6 +503,9 @@ const AdminDashboard = () => {
       {/* Low stock alerts */}
       <DashboardLowStock unitFilter={unitFilter} units={units} />
 
+      {/* WhatsApp batch notifications */}
+      <DashboardWhatsAppBatch unitFilter={unitFilter} />
+
       {/* Main lists grid */}
       <div className="grid lg:grid-cols-2 gap-4">
         {/* Overdue */}
