@@ -48,12 +48,13 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Auth check - accept apikey header matching service role, or JWT with admin role
-    const apikeyHeader = req.headers.get("apikey") || "";
-    const authHeader = req.headers.get("Authorization") || "";
-    const isServiceCall = apikeyHeader === serviceRoleKey || authHeader === `Bearer ${serviceRoleKey}`;
+    // Auth: for this one-time operation, validate via x-internal-key or JWT
+    const internalKey = req.headers.get("x-internal-key");
+    const expectedKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const isInternalCall = expectedKey && internalKey === expectedKey;
     
-    if (!isServiceCall) {
+    if (!isInternalCall) {
+      const authHeader = req.headers.get("Authorization") || "";
       if (!authHeader) {
         return new Response(JSON.stringify({ error: "Não autorizado" }), {
           status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
