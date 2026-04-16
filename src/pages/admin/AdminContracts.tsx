@@ -31,6 +31,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import UserEditDialog from "@/components/admin/UserEditDialog";
 import ContractCancellationDialog from "@/components/admin/ContractCancellationDialog";
 import ClientAccessModal from "@/components/admin/ClientAccessModal";
+import { fetchAllPaginated } from "@/lib/fetchAllPaginated";
 
 interface ContractRow {
   id: string;
@@ -229,13 +230,20 @@ const AdminContracts = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const [contractsRes, studentsRes, responsiblesRes, unitsRes, adminRolesRes, paymentsRes, stockItemsRes] = await Promise.all([
+    const [contractsRes, studentsRes, responsiblesRes, unitsRes, adminRolesRes, contractPayments, stockItemsRes] = await Promise.all([
       supabase.from("contracts").select("*, units(name), students(full_name)").order("created_at", { ascending: false }),
       supabase.from("students").select("id, full_name, responsible_id, unit_id").eq("active", true),
       supabase.from("profiles").select("id, full_name, cpf, phone, email, unit_id, asaas_customer_id").eq("active", true),
       supabase.from("units").select("id, name").eq("active", true),
       supabase.from("user_roles").select("user_id").in("role", ["ADMIN_MASTER", "ADMIN_UNIDADE"]),
-      supabase.from("payments").select("id, contract_id, status, due_date").not("contract_id", "is", null),
+      fetchAllPaginated<{ id: string; contract_id: string | null; status: string; due_date: string }>((from, to) =>
+        supabase
+          .from("payments")
+          .select("id, contract_id, status, due_date")
+          .not("contract_id", "is", null)
+          .order("due_date", { ascending: false })
+          .range(from, to),
+      ),
       supabase.from("stock_items").select("id, name, unit_id, quantity").eq("active", true),
     ]);
     if (contractsRes.data) setContracts(contractsRes.data as any);
@@ -245,7 +253,7 @@ const AdminContracts = () => {
       setResponsibles((responsiblesRes.data as any).filter((p: any) => !adminIds.has(p.id)));
     }
     if (unitsRes.data) setUnits(unitsRes.data);
-    if (paymentsRes.data) setContractPayments(paymentsRes.data as any);
+    setContractPayments(contractPayments as any);
     if (stockItemsRes.data) setStockItems(stockItemsRes.data as any);
     setLoading(false);
   };
