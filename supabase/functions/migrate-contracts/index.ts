@@ -4,6 +4,18 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+function cleanDescription(raw: string): string {
+  let d = raw
+    .replace(/Parcela\s+\d+\s+de\s+\d+\.?\s*/gi, "")
+    .replace(/Boleto\s+referente\s+ao\s+/gi, "")
+    .replace(/Parcela\s+referente\s+ao\s+/gi, "")
+    .replace(/curso\s+(na\s+escola\s+)?/gi, "Curso ")
+    .replace(/\s*-\s*$/g, "")
+    .replace(/\.\s*$/g, "")
+    .trim();
+  if (!d || d.length < 3) d = "Curso Profissionalizante";
+  return d.charAt(0).toUpperCase() + d.slice(1);
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
