@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { openWhatsApp } from "@/lib/whatsapp-utils";
 import UserEditDialog from "@/components/admin/UserEditDialog";
 import UserActionButtons from "@/components/admin/UserActionButtons";
 
@@ -480,9 +481,7 @@ const AdminClients = () => {
     const INSTALL_URL = "https://uplaypagamentos.lovable.app/instalar";
     const message = `Olá, ${client.full_name}! 👋\n\n📚 *Upwise / Ensino Up — Cursos Profissionalizantes*\n\nSeu acesso ao app de pagamentos está disponível:\n\n🔑 *Login:* ${login}\n🔒 *Senha:* 12345678\n\n📲 Acesse aqui: ${APP_URL}\n\n📱 *Instale o app no celular:*\n${INSTALL_URL}\n\nEm caso de dúvidas, estamos à disposição! 😊\n\nAtenciosamente,\n*Setor Financeiro*`;
 
-    const cleanPhone = client.phone.replace(/\D/g, "");
-    const fullPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
-    window.open(`https://wa.me/${fullPhone}?text=${encodeURIComponent(message)}`, "_blank");
+    openWhatsApp(client.phone, message);
   };
 
   const getAlertContent = () => {
