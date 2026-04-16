@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.migrate-contracts]
 verify_jwt = false
+
+[functions.sync-client-emails]
+verify_jwt = false
