@@ -79,6 +79,10 @@ Deno.serve(async (req) => {
       ? email.trim().toLowerCase()
       : targetProfile.email || `${cleanCpf}@uplay.app`;
 
+    if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return jsonResponse({ error: "E-mail inválido" }, 400);
+    }
+
     let nextUnitId = targetProfile.unit_id;
 
     if (isAdminMaster) {

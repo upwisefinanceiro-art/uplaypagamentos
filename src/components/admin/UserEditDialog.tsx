@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, MessageCircle, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { openWhatsApp } from "@/lib/whatsapp-utils";
+import { buildClientAccessMessage, isValidEmail, needsAsaasSync } from "@/lib/client-access";
 
 interface StudentEdit {
   id: string;
@@ -33,6 +35,7 @@ interface UserEditDialogProps {
     unit_id: string | null;
     email?: string | null;
     address?: string | null;
+    active?: boolean;
   } | null;
   units: { id: string; name: string }[];
   onSaved: () => void | Promise<void>;
@@ -50,7 +53,53 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
   const [studentsEdit, setStudentsEdit] = useState<StudentEdit[]>([]);
   const [contractsEdit, setContractsEdit] = useState<ContractEdit[]>([]);
   const [loadingRelated, setLoadingRelated] = useState(false);
+  const [syncingAsaas, setSyncingAsaas] = useState(false);
   const { toast } = useToast();
+
+  const syncFromAsaas = async ({ silent = false, automatic = false }: { silent?: boolean; automatic?: boolean } = {}) => {
+    if (!user) return;
+
+    setSyncingAsaas(true);
+    const { data, error } = await supabase.functions.invoke("sync-client-emails", {
+      body: {
+        profile_id: user.id,
+        unit_id: user.unit_id,
+        automatic,
+        update_name: true,
+        update_phone: true,
+      },
+    });
+    setSyncingAsaas(false);
+
+    if (error || data?.error) {
+      if (!silent) {
+        toast({
+          title: "Erro ao sincronizar com Asaas",
+          description: error?.message || data?.error,
+          variant: "destructive",
+        });
+      }
+      return;
+    }
+
+    const detail = Array.isArray(data?.details) ? data.details[0] : null;
+    if (detail) {
+      if (typeof detail.new_name === "string") setName(detail.new_name);
+      if (typeof detail.new_email === "string") setEmail(detail.new_email);
+      if (typeof detail.new_phone === "string") setPhone(detail.new_phone);
+    }
+
+    if (!silent) {
+      toast({
+        title: data?.updated > 0 ? "Dados sincronizados com Asaas" : "Nenhuma alteração necessária",
+        description: data?.protected_conflicts > 0 ? "Um e-mail válido diferente foi preservado por segurança." : undefined,
+      });
+    }
+
+    if (data?.updated > 0) {
+      await Promise.resolve(onSaved());
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -61,6 +110,9 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
       setAddress(user.address || "");
       setUnitId(user.unit_id || "");
       fetchRelatedData(user.id);
+      if (needsAsaasSync(user.email, user.phone)) {
+        void syncFromAsaas({ silent: true, automatic: true });
+      }
       return;
     }
 
@@ -117,6 +169,11 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
       return;
     }
 
+    if (email.trim() && !isValidEmail(email.trim())) {
+      toast({ title: "E-mail inválido", description: "Informe um e-mail válido para salvar.", variant: "destructive" });
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -168,6 +225,20 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
     }
   };
 
+  const handleNotifyApp = () => {
+    if (!user?.active) {
+      toast({ title: "Cliente sem login ativo", variant: "destructive" });
+      return;
+    }
+
+    if (!phone.trim()) {
+      toast({ title: "Cliente sem telefone cadastrado", variant: "destructive" });
+      return;
+    }
+
+    openWhatsApp(phone, buildClientAccessMessage({ cpf, email, fullName: name }));
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-card border-border max-h-[90vh] overflow-y-auto">
@@ -194,6 +265,20 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
           <div className="space-y-2">
             <Label className="text-foreground">E-mail</Label>
             <Input type="email" className="bg-input border-border text-foreground" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
+
+          <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
+            <Label className="text-foreground">Ações rápidas</Label>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button type="button" variant="outline" className="gap-2" onClick={() => void syncFromAsaas()} disabled={syncingAsaas}>
+                {syncingAsaas ? <Loader2 size={16} className="animate-spin" /> : <RefreshCcw size={16} />}
+                Sincronizar com Asaas
+              </Button>
+              <Button type="button" variant="outline" className="gap-2" onClick={handleNotifyApp} disabled={!user?.active || !phone.trim()}>
+                <MessageCircle size={16} />
+                Notificar App
+              </Button>
+            </div>
           </div>
 
           <div className="space-y-2">

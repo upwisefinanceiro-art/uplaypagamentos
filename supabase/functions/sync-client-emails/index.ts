@@ -5,12 +5,26 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+
 function normalizeCpf(value?: string | null) {
   return (value || "").replace(/\D/g, "");
 }
 
+function normalizePhone(value?: string | null) {
+  return (value || "").replace(/\D/g, "");
+}
+
+function normalizeEmail(value?: string | null) {
+  return (value || "").trim().toLowerCase();
+}
+
 function isPlaceholderEmail(email?: string | null) {
-  return /@imported\.uplay\.app$/i.test(email || "");
+  return /@(imported\.)?uplay\.app$/i.test(email || "");
+}
+
+function isValidEmail(email?: string | null) {
+  return !!email && EMAIL_REGEX.test(normalizeEmail(email));
 }
 
 interface AsaasCustomer {
@@ -22,20 +36,44 @@ interface AsaasCustomer {
   mobilePhone?: string | null;
 }
 
-async function fetchAllPages(baseUrl: string, path: string, apiKey: string): Promise<AsaasCustomer[]> {
-  const all: AsaasCustomer[] = [];
-  let offset = 0;
-  const limit = 100;
-  while (true) {
-    const url = `${baseUrl}${path}${path.includes("?") ? "&" : "?"}offset=${offset}&limit=${limit}`;
-    const res = await fetch(url, { headers: { access_token: apiKey } });
-    if (!res.ok) break;
-    const json = await res.json();
-    all.push(...(json.data || []));
-    if (!json.hasMore) break;
-    offset += limit;
-  }
-  return all;
+type ProfileRow = {
+  id: string;
+  cpf: string;
+  email: string | null;
+  full_name: string;
+  phone: string | null;
+  unit_id: string | null;
+  asaas_customer_id: string | null;
+};
+
+async function fetchCustomer(baseUrl: string, customerId: string, apiKey: string): Promise<AsaasCustomer | null> {
+  const res = await fetch(`${baseUrl}/customers/${customerId}`, { headers: { access_token: apiKey } });
+  if (!res.ok) return null;
+  return await res.json();
+}
+
+function shouldReplaceEmail(currentEmail: string | null, nextEmail: string | null, overwriteValidConflict: boolean) {
+  if (!nextEmail || !isValidEmail(nextEmail) || isPlaceholderEmail(nextEmail)) return false;
+  if (!currentEmail) return true;
+  if (currentEmail === nextEmail) return false;
+  if (isPlaceholderEmail(currentEmail) || !isValidEmail(currentEmail)) return true;
+  return overwriteValidConflict;
+}
+
+function hasProtectedEmailConflict(currentEmail: string | null, nextEmail: string | null) {
+  return !!currentEmail && !!nextEmail && currentEmail !== nextEmail && isValidEmail(currentEmail) && !isPlaceholderEmail(currentEmail);
+}
+
+function shouldReplacePhone(currentPhone: string | null, nextPhone: string | null) {
+  if (!nextPhone) return false;
+  if (!currentPhone) return true;
+  if (currentPhone === nextPhone) return false;
+  return currentPhone.length < 10 || /^0+$/.test(currentPhone);
+}
+
+function shouldReplaceName(currentName: string | null, nextName: string | null) {
+  if (!nextName) return false;
+  return !(currentName || "").trim();
 }
 
 Deno.serve(async (req) => {
@@ -74,10 +112,33 @@ Deno.serve(async (req) => {
     let body: Record<string, unknown> = {};
     try { body = await req.json(); } catch { /* */ }
     const filterUnitId = typeof body.unit_id === "string" ? body.unit_id : null;
+    const filterProfileId = typeof body.profile_id === "string" ? body.profile_id : null;
+    const overwriteConflictingEmails = body.overwrite_conflicting_emails === true;
+    const updateNames = body.update_name === true;
+    const updatePhones = body.update_phone !== false;
+    const automatic = body.automatic === true;
 
-    // Get units with Asaas keys
-    let unitsQuery = supabase.from("units").select("id, asaas_api_key, asaas_base_url, name").not("asaas_api_key", "is", null);
-    if (filterUnitId) unitsQuery = unitsQuery.eq("id", filterUnitId);
+    let profilesQuery = supabase
+      .from("profiles")
+      .select("id, cpf, email, full_name, phone, unit_id, asaas_customer_id");
+
+    if (filterProfileId) profilesQuery = profilesQuery.eq("id", filterProfileId);
+    else if (filterUnitId) profilesQuery = profilesQuery.eq("unit_id", filterUnitId);
+
+    const { data: profiles } = await profilesQuery;
+
+    if (!profiles || profiles.length === 0) {
+      return new Response(JSON.stringify({ error: "Nenhum cliente encontrado para sincronizar" }), {
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const unitIds = [...new Set((profiles as ProfileRow[]).map((profile) => profile.unit_id).filter(Boolean))] as string[];
+    let unitsQuery = supabase
+      .from("units")
+      .select("id, asaas_api_key, asaas_base_url, name")
+      .in("id", unitIds)
+      .not("asaas_api_key", "is", null);
     const { data: units } = await unitsQuery;
 
     if (!units || units.length === 0) {
@@ -86,101 +147,135 @@ Deno.serve(async (req) => {
       });
     }
 
+    const unitsById = new Map(units.map((unit) => [unit.id, unit]));
     let updated = 0;
     let skipped = 0;
-    let noMatch = 0;
-    let totalCustomers = 0;
-    const details: { name: string; cpf: string; oldEmail: string | null; newEmail: string }[] = [];
+    let protectedConflicts = 0;
+    let missingAsaasId = 0;
+    let fetchErrors = 0;
+    const details: Array<Record<string, unknown>> = [];
 
-    for (const unit of units) {
+    for (const profile of profiles as ProfileRow[]) {
+      if (!profile.unit_id || !unitsById.has(profile.unit_id)) {
+        skipped++;
+        continue;
+      }
+
+      if (!profile.asaas_customer_id) {
+        missingAsaasId++;
+        continue;
+      }
+
+      const unit = unitsById.get(profile.unit_id)!;
       const baseUrl = unit.asaas_base_url || "https://api.asaas.com/v3";
       const apiKey = unit.asaas_api_key;
 
-      console.log(`[sync-emails] Processing unit: ${unit.name} (${unit.id})`);
+      const customer = await fetchCustomer(baseUrl, profile.asaas_customer_id, apiKey);
+      if (!customer) {
+        fetchErrors++;
+        continue;
+      }
 
-      // Fetch all customers from Asaas
-      const customers = await fetchAllPages(baseUrl, "/customers", apiKey);
-      totalCustomers += customers.length;
+      const currentEmail = normalizeEmail(profile.email) || null;
+      const currentPhone = normalizePhone(profile.phone) || null;
+      const asaasEmail = normalizeEmail(customer.email) || null;
+      const asaasPhone = normalizePhone(customer.mobilePhone || customer.phone) || null;
+      const asaasName = customer.name?.trim() || null;
 
-      // Get all profiles for this unit
-      const { data: profiles } = await supabase
+      const updatePayload: Record<string, string | null> = {};
+      const fieldsUpdated: string[] = [];
+
+      if (shouldReplaceEmail(currentEmail, asaasEmail, overwriteConflictingEmails)) {
+        updatePayload.email = asaasEmail;
+        fieldsUpdated.push("email");
+      } else if (hasProtectedEmailConflict(currentEmail, asaasEmail)) {
+        protectedConflicts++;
+      }
+
+      if (updatePhones && shouldReplacePhone(currentPhone, asaasPhone)) {
+        updatePayload.phone = asaasPhone;
+        fieldsUpdated.push("phone");
+      }
+
+      if (updateNames && shouldReplaceName(profile.full_name, asaasName)) {
+        updatePayload.full_name = asaasName;
+        fieldsUpdated.push("full_name");
+      }
+
+      if (fieldsUpdated.length === 0) {
+        skipped++;
+        continue;
+      }
+
+      const { error: updateErr } = await supabase
         .from("profiles")
-        .select("id, cpf, email, full_name, asaas_customer_id")
-        .eq("unit_id", unit.id);
+        .update(updatePayload)
+        .eq("id", profile.id);
 
-      if (!profiles || profiles.length === 0) continue;
-
-      // Build lookup maps
-      const profileByCpf = new Map<string, typeof profiles[0]>();
-      const profileByAsaasId = new Map<string, typeof profiles[0]>();
-      for (const p of profiles) {
-        const cpf = normalizeCpf(p.cpf);
-        if (cpf) profileByCpf.set(cpf, p);
-        if (p.asaas_customer_id) profileByAsaasId.set(p.asaas_customer_id, p);
+      if (updateErr) {
+        console.error(`[sync-emails] Error updating ${profile.full_name}:`, updateErr);
+        fetchErrors++;
+        continue;
       }
 
-      for (const customer of customers) {
-        const asaasEmail = customer.email?.trim().toLowerCase() || null;
-        const cpf = normalizeCpf(customer.cpfCnpj);
-
-        // Match profile
-        let profile = profileByAsaasId.get(customer.id) || null;
-        if (!profile && cpf) profile = profileByCpf.get(cpf) || null;
-
-        if (!profile) {
-          noMatch++;
-          continue;
+      try {
+        if (updatePayload.email || updatePayload.full_name) {
+          await supabase.auth.admin.updateUserById(profile.id, {
+            ...(updatePayload.email ? { email: updatePayload.email } : {}),
+            ...(updatePayload.full_name ? {
+              user_metadata: {
+                cpf: normalizeCpf(profile.cpf),
+                full_name: updatePayload.full_name,
+              },
+            } : {}),
+          });
         }
-
-        // Skip if Asaas has no real email
-        if (!asaasEmail || isPlaceholderEmail(asaasEmail)) {
-          skipped++;
-          continue;
-        }
-
-        // Skip if profile already has a good email (same as Asaas)
-        const currentEmail = profile.email?.trim().toLowerCase() || null;
-        if (currentEmail === asaasEmail) {
-          skipped++;
-          continue;
-        }
-
-        // Update profile email
-        const { error: updateErr } = await supabase
-          .from("profiles")
-          .update({ email: asaasEmail })
-          .eq("id", profile.id);
-
-        if (updateErr) {
-          console.error(`[sync-emails] Error updating ${profile.full_name}:`, updateErr);
-          continue;
-        }
-
-        // Also update auth user email if it's a placeholder
-        if (isPlaceholderEmail(currentEmail)) {
-          try {
-            await supabase.auth.admin.updateUserById(profile.id, { email: asaasEmail });
-          } catch (e) {
-            console.log(`[sync-emails] Could not update auth email for ${profile.id}:`, e);
-          }
-        }
-
-        details.push({
-          name: profile.full_name,
-          cpf: cpf.substring(0, 4) + "***",
-          oldEmail: currentEmail,
-          newEmail: asaasEmail,
-        });
-        updated++;
+      } catch (e) {
+        console.log(`[sync-emails] Could not update auth user for ${profile.id}:`, e);
       }
+
+      await supabase.from("audit_logs").insert({
+        action: automatic ? "AUTO_SYNC_ASAAS" : "SYNC_ASAAS",
+        target_table: "profiles",
+        target_id: profile.id,
+        performed_by: callerId,
+        details: {
+          unit_id: profile.unit_id,
+          asaas_customer_id: profile.asaas_customer_id,
+          old_email: currentEmail,
+          new_email: updatePayload.email ?? currentEmail,
+          old_phone: currentPhone,
+          new_phone: updatePayload.phone ?? currentPhone,
+          old_name: profile.full_name,
+          new_name: updatePayload.full_name ?? profile.full_name,
+          automatic,
+          fields_updated: fieldsUpdated,
+        },
+      });
+
+      details.push({
+        profile_id: profile.id,
+        name: updatePayload.full_name ?? profile.full_name,
+        cpf: normalizeCpf(profile.cpf).slice(0, 4) + "***",
+        old_email: currentEmail,
+        new_email: updatePayload.email ?? currentEmail,
+        old_phone: currentPhone,
+        new_phone: updatePayload.phone ?? currentPhone,
+        old_name: profile.full_name,
+        new_name: updatePayload.full_name ?? profile.full_name,
+        fields_updated: fieldsUpdated,
+      });
+      updated++;
     }
 
     return new Response(JSON.stringify({
       success: true,
-      total_asaas_customers: totalCustomers,
+      processed_profiles: profiles.length,
       updated,
       skipped,
-      no_match: noMatch,
+      protected_conflicts: protectedConflicts,
+      missing_asaas_id: missingAsaasId,
+      fetch_errors: fetchErrors,
       details: details.slice(0, 50),
     }), {
       status: 200,

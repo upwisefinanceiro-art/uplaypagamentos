@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, ChevronUp, Loader2, MessageCircle, Plus, Search } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2, MessageCircle, Plus, RefreshCcw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +23,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { openWhatsApp } from "@/lib/whatsapp-utils";
+import { buildClientAccessMessage, isValidEmail } from "@/lib/client-access";
 import UserEditDialog from "@/components/admin/UserEditDialog";
 import UserActionButtons from "@/components/admin/UserActionButtons";
 
@@ -135,9 +136,11 @@ const AdminClients = () => {
   const [formName, setFormName] = useState("");
   const [formCpf, setFormCpf] = useState("");
   const [formPhone, setFormPhone] = useState("");
+  const [formEmail, setFormEmail] = useState("");
   const [formPassword, setFormPassword] = useState("");
   const [formStudentName, setFormStudentName] = useState("");
   const [formUnitId, setFormUnitId] = useState("");
+  const [syncingClientId, setSyncingClientId] = useState<string | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -282,6 +285,7 @@ const AdminClients = () => {
     setFormName("");
     setFormCpf("");
     setFormPhone("");
+    setFormEmail("");
     setFormPassword("");
     setFormStudentName("");
     setFormUnitId(profile?.unit_id || "");
@@ -294,6 +298,15 @@ const AdminClients = () => {
       toast({
         title: "Preencha os campos obrigatórios",
         description: "Nome, CPF e senha são obrigatórios.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (formEmail.trim() && !isValidEmail(formEmail.trim())) {
+      toast({
+        title: "E-mail inválido",
+        description: "Informe um e-mail válido para o cliente.",
         variant: "destructive",
       });
       return;
@@ -312,6 +325,7 @@ const AdminClients = () => {
         cpf: formCpf,
         full_name: formName,
         phone: formPhone || undefined,
+        email: formEmail || undefined,
         password: formPassword,
         role: "RESPONSAVEL",
         unit_id: unitId,
@@ -467,21 +481,64 @@ const AdminClients = () => {
       return;
     }
 
-    const cpfFormatted = client.cpf
-      ? client.cpf.replace(/\D/g, "").replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")
-      : "";
-    const login = client.email || cpfFormatted;
+    const message = buildClientAccessMessage({
+      cpf: client.cpf,
+      email: client.email,
+      fullName: client.full_name,
+    });
 
-    if (!login) {
+    if (!client.cpf && !client.email) {
       toast({ title: "Cliente sem login definido", description: "É necessário CPF ou e-mail.", variant: "destructive" });
       return;
     }
 
-    const APP_URL = "https://uplaypagamentos.lovable.app/login";
-    const INSTALL_URL = "https://uplaypagamentos.lovable.app/instalar";
-    const message = `Olá, ${client.full_name}! 👋\n\n📚 *Upwise / Ensino Up — Cursos Profissionalizantes*\n\nSeu acesso ao app de pagamentos está disponível:\n\n🔑 *Login:* ${login}\n🔒 *Senha:* 12345678\n\n📲 Acesse aqui: ${APP_URL}\n\n📱 *Instale o app no celular:*\n${INSTALL_URL}\n\nEm caso de dúvidas, estamos à disposição! 😊\n\nAtenciosamente,\n*Setor Financeiro*`;
-
     openWhatsApp(client.phone, message);
+  };
+
+  const handleManualSync = async (client: ClientRow) => {
+    if (client.source !== "profile") {
+      toast({
+        title: "Sincronização indisponível",
+        description: "Esse cadastro existe apenas como snapshot de contrato.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSyncingClientId(client.id);
+
+    const { data, error } = await supabase.functions.invoke("sync-client-emails", {
+      body: {
+        profile_id: client.id,
+        unit_id: client.unit_id,
+        update_name: true,
+        update_phone: true,
+      },
+    });
+
+    setSyncingClientId(null);
+
+    if (error || data?.error) {
+      toast({
+        title: "Erro ao sincronizar com Asaas",
+        description: error?.message || data?.error,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (data?.updated > 0) {
+      toast({ title: "Cliente sincronizado com Asaas" });
+      await fetchData();
+      return;
+    }
+
+    toast({
+      title: "Nenhuma alteração necessária",
+      description: data?.protected_conflicts > 0
+        ? "Existe um e-mail válido diferente do Asaas e ele foi preservado."
+        : "Os dados já estavam consistentes para este cliente.",
+    });
   };
 
   const getAlertContent = () => {
@@ -562,6 +619,16 @@ const AdminClients = () => {
                 <div className="space-y-2">
                   <Label className="text-foreground">Telefone</Label>
                   <Input className="bg-input border-border text-foreground" placeholder="(00) 00000-0000" value={formPhone} onChange={(e) => setFormPhone(e.target.value)} />
+                </div>
+                <div className="space-y-2 col-span-2">
+                  <Label className="text-foreground">E-mail</Label>
+                  <Input
+                    className="bg-input border-border text-foreground"
+                    type="email"
+                    placeholder="cliente@exemplo.com"
+                    value={formEmail}
+                    onChange={(e) => setFormEmail(e.target.value)}
+                  />
                 </div>
                 <div className="space-y-2 col-span-2">
                   <Label className="text-foreground">Nome do Aluno</Label>
@@ -667,13 +734,33 @@ const AdminClients = () => {
                       <Button variant="outline" size="sm" onClick={() => navigate(`/admin/cobrancas?responsible=${client.id}&create=manual`)}>
                         Adicionar parcela
                       </Button>
+                      {client.source === "profile" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5"
+                          onClick={() => handleManualSync(client)}
+                          disabled={syncingClientId === client.id}
+                        >
+                          {syncingClientId === client.id ? <Loader2 size={14} className="animate-spin" /> : <RefreshCcw size={14} />}
+                          Sincronizar com Asaas
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
                         className="gap-1.5 text-green-700 border-green-500/30 hover:bg-green-500/10"
                         onClick={() => handleSendAccess(client)}
-                        disabled={!client.phone}
-                        title={client.phone ? "Enviar credenciais via WhatsApp" : "Sem telefone cadastrado"}
+                        disabled={!client.active || !client.phone || client.source !== "profile"}
+                        title={
+                          client.source !== "profile"
+                            ? "Disponível apenas para clientes com acesso ao app"
+                            : !client.active
+                              ? "Cliente sem login ativo"
+                              : client.phone
+                                ? "Enviar credenciais via WhatsApp"
+                                : "Sem telefone cadastrado"
+                        }
                       >
                         <MessageCircle size={14} />
                         Notificar APP
