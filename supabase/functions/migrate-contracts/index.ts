@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    const { dry_run = false, unit_id } = await req.json().catch(() => ({}));
+    const { dry_run = false, unit_id, limit = 100 } = await req.json().catch(() => ({}));
 
     // Find all RESPONSAVEL profiles without contracts
     let query = supabase
