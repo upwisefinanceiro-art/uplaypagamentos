@@ -681,6 +681,14 @@ const AdminClients = () => {
         showUnitSelector={hasRole("ADMIN_MASTER")}
       />
 
+      <NotifyClientDialog
+        open={!!notifyTarget}
+        onOpenChange={(open) => !open && setNotifyTarget(null)}
+        clientId={notifyTarget?.id ?? null}
+        clientName={notifyTarget?.full_name ?? null}
+        unitId={notifyTarget?.unit_id ?? null}
+      />
+
       <AlertDialog open={!!actionTarget} onOpenChange={(open) => !open && setActionTarget(null)}>
         <AlertDialogContent className="bg-card border-border">
           <AlertDialogHeader>
