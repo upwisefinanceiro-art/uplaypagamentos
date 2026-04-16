@@ -80,11 +80,18 @@ interface ContractLinkRow {
   email: string | null;
   phone: string | null;
   address: string | null;
+  address_number?: string | null;
+  complement?: string | null;
+  neighborhood?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip_code?: string | null;
   unit_id: string;
   student_id: string | null;
   description: string;
   status: string;
   contract_number: string | null;
+  rg?: string | null;
 }
 
 type ActionType = "deactivate" | "reactivate" | "permanent_delete";
@@ -150,7 +157,7 @@ const AdminClients = () => {
       supabase.from("user_roles").select("user_id").eq("role", "RESPONSAVEL"),
       supabase.from("students").select("id, full_name, responsible_id").order("full_name"),
       supabase.from("units").select("id, name").order("name"),
-      supabase.from("contracts").select("id, responsible_id, responsible_name, cpf, email, phone, address, unit_id, student_id, description, status, contract_number"),
+      supabase.from("contracts").select("id, responsible_id, responsible_name, cpf, email, phone, address, address_number, complement, neighborhood, city, state, zip_code, rg, unit_id, student_id, description, status, contract_number"),
     ]);
 
     // Fetch ALL payment counts using pagination to avoid 1000 row limit
@@ -453,6 +460,20 @@ const AdminClients = () => {
     return contracts.filter((contract) => contract.responsible_id === client.id || contractIds.has(contract.id));
   };
 
+  const formatContractAddress = (contract?: ContractLinkRow) => {
+    if (!contract) return "";
+
+    return [
+      [contract.address, contract.address_number].filter(Boolean).join(", "),
+      contract.complement,
+      contract.neighborhood,
+      [contract.city, contract.state].filter(Boolean).join("/"),
+      contract.zip_code,
+    ]
+      .filter((value) => !!value && value.trim() !== "")
+      .join(" • ");
+  };
+
   const filtered = clients.filter((client) => {
     if (!showInactive && !client.active) return false;
     if (!search.trim()) return true;
@@ -669,8 +690,14 @@ const AdminClients = () => {
             const paymentCount = getClientPaymentCount(client);
             const linkedPayments = getClientPayments(client);
             const linkedContracts = getClientContracts(client);
+            const primaryContract = linkedContracts[0];
             const isExpanded = expandedClientId === client.id;
             const studentNames = getStudents(client.id, client.student_names);
+            const displayCpf = client.cpf || primaryContract?.cpf || "CPF não informado";
+            const displayPhone = client.phone || primaryContract?.phone;
+            const displayEmail = client.email || primaryContract?.email;
+            const displayAddress = client.address || formatContractAddress(primaryContract);
+            const displayRg = primaryContract?.rg;
 
             return (
               <div key={`${client.source}-${client.id}-${client.contract_ids?.[0] || "base"}`} className={`glass-card p-4 space-y-4 ${!client.active ? "opacity-60" : ""}`}>
@@ -696,10 +723,12 @@ const AdminClients = () => {
                         </Badge>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground">{client.cpf || "CPF não informado"} • {unitMap[client.unit_id || ""] || "—"}</p>
-                    {(client.phone || client.email) && (
-                      <p className="text-xs text-muted-foreground">{[client.phone, client.email].filter(Boolean).join(" • ")}</p>
+                    <p className="text-xs text-muted-foreground">CPF: {displayCpf} • {unitMap[client.unit_id || ""] || "—"}</p>
+                    {(displayPhone || displayEmail) && (
+                      <p className="text-xs text-muted-foreground">{[displayPhone ? `Telefone: ${displayPhone}` : null, displayEmail ? `E-mail: ${displayEmail}` : null].filter(Boolean).join(" • ")}</p>
                     )}
+                    {displayRg && <p className="text-xs text-muted-foreground">RG: {displayRg}</p>}
+                    {displayAddress && <p className="text-xs text-muted-foreground">Endereço: {displayAddress}</p>}
                     {studentNames && <p className="text-xs text-muted-foreground">Aluno(s): {studentNames}</p>}
                     {linkedContracts.length > 0 && (
                       <div className="space-y-1">
