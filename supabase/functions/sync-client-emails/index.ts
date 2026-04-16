@@ -48,11 +48,12 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Auth check - accept service role key header or JWT with admin role
-    const authHeader = req.headers.get("Authorization");
-    const isServiceRole = authHeader?.includes(serviceRoleKey);
+    // Auth check - accept apikey header matching service role, or JWT with admin role
+    const apikeyHeader = req.headers.get("apikey") || "";
+    const authHeader = req.headers.get("Authorization") || "";
+    const isServiceCall = apikeyHeader === serviceRoleKey || authHeader === `Bearer ${serviceRoleKey}`;
     
-    if (!isServiceRole) {
+    if (!isServiceCall) {
       if (!authHeader) {
         return new Response(JSON.stringify({ error: "Não autorizado" }), {
           status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
