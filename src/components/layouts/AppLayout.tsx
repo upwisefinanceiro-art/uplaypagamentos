@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCompanyBranding } from "@/contexts/CompanyBrandingContext";
 import InstallPrompt from "@/components/InstallPrompt";
 import WhatsAppFinanceiroFab from "@/components/app/WhatsAppFinanceiroFab";
+import NotificationsBell from "@/components/app/NotificationsBell";
 
 const AppLayout = () => {
   const location = useLocation();
@@ -48,16 +49,19 @@ const AppLayout = () => {
           <img src={branding.logoUrl || "/logo.png"} alt={branding.name} className="h-8 w-auto" />
           <span className="text-sm font-semibold text-foreground">{branding.systemName || "UPLAY"}</span>
         </div>
-        <button
-          onClick={async () => {
-            await signOut();
-            navigate("/login", { replace: true });
-          }}
-          className="text-muted-foreground hover:text-foreground transition-colors p-2 -mr-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
-          aria-label="Sair"
-        >
-          <LogOut size={20} />
-        </button>
+        <div className="flex items-center gap-1 -mr-2">
+          <NotificationsBell />
+          <button
+            onClick={async () => {
+              await signOut();
+              navigate("/login", { replace: true });
+            }}
+            className="text-muted-foreground hover:text-foreground transition-colors p-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label="Sair"
+          >
+            <LogOut size={20} />
+          </button>
+        </div>
       </header>
 
       {/* Content */}
