@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, ChevronUp, Loader2, Plus, Search } from "lucide-react";
+import { Bell, ChevronDown, ChevronUp, Loader2, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import UserEditDialog from "@/components/admin/UserEditDialog";
 import UserActionButtons from "@/components/admin/UserActionButtons";
+import NotifyClientDialog from "@/components/admin/NotifyClientDialog";
 import { fetchAllPaginated } from "@/lib/fetchAllPaginated";
 
 interface ClientRow {
@@ -118,6 +119,7 @@ const AdminClients = () => {
   const [showInactive, setShowInactive] = useState(false);
   const [expandedClientId, setExpandedClientId] = useState<string | null>(null);
   const [actionTarget, setActionTarget] = useState<{ client: ClientRow; action: ActionType } | null>(null);
+  const [notifyTarget, setNotifyTarget] = useState<ClientRow | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [editTarget, setEditTarget] = useState<ClientRow | null>(null);
   const [dependencyBlocker, setDependencyBlocker] = useState<{ client: ClientRow; paymentCount: number; contractCount: number } | null>(null);
@@ -583,6 +585,12 @@ const AdminClients = () => {
                       <Button variant="outline" size="sm" onClick={() => navigate(`/admin/cobrancas?responsible=${client.id}&create=manual`)}>
                         Adicionar parcela
                       </Button>
+                      {client.source === "profile" && (
+                        <Button variant="outline" size="sm" onClick={() => setNotifyTarget(client)}>
+                          <Bell size={14} className="mr-1" />
+                          Notificar app
+                        </Button>
+                      )}
                     </div>
                   </div>
                   {client.source === "profile" ? (
@@ -671,6 +679,14 @@ const AdminClients = () => {
         units={units}
         onSaved={fetchData}
         showUnitSelector={hasRole("ADMIN_MASTER")}
+      />
+
+      <NotifyClientDialog
+        open={!!notifyTarget}
+        onOpenChange={(open) => !open && setNotifyTarget(null)}
+        clientId={notifyTarget?.id ?? null}
+        clientName={notifyTarget?.full_name ?? null}
+        unitId={notifyTarget?.unit_id ?? null}
       />
 
       <AlertDialog open={!!actionTarget} onOpenChange={(open) => !open && setActionTarget(null)}>

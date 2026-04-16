@@ -44,6 +44,42 @@ export type Database = {
         }
         Relationships: []
       }
+      client_notifications: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          read_at: string | null
+          responsible_id: string
+          sent_by: string
+          sent_by_name: string | null
+          title: string
+          unit_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          read_at?: string | null
+          responsible_id: string
+          sent_by: string
+          sent_by_name?: string | null
+          title: string
+          unit_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          read_at?: string | null
+          responsible_id?: string
+          sent_by?: string
+          sent_by_name?: string | null
+          title?: string
+          unit_id?: string
+        }
+        Relationships: []
+      }
       companies: {
         Row: {
           asaas_api_key_master: string | null
