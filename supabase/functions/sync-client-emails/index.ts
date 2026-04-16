@@ -120,7 +120,7 @@ function shouldReplaceAddress(currentAddress: string | null, nextAddress: string
   if (!nextAddress) return false;
   if (!currentAddress) return true;
   if (currentAddress === nextAddress) return false;
-  return forceSync;
+  return forceSync && currentAddress.length < 12;
 }
 
 function shouldReplaceName(currentName: string | null, nextName: string | null) {
