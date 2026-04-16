@@ -60,6 +60,12 @@ function shouldReplaceEmail(currentEmail: string | null, nextEmail: string | nul
   return overwriteValidConflict;
 }
 
+function shouldClearEmail(currentEmail: string | null, nextEmail: string | null) {
+  if (!currentEmail) return false;
+  if (nextEmail && isValidEmail(nextEmail) && !isPlaceholderEmail(nextEmail)) return false;
+  return isPlaceholderEmail(currentEmail) || !isValidEmail(currentEmail);
+}
+
 function hasProtectedEmailConflict(currentEmail: string | null, nextEmail: string | null) {
   return !!currentEmail && !!nextEmail && currentEmail !== nextEmail && isValidEmail(currentEmail) && !isPlaceholderEmail(currentEmail);
 }
@@ -102,8 +108,10 @@ Deno.serve(async (req) => {
       });
     }
     const { data: callerRoles } = await supabase.from("user_roles").select("role").eq("user_id", callerId);
-    const isAllowed = callerRoles?.some((r: { role: string }) => ["SUPER_ADMIN", "ADMIN_MASTER"].includes(r.role));
-    if (!isAllowed) {
+    const isSuperAdmin = callerRoles?.some((r: { role: string }) => r.role === "SUPER_ADMIN") ?? false;
+    const isAdminMaster = callerRoles?.some((r: { role: string }) => r.role === "ADMIN_MASTER") ?? false;
+    const isAdminUnidade = callerRoles?.some((r: { role: string }) => r.role === "ADMIN_UNIDADE") ?? false;
+    if (!isSuperAdmin && !isAdminMaster && !isAdminUnidade) {
       return new Response(JSON.stringify({ error: "Sem permissão" }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -117,10 +125,37 @@ Deno.serve(async (req) => {
     const updateNames = body.update_name === true;
     const updatePhones = body.update_phone !== false;
     const automatic = body.automatic === true;
+    let callerUnitId: string | null = null;
+
+    if (isAdminUnidade) {
+      const { data: callerProfile } = await supabase
+        .from("profiles")
+        .select("unit_id")
+        .eq("id", callerId)
+        .single();
+
+      callerUnitId = callerProfile?.unit_id ?? null;
+
+      if (!callerUnitId) {
+        return new Response(JSON.stringify({ error: "Administrador sem unidade vinculada" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (filterUnitId && filterUnitId !== callerUnitId) {
+        return new Response(JSON.stringify({ error: "Sem permissão para sincronizar outra unidade" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
 
     let profilesQuery = supabase
       .from("profiles")
       .select("id, cpf, email, full_name, phone, unit_id, asaas_customer_id");
+
+    if (callerUnitId) {
+      profilesQuery = profilesQuery.eq("unit_id", callerUnitId);
+    }
 
     if (filterProfileId) profilesQuery = profilesQuery.eq("id", filterProfileId);
     else if (filterUnitId) profilesQuery = profilesQuery.eq("unit_id", filterUnitId);
@@ -187,6 +222,9 @@ Deno.serve(async (req) => {
 
       if (shouldReplaceEmail(currentEmail, asaasEmail, overwriteConflictingEmails)) {
         updatePayload.email = asaasEmail;
+        fieldsUpdated.push("email");
+      } else if (shouldClearEmail(currentEmail, asaasEmail)) {
+        updatePayload.email = null;
         fieldsUpdated.push("email");
       } else if (hasProtectedEmailConflict(currentEmail, asaasEmail)) {
         protectedConflicts++;

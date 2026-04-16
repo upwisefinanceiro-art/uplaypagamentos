@@ -75,9 +75,9 @@ Deno.serve(async (req) => {
     const normalizedName = String(full_name).trim();
     const normalizedPhone = typeof phone === "string" && phone.trim() ? phone.trim() : null;
     const normalizedAddress = typeof address === "string" && address.trim() ? address.trim() : null;
-    const normalizedEmail = typeof email === "string" && email.trim()
-      ? email.trim().toLowerCase()
-      : targetProfile.email || `${cleanCpf}@uplay.app`;
+    const normalizedEmail = typeof email === "string"
+      ? (email.trim() ? email.trim().toLowerCase() : null)
+      : (targetProfile.email?.trim() ? targetProfile.email.trim().toLowerCase() : null);
 
     if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       return jsonResponse({ error: "E-mail inválido" }, 400);
