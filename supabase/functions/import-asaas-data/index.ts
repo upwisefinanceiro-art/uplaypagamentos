@@ -105,6 +105,19 @@ function normalizeCpf(value?: string | null) {
   return (value || "").replace(/\D/g, "");
 }
 
+function normalizePhone(value?: string | null) {
+  return (value || "").replace(/\D/g, "");
+}
+
+function normalizeName(value?: string | null) {
+  return (value || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function normalizeEmail(value?: string | null) {
   const normalized = value?.trim().toLowerCase() || "";
   return normalized || null;
@@ -413,6 +426,8 @@ Deno.serve(async (req) => {
     const profilesById = new Map<string, ProfileRow>();
     const profilesByAsaasCustomerId = new Map<string, ProfileRow>();
     const profilesByCpf = new Map<string, ProfileRow[]>();
+    const profilesByPhone = new Map<string, ProfileRow[]>();
+    const profilesByName = new Map<string, ProfileRow[]>();
 
     for (const profile of allProfiles) {
       profilesById.set(profile.id, profile);
@@ -422,10 +437,25 @@ Deno.serve(async (req) => {
       if (profile.unit_id !== unitId) continue;
 
       const cpf = normalizeCpf(profile.cpf);
-      if (!cpf) continue;
-      const list = profilesByCpf.get(cpf) || [];
-      list.push(profile);
-      profilesByCpf.set(cpf, list);
+      if (cpf) {
+        const list = profilesByCpf.get(cpf) || [];
+        list.push(profile);
+        profilesByCpf.set(cpf, list);
+      }
+
+      const phone = normalizePhone(profile.phone);
+      if (phone) {
+        const list = profilesByPhone.get(phone) || [];
+        list.push(profile);
+        profilesByPhone.set(phone, list);
+      }
+
+      const normalizedName = normalizeName(profile.full_name);
+      if (normalizedName) {
+        const list = profilesByName.get(normalizedName) || [];
+        list.push(profile);
+        profilesByName.set(normalizedName, list);
+      }
     }
 
     const existingPaymentIds = new Set(
@@ -675,9 +705,15 @@ Deno.serve(async (req) => {
 
     for (const customer of customersWithoutCpf) {
       const customerEmail = normalizeEmail(customer.email);
-      const matchedProfile = customerEmail
-        ? Array.from(profilesById.values()).find((profile) => profile.unit_id === unitId && normalizeEmail(profile.email) === customerEmail)
-        : null;
+      const customerPhone = normalizePhone(customer.mobilePhone || customer.phone);
+      const customerName = normalizeName(customer.name);
+      const matchedProfile =
+        profilesByAsaasCustomerId.get(buildCustomerUnitKey(customer.id, unitId)) ||
+        (customerEmail
+          ? Array.from(profilesById.values()).find((profile) => profile.unit_id === unitId && normalizeEmail(profile.email) === customerEmail)
+          : null) ||
+        (customerPhone ? (profilesByPhone.get(customerPhone) || []).find((profile) => profile.unit_id === unitId) || null : null) ||
+        (customerName ? (profilesByName.get(customerName) || []).find((profile) => profile.unit_id === unitId) || null : null);
 
       if (matchedProfile) {
         customerToProfile.set(customer.id, matchedProfile.id);
@@ -725,6 +761,14 @@ Deno.serve(async (req) => {
       let responsibleId = customerToProfile.get(payment.customer) || null;
 
       if (!responsibleId) {
+        const directProfileMatch = profilesByAsaasCustomerId.get(buildCustomerUnitKey(payment.customer, unitId)) || null;
+        if (directProfileMatch) {
+          responsibleId = directProfileMatch.id;
+          customerToProfile.set(payment.customer, directProfileMatch.id);
+        }
+      }
+
+      if (!responsibleId) {
         let paymentCustomer = customerInfoById.get(payment.customer) || null;
 
         if (!paymentCustomer) {
@@ -744,9 +788,36 @@ Deno.serve(async (req) => {
         }
 
         if (!responsibleId && paymentCustomer?.email) {
-          const matchedProfile = Array.from(profilesById.values()).find(
-            (profile) => profile.unit_id === unitId && normalizeEmail(profile.email) === normalizeEmail(paymentCustomer?.email),
-          );
+          const normalizedEmail = normalizeEmail(paymentCustomer.email);
+          const matchedProfile = normalizedEmail
+            ? Array.from(profilesById.values()).find(
+                (profile) => profile.unit_id === unitId && normalizeEmail(profile.email) === normalizedEmail,
+              )
+            : null;
+
+          if (matchedProfile) {
+            responsibleId = matchedProfile.id;
+            customerToProfile.set(payment.customer, matchedProfile.id);
+          }
+        }
+
+        if (!responsibleId) {
+          const customerPhone = normalizePhone(paymentCustomer?.mobilePhone || paymentCustomer?.phone);
+          const matchedProfile = customerPhone
+            ? (profilesByPhone.get(customerPhone) || []).find((profile) => profile.unit_id === unitId) || null
+            : null;
+
+          if (matchedProfile) {
+            responsibleId = matchedProfile.id;
+            customerToProfile.set(payment.customer, matchedProfile.id);
+          }
+        }
+
+        if (!responsibleId) {
+          const customerName = normalizeName(paymentCustomer?.name);
+          const matchedProfile = customerName
+            ? (profilesByName.get(customerName) || []).find((profile) => profile.unit_id === unitId) || null
+            : null;
 
           if (matchedProfile) {
             responsibleId = matchedProfile.id;
