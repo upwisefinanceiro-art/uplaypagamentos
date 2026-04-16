@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
 
     const profiles = (allProfiles || []).filter(
       (p: any) => responsavelIds.has(p.id) && !responsaveisWithContract.has(p.id)
-    );
+    ).slice(0, limit);
 
     if (profiles.length === 0) {
       return new Response(
