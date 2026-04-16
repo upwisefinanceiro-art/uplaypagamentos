@@ -543,22 +543,35 @@ const AdminClients = () => {
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground">{client.cpf || "CPF não informado"} • {unitMap[client.unit_id || ""] || "—"}</p>
-                    {(client.phone || client.email) && (
-                      <p className="text-xs text-muted-foreground">{[client.phone, client.email].filter(Boolean).join(" • ")}</p>
-                    )}
+                    {(() => {
+                      const displayEmail = client.email && !/@imported\.uplay\.app$/i.test(client.email) ? client.email : null;
+                      const contactLine = [client.phone, displayEmail].filter(Boolean).join(" • ");
+                      return contactLine ? (
+                        <p className="text-xs text-muted-foreground">{contactLine}</p>
+                      ) : null;
+                    })()}
                     {studentNames && <p className="text-xs text-muted-foreground">Aluno(s): {studentNames}</p>}
-                    {linkedContracts.length > 0 && (
-                      <div className="space-y-1">
-                        {linkedContracts.map((contract) => (
-                          <p key={contract.id} className="text-xs text-muted-foreground">
-                            📄 {contract.contract_number ? `Nº ${contract.contract_number} — ` : ""}{contract.description}
-                            <span className={`ml-1.5 inline-block text-[10px] px-1.5 py-0 rounded-full border font-medium ${contract.status === "ACTIVE" ? "bg-green-500/15 text-green-700 border-green-500/30" : contract.status === "CANCELLED" ? "bg-destructive/15 text-destructive border-destructive/30" : "bg-muted text-muted-foreground border-border"}`}>
-                              {contract.status === "ACTIVE" ? "Ativo" : contract.status === "CANCELLED" ? "Cancelado" : contract.status}
-                            </span>
-                          </p>
-                        ))}
-                      </div>
-                    )}
+                    {linkedContracts.length > 0 && (() => {
+                      const seen = new Set<string>();
+                      const uniqueContracts = linkedContracts.filter((contract) => {
+                        const key = `${(contract.contract_number || "").trim().toLowerCase()}|${(contract.description || "").trim().toLowerCase()}|${contract.status}`;
+                        if (seen.has(key)) return false;
+                        seen.add(key);
+                        return true;
+                      });
+                      return (
+                        <div className="space-y-1">
+                          {uniqueContracts.map((contract) => (
+                            <p key={contract.id} className="text-xs text-muted-foreground">
+                              📄 {contract.contract_number ? `Nº ${contract.contract_number} — ` : ""}{contract.description}
+                              <span className={`ml-1.5 inline-block text-[10px] px-1.5 py-0 rounded-full border font-medium ${contract.status === "ACTIVE" ? "bg-green-500/15 text-green-700 border-green-500/30" : contract.status === "CANCELLED" ? "bg-destructive/15 text-destructive border-destructive/30" : "bg-muted text-muted-foreground border-border"}`}>
+                                {contract.status === "ACTIVE" ? "Ativo" : contract.status === "CANCELLED" ? "Cancelado" : contract.status}
+                              </span>
+                            </p>
+                          ))}
+                        </div>
+                      );
+                    })()}
                     <div className="flex flex-wrap gap-2 pt-1">
                       <Button variant="outline" size="sm" onClick={() => setExpandedClientId(isExpanded ? null : client.id)}>
                         {isExpanded ? <ChevronUp size={14} className="mr-1" /> : <ChevronDown size={14} className="mr-1" />}
