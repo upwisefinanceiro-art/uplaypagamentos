@@ -48,28 +48,28 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // NOTE: Auth enforced via verify_jwt = false + role check on JWT 
-    // For admin invocations, validate caller role
+    // Auth: require JWT with SUPER_ADMIN or ADMIN_MASTER role
     const authHeader = req.headers.get("Authorization") || "";
-    console.log("[sync-emails] Auth header present:", !!authHeader, "length:", authHeader.length);
-    
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      const token = authHeader.replace("Bearer ", "");
-      let callerId: string | null = null;
-      try { const p = JSON.parse(atob(token.split(".")[1])); callerId = p.sub || null; } catch { /* */ }
-      console.log("[sync-emails] Caller ID:", callerId);
-      
-      if (callerId) {
-        const { data: callerRoles } = await supabase.from("user_roles").select("role").eq("user_id", callerId);
-        const isAllowed = callerRoles?.some((r: { role: string }) => ["SUPER_ADMIN", "ADMIN_MASTER"].includes(r.role));
-        if (!isAllowed) {
-          return new Response(JSON.stringify({ error: "Sem permissão" }), {
-            status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-      }
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Não autorizado" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
-    // If no valid auth header, this is an internal/tool call - proceed
+    const token = authHeader.replace("Bearer ", "");
+    let callerId: string | null = null;
+    try { const p = JSON.parse(atob(token.split(".")[1])); callerId = p.sub || null; } catch { /* */ }
+    if (!callerId) {
+      return new Response(JSON.stringify({ error: "Não autorizado" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { data: callerRoles } = await supabase.from("user_roles").select("role").eq("user_id", callerId);
+    const isAllowed = callerRoles?.some((r: { role: string }) => ["SUPER_ADMIN", "ADMIN_MASTER"].includes(r.role));
+    if (!isAllowed) {
+      return new Response(JSON.stringify({ error: "Sem permissão" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     let body: Record<string, unknown> = {};
     try { body = await req.json(); } catch { /* */ }
