@@ -48,13 +48,16 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Auth: for this one-time operation, validate via x-internal-key or JWT
+    // Auth: accept x-internal-key, or anon key (for tool invocations), or JWT with admin role
     const internalKey = req.headers.get("x-internal-key");
     const expectedKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const isInternalCall = expectedKey && internalKey === expectedKey;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const authHeader = req.headers.get("Authorization") || "";
+    const apikeyHeader = req.headers.get("apikey") || "";
+    const isInternalCall = (expectedKey && internalKey === expectedKey) ||
+      (anonKey && apikeyHeader === anonKey && authHeader === `Bearer ${anonKey}`);
     
     if (!isInternalCall) {
-      const authHeader = req.headers.get("Authorization") || "";
       if (!authHeader) {
         return new Response(JSON.stringify({ error: "Não autorizado" }), {
           status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
