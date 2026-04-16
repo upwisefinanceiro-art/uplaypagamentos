@@ -638,12 +638,22 @@ const AdminClients = () => {
                     {linkedContracts.length > 0 && (
                       <div className="space-y-1">
                         {linkedContracts.map((contract) => (
-                          <p key={contract.id} className="text-xs text-muted-foreground">
-                            📄 {contract.contract_number ? `Nº ${contract.contract_number} — ` : ""}{contract.description}
-                            <span className={`ml-1.5 inline-block text-[10px] px-1.5 py-0 rounded-full border font-medium ${contract.status === "ACTIVE" ? "bg-green-500/15 text-green-700 border-green-500/30" : contract.status === "CANCELLED" ? "bg-destructive/15 text-destructive border-destructive/30" : "bg-muted text-muted-foreground border-border"}`}>
-                              {contract.status === "ACTIVE" ? "Ativo" : contract.status === "CANCELLED" ? "Cancelado" : contract.status}
-                            </span>
-                          </p>
+                          <div key={contract.id} className="flex items-center gap-2">
+                            <p className="text-xs text-muted-foreground">
+                              📄 {contract.contract_number ? `Nº ${contract.contract_number} — ` : ""}{contract.description}
+                              <span className={`ml-1.5 inline-block text-[10px] px-1.5 py-0 rounded-full border font-medium ${contract.status === "ACTIVE" ? "bg-green-500/15 text-green-700 border-green-500/30" : contract.status === "CANCELLED" ? "bg-destructive/15 text-destructive border-destructive/30" : "bg-muted text-muted-foreground border-border"}`}>
+                                {contract.status === "ACTIVE" ? "Ativo" : contract.status === "CANCELLED" ? "Cancelado" : contract.status}
+                              </span>
+                            </p>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-5 px-1.5 text-[10px] text-primary hover:text-primary/80"
+                              onClick={() => navigate(`/admin/contratos?contract=${contract.id}`)}
+                            >
+                              Ver contrato →
+                            </Button>
+                          </div>
                         ))}
                       </div>
                     )}
