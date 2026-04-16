@@ -15,6 +15,35 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
+    // ── Auth check: accept internal key (cron) or JWT with SUPER_ADMIN/ADMIN_MASTER ──
+    const internalKey = req.headers.get("x-internal-key");
+    const expectedKey = Deno.env.get("X_INTERNAL_KEY");
+    const isInternalCall = expectedKey && internalKey === expectedKey;
+
+    if (!isInternalCall) {
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader) {
+        return new Response(JSON.stringify({ error: "Não autorizado" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const token = authHeader.replace("Bearer ", "");
+      let callerId: string | null = null;
+      try { const p = JSON.parse(atob(token.split(".")[1])); callerId = p.sub || null; } catch { /* */ }
+      if (!callerId) {
+        return new Response(JSON.stringify({ error: "Não autorizado" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { data: callerRoles } = await supabase.from("user_roles").select("role").eq("user_id", callerId);
+      const isAllowed = callerRoles?.some((r: { role: string }) => ["SUPER_ADMIN", "ADMIN_MASTER"].includes(r.role));
+      if (!isAllowed) {
+        return new Response(JSON.stringify({ error: "Sem permissão" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     const today = new Date().toISOString().split("T")[0];
 
     // Get all subscriptions that need checking
