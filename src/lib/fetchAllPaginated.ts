@@ -1,7 +1,12 @@
 const DEFAULT_PAGE_SIZE = 1000;
 
+type PaginatedResult<T> = PromiseLike<{
+  data: T[] | null;
+  error: { message: string } | null;
+}>;
+
 export async function fetchAllPaginated<T>(
-  fetchPage: (from: number, to: number) => Promise<{ data: T[] | null; error: { message: string } | null }>,
+  fetchPage: (from: number, to: number) => PaginatedResult<T>,
   pageSize = DEFAULT_PAGE_SIZE,
 ) {
   const allRows: T[] = [];
