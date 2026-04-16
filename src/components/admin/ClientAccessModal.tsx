@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Copy, Check, MessageCircle, X, User, GraduationCap, KeyRound, Mail, Phone } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { openWhatsApp } from "@/lib/whatsapp-utils";
 import { useToast } from "@/hooks/use-toast";
 
 interface ClientAccessData {
@@ -52,10 +53,8 @@ const ClientAccessModal = ({ open, onOpenChange, data }: ClientAccessModalProps)
       toast({ title: "Cliente não possui telefone cadastrado", variant: "destructive" });
       return;
     }
-    const cleanPhone = data.phone.replace(/\D/g, "");
-    const fullPhone = cleanPhone.length <= 11 ? `55${cleanPhone}` : cleanPhone;
-    const encoded = encodeURIComponent(whatsappMessage);
-    window.open(`https://wa.me/${fullPhone}?text=${encoded}`, "_blank");
+
+    openWhatsApp(data.phone, whatsappMessage);
   };
 
   return (
