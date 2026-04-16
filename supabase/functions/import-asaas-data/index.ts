@@ -28,17 +28,17 @@ STATUS_MAP.DUNNING_REQUESTED = "PENDING";
 interface AsaasCustomer {
   id: string;
   name: string;
-  cpfCnpj?: string;
-  email?: string;
-  phone?: string;
-  mobilePhone?: string;
-  address?: string;
-  addressNumber?: string;
-  complement?: string;
-  province?: string;
-  postalCode?: string;
-  city?: string;
-  state?: string;
+  cpfCnpj?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  mobilePhone?: string | null;
+  address?: string | null;
+  addressNumber?: string | null;
+  complement?: string | null;
+  province?: string | null;
+  postalCode?: string | null;
+  city?: string | null;
+  state?: string | null;
 }
 
 interface AsaasPayment {
@@ -80,6 +80,8 @@ interface StudentRow {
 interface PaymentRow {
   id: string;
   asaas_payment_id: string | null;
+  responsible_id: string;
+  student_id: string | null;
 }
 
 interface UnitConfig {
@@ -130,6 +132,10 @@ function buildImportedLoginEmail(cpf: string, unitId: string, customerId: string
   const safeUnit = unitId.replace(/\W/g, "").slice(0, 8).toLowerCase();
   const safeCustomer = customerId.replace(/\W/g, "").slice(-8).toLowerCase();
   return `${cpf}.${safeUnit}.${safeCustomer}@imported.uplay.app`;
+}
+
+function buildCustomerUnitKey(customerId: string, unitId: string | null | undefined) {
+  return `${customerId}::${unitId || "no-unit"}`;
 }
 
 function buildAddress(customer: AsaasCustomer) {
@@ -183,6 +189,29 @@ async function fetchAllPages<T>(baseUrl: string, path: string, apiKey: string): 
   return all;
 }
 
+async function fetchAllSupabaseRows<T>(
+  fetchPage: (from: number, to: number) => Promise<{ data: T[] | null; error: { message?: string } | null }>,
+  pageSize = 1000,
+) {
+  const allRows: T[] = [];
+
+  for (let from = 0; ; from += pageSize) {
+    const to = from + pageSize - 1;
+    const { data, error } = await fetchPage(from, to);
+
+    if (error) {
+      throw new Error(error.message || "Erro ao buscar dados paginados no banco");
+    }
+
+    const page = data || [];
+    allRows.push(...page);
+
+    if (page.length < pageSize) break;
+  }
+
+  return allRows;
+}
+
 async function fetchAsaasCustomerById(baseUrl: string, customerId: string, apiKey: string): Promise<AsaasCustomer | null> {
   const response = await fetch(`${baseUrl}/customers/${customerId}`, {
     headers: { access_token: apiKey },
@@ -234,6 +263,7 @@ function buildSummary(stats: Record<string, number>) {
     stats.customersSkipped ? `${stats.customersSkipped} responsável(is) já existente(s)` : null,
     stats.studentsCreated ? `${stats.studentsCreated} aluno(s) criado(s)` : null,
     stats.paymentsImported ? `${stats.paymentsImported} cobrança(s) importada(s)` : null,
+    stats.paymentsUpdated ? `${stats.paymentsUpdated} cobrança(s) corrigida(s)` : null,
     stats.paymentsSkipped ? `${stats.paymentsSkipped} cobrança(s) já existente(s)` : null,
     stats.errors ? `${stats.errors} erro(s)` : null,
   ].filter(Boolean);
@@ -326,19 +356,36 @@ Deno.serve(async (req) => {
 
     console.log(`[import] Starting import for unit ${unitId}`);
 
-    const [asaasCustomers, asaasPayments, profilesRes, studentsRes, paymentsRes, authUsers, responsibleRolesRes] = await Promise.all([
+    const [asaasCustomers, asaasPayments, allProfiles, localStudents, existingPayments, authUsers, responsibleRolesRes] = await Promise.all([
       fetchAllPages<AsaasCustomer>(baseUrl, "/customers", apiKey),
       fetchAllPages<AsaasPayment>(baseUrl, "/payments", apiKey),
-      supabaseAdmin.from("profiles").select("id, cpf, full_name, phone, email, address, unit_id, asaas_customer_id"),
-      supabaseAdmin.from("students").select("id, full_name, responsible_id").eq("unit_id", unitId),
-      supabaseAdmin.from("payments").select("id, asaas_payment_id").eq("unit_id", unitId),
+      fetchAllSupabaseRows<ProfileRow>((from, to) =>
+        supabaseAdmin
+          .from("profiles")
+          .select("id, cpf, full_name, phone, email, address, unit_id, asaas_customer_id")
+          .order("created_at", { ascending: true })
+          .range(from, to),
+      ),
+      fetchAllSupabaseRows<StudentRow>((from, to) =>
+        supabaseAdmin
+          .from("students")
+          .select("id, full_name, responsible_id")
+          .eq("unit_id", unitId)
+          .order("created_at", { ascending: true })
+          .range(from, to),
+      ),
+      fetchAllSupabaseRows<PaymentRow>((from, to) =>
+        supabaseAdmin
+          .from("payments")
+          .select("id, asaas_payment_id, responsible_id, student_id")
+          .eq("unit_id", unitId)
+          .order("created_at", { ascending: true })
+          .range(from, to),
+      ),
       fetchAllAuthUsers(supabaseAdmin),
       supabaseAdmin.from("user_roles").select("user_id").eq("role", "RESPONSAVEL"),
     ]);
 
-    const allProfiles = (profilesRes.data || []) as ProfileRow[];
-    const localStudents = (studentsRes.data || []) as StudentRow[];
-    const existingPayments = (paymentsRes.data || []) as PaymentRow[];
     const existingResponsibleRoleIds = new Set(
       ((responsibleRolesRes.data || []) as Array<{ user_id: string }>).map((entry) => entry.user_id),
     );
@@ -351,6 +398,7 @@ Deno.serve(async (req) => {
       customersSkipped: 0,
       studentsCreated: 0,
       paymentsImported: 0,
+      paymentsUpdated: 0,
       paymentsSkipped: 0,
       errors: 0,
     };
@@ -368,7 +416,9 @@ Deno.serve(async (req) => {
 
     for (const profile of allProfiles) {
       profilesById.set(profile.id, profile);
-      if (profile.asaas_customer_id) profilesByAsaasCustomerId.set(profile.asaas_customer_id, profile);
+      if (profile.asaas_customer_id) {
+        profilesByAsaasCustomerId.set(buildCustomerUnitKey(profile.asaas_customer_id, profile.unit_id), profile);
+      }
       if (profile.unit_id !== unitId) continue;
 
       const cpf = normalizeCpf(profile.cpf);
@@ -382,6 +432,11 @@ Deno.serve(async (req) => {
       existingPayments
         .map((payment) => payment.asaas_payment_id)
         .filter((value): value is string => Boolean(value)),
+    );
+    const existingPaymentsByAsaasId = new Map(
+      existingPayments
+        .filter((payment): payment is PaymentRow & { asaas_payment_id: string } => Boolean(payment.asaas_payment_id))
+        .map((payment) => [payment.asaas_payment_id, payment]),
     );
 
     const paymentsByCustomerId = new Map<string, AsaasPayment[]>();
@@ -473,7 +528,7 @@ Deno.serve(async (req) => {
 
         const matchingProfiles = profilesByCpf.get(cpf) || [];
         const existingProfile =
-          profilesByAsaasCustomerId.get(customer.id) ||
+          profilesByAsaasCustomerId.get(buildCustomerUnitKey(customer.id, unitId)) ||
           matchingProfiles.find((profile) => profile.unit_id === unitId) ||
           null;
 
@@ -517,7 +572,7 @@ Deno.serve(async (req) => {
           } satisfies ProfileRow;
 
           profilesById.set(existingProfile.id, mergedProfile);
-          profilesByAsaasCustomerId.set(customer.id, mergedProfile);
+          profilesByAsaasCustomerId.set(buildCustomerUnitKey(customer.id, mergedProfile.unit_id), mergedProfile);
           profilesByCpf.set(cpf, [
             mergedProfile,
             ...matchingProfiles.filter((profile) => profile.id !== mergedProfile.id),
@@ -525,7 +580,7 @@ Deno.serve(async (req) => {
 
           for (const alias of aliases) {
             customerToProfile.set(alias.id, existingProfile.id);
-            profilesByAsaasCustomerId.set(alias.id, mergedProfile);
+            profilesByAsaasCustomerId.set(buildCustomerUnitKey(alias.id, mergedProfile.unit_id), mergedProfile);
           }
           stats.customersUpdated += 1;
           continue;
@@ -606,7 +661,7 @@ Deno.serve(async (req) => {
 
         profilesById.set(userId, profileRow);
         for (const alias of aliases) {
-          profilesByAsaasCustomerId.set(alias.id, profileRow);
+          profilesByAsaasCustomerId.set(buildCustomerUnitKey(alias.id, profileRow.unit_id), profileRow);
           customerToProfile.set(alias.id, userId);
         }
         profilesByCpf.set(cpf, [...(profilesByCpf.get(cpf) || []), profileRow]);
@@ -626,7 +681,7 @@ Deno.serve(async (req) => {
 
       if (matchedProfile) {
         customerToProfile.set(customer.id, matchedProfile.id);
-        profilesByAsaasCustomerId.set(customer.id, matchedProfile);
+        profilesByAsaasCustomerId.set(buildCustomerUnitKey(customer.id, matchedProfile.unit_id), matchedProfile);
       }
     }
 
@@ -664,13 +719,9 @@ Deno.serve(async (req) => {
     }
 
     const paymentRowsByAsaasId = new Map<string, Record<string, unknown>>();
+    const paymentUpdates: Array<{ id: string; values: Record<string, unknown> }> = [];
 
     for (const payment of asaasPayments) {
-      if (existingPaymentIds.has(payment.id) || paymentRowsByAsaasId.has(payment.id)) {
-        stats.paymentsSkipped += 1;
-        continue;
-      }
-
       let responsibleId = customerToProfile.get(payment.customer) || null;
 
       if (!responsibleId) {
@@ -718,8 +769,7 @@ Deno.serve(async (req) => {
           ? payment.paymentDate || payment.confirmedDate || payment.clientPaymentDate || null
           : null;
 
-      paymentRowsByAsaasId.set(payment.id, {
-        asaas_payment_id: payment.id,
+      const paymentPayload = {
         responsible_id: responsibleId,
         student_id: studentId,
         unit_id: unitId,
@@ -737,6 +787,26 @@ Deno.serve(async (req) => {
         boleto_barcode: payment.identificationField || null,
         raw_response: payment,
         paid_at: paidAt,
+      };
+
+      const existingPayment = existingPaymentsByAsaasId.get(payment.id) || null;
+      if (existingPayment) {
+        if (existingPayment.responsible_id !== responsibleId || existingPayment.student_id !== studentId) {
+          paymentUpdates.push({ id: existingPayment.id, values: paymentPayload });
+        } else {
+          stats.paymentsSkipped += 1;
+        }
+        continue;
+      }
+
+      if (paymentRowsByAsaasId.has(payment.id)) {
+        stats.paymentsSkipped += 1;
+        continue;
+      }
+
+      paymentRowsByAsaasId.set(payment.id, {
+        asaas_payment_id: payment.id,
+        ...paymentPayload,
       });
     }
 
@@ -780,6 +850,26 @@ Deno.serve(async (req) => {
         insertedPayments.push(singleData as { id: string; asaas_payment_id: string; payment_method: string | null; status: string });
         stats.paymentsImported += 1;
         if (typeof row.asaas_payment_id === "string") existingPaymentIds.add(row.asaas_payment_id);
+      }
+    }
+
+    for (const chunk of chunkArray(paymentUpdates, 100)) {
+      for (const item of chunk) {
+        const { data, error } = await supabaseAdmin
+          .from("payments")
+          .update(item.values)
+          .eq("id", item.id)
+          .select("id, asaas_payment_id, payment_method, status")
+          .maybeSingle();
+
+        if (error || !data) {
+          diagnostics.push(`cobrança ${item.id}: ${error?.message || "falha ao corrigir vínculo"}`);
+          stats.errors += 1;
+          continue;
+        }
+
+        insertedPayments.push(data as { id: string; asaas_payment_id: string; payment_method: string | null; status: string });
+        stats.paymentsUpdated += 1;
       }
     }
 
