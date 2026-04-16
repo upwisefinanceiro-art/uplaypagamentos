@@ -34,6 +34,11 @@ interface AsaasCustomer {
   email?: string | null;
   phone?: string | null;
   mobilePhone?: string | null;
+  address?: string | null;
+  addressNumber?: string | null;
+  complement?: string | null;
+  province?: string | null;
+  postalCode?: string | null;
 }
 
 type ProfileRow = {
@@ -44,7 +49,33 @@ type ProfileRow = {
   phone: string | null;
   unit_id: string | null;
   asaas_customer_id: string | null;
+  address: string | null;
 };
+
+function normalizeText(value?: string | null) {
+  const normalized = (value || "").trim();
+  return normalized || null;
+}
+
+function normalizePostalCode(value?: string | null) {
+  const digits = (value || "").replace(/\D/g, "");
+  return digits || null;
+}
+
+function buildFullAddress(customer: AsaasCustomer) {
+  const line = [normalizeText(customer.address), normalizeText(customer.addressNumber)]
+    .filter(Boolean)
+    .join(", ");
+
+  return [
+    line || null,
+    normalizeText(customer.complement),
+    normalizeText(customer.province),
+    normalizePostalCode(customer.postalCode),
+  ]
+    .filter(Boolean)
+    .join(" - ") || null;
+}
 
 async function fetchCustomer(baseUrl: string, customerId: string, apiKey: string): Promise<AsaasCustomer | null> {
   const res = await fetch(`${baseUrl}/customers/${customerId}`, { headers: { access_token: apiKey } });
@@ -75,6 +106,21 @@ function shouldReplacePhone(currentPhone: string | null, nextPhone: string | nul
   if (!currentPhone) return true;
   if (currentPhone === nextPhone) return false;
   return currentPhone.length < 10 || /^0+$/.test(currentPhone);
+}
+
+function shouldReplaceCpf(currentCpf: string | null, nextCpf: string | null, forceSync: boolean) {
+  if (!nextCpf) return false;
+  if (!currentCpf) return true;
+  if (currentCpf === nextCpf) return false;
+  if (![11, 14].includes(currentCpf.length)) return true;
+  return forceSync;
+}
+
+function shouldReplaceAddress(currentAddress: string | null, nextAddress: string | null, forceSync: boolean) {
+  if (!nextAddress) return false;
+  if (!currentAddress) return true;
+  if (currentAddress === nextAddress) return false;
+  return forceSync;
 }
 
 function shouldReplaceName(currentName: string | null, nextName: string | null) {
@@ -124,7 +170,10 @@ Deno.serve(async (req) => {
     const overwriteConflictingEmails = body.overwrite_conflicting_emails === true;
     const updateNames = body.update_name === true;
     const updatePhones = body.update_phone !== false;
+    const updateCpf = body.update_cpf !== false;
+    const updateAddress = body.update_address !== false;
     const automatic = body.automatic === true;
+    const forceSync = body.force_sync === true;
     let callerUnitId: string | null = null;
 
     if (isAdminUnidade) {
@@ -151,7 +200,7 @@ Deno.serve(async (req) => {
 
     let profilesQuery = supabase
       .from("profiles")
-      .select("id, cpf, email, full_name, phone, unit_id, asaas_customer_id");
+      .select("id, cpf, email, full_name, phone, unit_id, asaas_customer_id, address");
 
     if (callerUnitId) {
       profilesQuery = profilesQuery.eq("unit_id", callerUnitId);
@@ -213,30 +262,60 @@ Deno.serve(async (req) => {
 
       const currentEmail = normalizeEmail(profile.email) || null;
       const currentPhone = normalizePhone(profile.phone) || null;
+      const currentCpf = normalizeCpf(profile.cpf) || null;
+      const currentAddress = normalizeText(profile.address);
       const asaasEmail = normalizeEmail(customer.email) || null;
       const asaasPhone = normalizePhone(customer.mobilePhone || customer.phone) || null;
+      const asaasCpf = normalizeCpf(customer.cpfCnpj) || null;
       const asaasName = customer.name?.trim() || null;
+      const asaasAddress = buildFullAddress(customer);
+      const asaasAddressLine = normalizeText(customer.address);
+      const asaasAddressNumber = normalizeText(customer.addressNumber);
+      const asaasComplement = normalizeText(customer.complement);
+      const asaasProvince = normalizeText(customer.province);
+      const asaasPostalCode = normalizePostalCode(customer.postalCode);
 
       const updatePayload: Record<string, string | null> = {};
+      const contractUpdatePayload: Record<string, string | null> = {};
       const fieldsUpdated: string[] = [];
 
-      if (shouldReplaceEmail(currentEmail, asaasEmail, overwriteConflictingEmails)) {
+      if (shouldReplaceEmail(currentEmail, asaasEmail, overwriteConflictingEmails || forceSync)) {
         updatePayload.email = asaasEmail;
+        contractUpdatePayload.email = asaasEmail;
         fieldsUpdated.push("email");
       } else if (shouldClearEmail(currentEmail, asaasEmail)) {
         updatePayload.email = null;
+        contractUpdatePayload.email = null;
         fieldsUpdated.push("email");
       } else if (hasProtectedEmailConflict(currentEmail, asaasEmail)) {
         protectedConflicts++;
       }
 
-      if (updatePhones && shouldReplacePhone(currentPhone, asaasPhone)) {
+      if (updatePhones && (forceSync ? !!asaasPhone && currentPhone !== asaasPhone : shouldReplacePhone(currentPhone, asaasPhone))) {
         updatePayload.phone = asaasPhone;
+        contractUpdatePayload.phone = asaasPhone;
         fieldsUpdated.push("phone");
       }
 
-      if (updateNames && shouldReplaceName(profile.full_name, asaasName)) {
+      if (updateCpf && shouldReplaceCpf(currentCpf, asaasCpf, forceSync)) {
+        updatePayload.cpf = asaasCpf;
+        contractUpdatePayload.cpf = asaasCpf;
+        fieldsUpdated.push("cpf");
+      }
+
+      if (updateAddress && shouldReplaceAddress(currentAddress, asaasAddress, forceSync)) {
+        updatePayload.address = asaasAddress;
+        contractUpdatePayload.address = asaasAddressLine;
+        contractUpdatePayload.address_number = asaasAddressNumber;
+        contractUpdatePayload.complement = asaasComplement;
+        contractUpdatePayload.neighborhood = asaasProvince;
+        contractUpdatePayload.zip_code = asaasPostalCode;
+        fieldsUpdated.push("address");
+      }
+
+      if (updateNames && (forceSync ? !!asaasName && profile.full_name !== asaasName : shouldReplaceName(profile.full_name, asaasName))) {
         updatePayload.full_name = asaasName;
+        contractUpdatePayload.responsible_name = asaasName;
         fieldsUpdated.push("full_name");
       }
 
@@ -256,14 +335,26 @@ Deno.serve(async (req) => {
         continue;
       }
 
+      if (Object.keys(contractUpdatePayload).length > 0) {
+        const { error: contractUpdateErr } = await supabase
+          .from("contracts")
+          .update(contractUpdatePayload)
+          .eq("responsible_id", profile.id);
+
+        if (contractUpdateErr) {
+          console.error(`[sync-emails] Error updating contracts for ${profile.full_name}:`, contractUpdateErr);
+          fetchErrors++;
+        }
+      }
+
       try {
-        if (updatePayload.email || updatePayload.full_name) {
+        if (updatePayload.email || updatePayload.full_name || updatePayload.cpf) {
           await supabase.auth.admin.updateUserById(profile.id, {
             ...(updatePayload.email ? { email: updatePayload.email } : {}),
-            ...(updatePayload.full_name ? {
+            ...((updatePayload.full_name || updatePayload.cpf) ? {
               user_metadata: {
-                cpf: normalizeCpf(profile.cpf),
-                full_name: updatePayload.full_name,
+                cpf: updatePayload.cpf ?? currentCpf ?? "",
+                full_name: updatePayload.full_name ?? profile.full_name,
               },
             } : {}),
           });
@@ -280,13 +371,18 @@ Deno.serve(async (req) => {
         details: {
           unit_id: profile.unit_id,
           asaas_customer_id: profile.asaas_customer_id,
+          old_cpf: currentCpf,
+          new_cpf: updatePayload.cpf ?? currentCpf,
           old_email: currentEmail,
           new_email: updatePayload.email ?? currentEmail,
           old_phone: currentPhone,
           new_phone: updatePayload.phone ?? currentPhone,
+          old_address: currentAddress,
+          new_address: updatePayload.address ?? currentAddress,
           old_name: profile.full_name,
           new_name: updatePayload.full_name ?? profile.full_name,
           automatic,
+          force_sync: forceSync,
           fields_updated: fieldsUpdated,
         },
       });
@@ -294,11 +390,13 @@ Deno.serve(async (req) => {
       details.push({
         profile_id: profile.id,
         name: updatePayload.full_name ?? profile.full_name,
-        cpf: normalizeCpf(profile.cpf).slice(0, 4) + "***",
+        cpf: (updatePayload.cpf ?? currentCpf ?? "").slice(0, 4) + "***",
         old_email: currentEmail,
         new_email: updatePayload.email ?? currentEmail,
         old_phone: currentPhone,
         new_phone: updatePayload.phone ?? currentPhone,
+        old_address: currentAddress,
+        new_address: updatePayload.address ?? currentAddress,
         old_name: profile.full_name,
         new_name: updatePayload.full_name ?? profile.full_name,
         fields_updated: fieldsUpdated,
