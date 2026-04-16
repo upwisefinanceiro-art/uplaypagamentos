@@ -122,7 +122,8 @@ Deno.serve(async (req) => {
         const totalValue = mensalidades.length > 0
           ? mensalidades.reduce((s: number, p: any) => s + Number(p.value), 0)
           : avgValue;
-        const desc = mensalidades[0]?.description || "Curso Profissionalizante";
+        const rawDesc = mensalidades[0]?.description || payments[0]?.description || "Curso Profissionalizante";
+        const desc = rawDesc;
 
         // Create a dummy student for this profile
         const { data: newStudent, error: stuErr } = await supabase
