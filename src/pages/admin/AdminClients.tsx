@@ -478,7 +478,7 @@ const AdminClients = () => {
 
     const APP_URL = "https://uplaypagamentos.lovable.app/login";
     const INSTALL_URL = "https://uplaypagamentos.lovable.app/instalar";
-    const message = `Olá, ${client.full_name}! 👋\n\nSeu acesso ao app da *UPLAY Pagamentos* está disponível:\n\n🔑 *Login:* ${login}\n🔒 *Senha:* 12345678\n\n📲 Acesse aqui: ${APP_URL}\n\n📱 *Instale o app no celular:*\n${INSTALL_URL}\n\nEm caso de dúvidas, estamos à disposição! 😊`;
+    const message = `Olá, ${client.full_name}! 👋\n\n📚 *Upwise / Ensino Up — Cursos Profissionalizantes*\n\nSeu acesso ao app de pagamentos está disponível:\n\n🔑 *Login:* ${login}\n🔒 *Senha:* 12345678\n\n📲 Acesse aqui: ${APP_URL}\n\n📱 *Instale o app no celular:*\n${INSTALL_URL}\n\nEm caso de dúvidas, estamos à disposição! 😊\n\nAtenciosamente,\n*Setor Financeiro*`;
 
     const cleanPhone = client.phone.replace(/\D/g, "");
     const fullPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
