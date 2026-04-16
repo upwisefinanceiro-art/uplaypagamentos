@@ -35,6 +35,7 @@ import { supabase } from "@/integrations/supabase/client";
 import WhatsAppDialog from "@/components/WhatsAppDialog";
 import { resolveWhatsAppChargeData } from "@/lib/asaas-payment";
 import ManualChargeDialog from "@/components/admin/ManualChargeDialog";
+import { fetchAllPaginated } from "@/lib/fetchAllPaginated";
 
 type PaymentStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELLED";
 type BillingType = "PIX" | "BOLETO" | "CARD";
@@ -215,23 +216,32 @@ const AdminCharges = () => {
   const fetchData = async () => {
     setLoadingData(true);
 
-    const [paymentsRes, studentsRes, unitsRes, profilesRes, rolesRes, contractsRes, stockRes] = await Promise.all([
-      supabase
-        .from("payments")
-        .select("id, value, final_value, due_date, status, payment_method, pix_copy_paste, invoice_url, checkout_url, boleto_url, pix_qr_code, asaas_payment_id, responsible_id, unit_id, installment_number, contract_id, student_id, description, payment_type")
-        .order("due_date", { ascending: false }),
+    const [payments, studentsRes, unitsRes, profilesRes, rolesRes, contracts, stockRes] = await Promise.all([
+      fetchAllPaginated<PaymentRow>((from, to) =>
+        supabase
+          .from("payments")
+          .select("id, value, final_value, due_date, status, payment_method, pix_copy_paste, invoice_url, checkout_url, boleto_url, pix_qr_code, asaas_payment_id, responsible_id, unit_id, installment_number, contract_id, student_id, description, payment_type")
+          .order("due_date", { ascending: false })
+          .range(from, to),
+      ),
       supabase.from("students").select("id, full_name, responsible_id").order("full_name"),
       supabase.from("units").select("id, name").order("name"),
       supabase.from("profiles").select("id, full_name, unit_id, active, phone").order("full_name"),
       supabase.from("user_roles").select("user_id").eq("role", "RESPONSAVEL"),
-      supabase.from("contracts").select("id, description, contract_number, responsible_id, student_id, unit_id, status").order("created_at", { ascending: false }),
+      fetchAllPaginated<ContractRow>((from, to) =>
+        supabase
+          .from("contracts")
+          .select("id, description, contract_number, responsible_id, student_id, unit_id, status")
+          .order("created_at", { ascending: false })
+          .range(from, to),
+      ),
       supabase.from("stock_items").select("id, name, unit_id, quantity").eq("active", true).order("name"),
     ]);
 
-    if (paymentsRes.data) setPayments(paymentsRes.data as PaymentRow[]);
+    setPayments(payments);
     if (studentsRes.data) setStudents(studentsRes.data as StudentRow[]);
     if (unitsRes.data) setUnits(unitsRes.data as UnitRow[]);
-    if (contractsRes.data) setContracts(contractsRes.data as ContractRow[]);
+    setContracts(contracts);
     if (stockRes.data) setStockItems(stockRes.data as { id: string; name: string; unit_id: string; quantity: number }[]);
 
     if (profilesRes.data) {

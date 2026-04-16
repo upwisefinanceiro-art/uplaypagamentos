@@ -23,6 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import UserEditDialog from "@/components/admin/UserEditDialog";
 import UserActionButtons from "@/components/admin/UserActionButtons";
+import { fetchAllPaginated } from "@/lib/fetchAllPaginated";
 
 interface ClientRow {
   id: string;
@@ -133,19 +134,28 @@ const AdminClients = () => {
   const fetchData = async () => {
     setLoading(true);
 
-    const [profilesRes, rolesRes, studentsRes, unitsRes, paymentsRes, contractsRes] = await Promise.all([
+    const [profilesRes, rolesRes, studentsRes, unitsRes, payments, contracts] = await Promise.all([
       supabase.from("profiles").select("id, full_name, cpf, phone, unit_id, active, email, address").order("full_name"),
       supabase.from("user_roles").select("user_id").eq("role", "RESPONSAVEL"),
       supabase.from("students").select("id, full_name, responsible_id").order("full_name"),
       supabase.from("units").select("id, name").order("name"),
-      supabase
-        .from("payments")
-        .select("id, responsible_id, contract_id, student_id, description, payment_type, installment_number, due_date, status, value, final_value, unit_id")
-        .order("due_date", { ascending: false }),
-      supabase.from("contracts").select("id, responsible_id, responsible_name, cpf, email, phone, address, unit_id, student_id, description, status, contract_number"),
+      fetchAllPaginated<PaymentRow>((from, to) =>
+        supabase
+          .from("payments")
+          .select("id, responsible_id, contract_id, student_id, description, payment_type, installment_number, due_date, status, value, final_value, unit_id")
+          .order("due_date", { ascending: false })
+          .range(from, to),
+      ),
+      fetchAllPaginated<ContractLinkRow>((from, to) =>
+        supabase
+          .from("contracts")
+          .select("id, responsible_id, responsible_name, cpf, email, phone, address, unit_id, student_id, description, status, contract_number")
+          .order("created_at", { ascending: false })
+          .range(from, to),
+      ),
     ]);
 
-    if (profilesRes.data && rolesRes.data && studentsRes.data && contractsRes.data) {
+    if (profilesRes.data && rolesRes.data && studentsRes.data) {
       const responsibleIds = new Set(rolesRes.data.map((row: { user_id: string }) => row.user_id));
       const studentNamesByResponsible = new Map<string, string[]>();
 
@@ -165,7 +175,7 @@ const AdminClients = () => {
         }));
 
       const profileIds = new Set(profileClients.map((client) => client.id));
-      const snapshotClients = (contractsRes.data as ContractLinkRow[])
+      const snapshotClients = contracts
         .filter((contract) => contract.responsible_id && !profileIds.has(contract.responsible_id))
         .reduce<ClientRow[]>((acc, contract) => {
           const existing = acc.find((client) => client.id === contract.responsible_id);
@@ -199,8 +209,8 @@ const AdminClients = () => {
 
     if (studentsRes.data) setStudents(studentsRes.data as StudentRow[]);
     if (unitsRes.data) setUnits(unitsRes.data as UnitRow[]);
-    if (paymentsRes.data) setPayments(paymentsRes.data as PaymentRow[]);
-    if (contractsRes.data) setContracts(contractsRes.data as ContractLinkRow[]);
+    setPayments(payments);
+    setContracts(contracts);
     setLoading(false);
   };
 
