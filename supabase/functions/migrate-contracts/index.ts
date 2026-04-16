@@ -162,7 +162,7 @@ Deno.serve(async (req) => {
           cpf: profile.cpf,
           phone: profile.phone,
           email: profile.email,
-          description: desc.replace(/Parcela \d+ de \d+\.?\s*/i, "").trim() || "Curso Profissionalizante",
+          description: cleanDescription(rawDesc),
           total_value: totalValue > 0 ? Math.round(totalValue * 100) / 100 : 0,
           installments: mensalidades.length || 1,
           start_date: firstDue || profile.created_at?.split("T")[0] || new Date().toISOString().split("T")[0],
@@ -185,7 +185,7 @@ Deno.serve(async (req) => {
           const totalValue = mensalidades.length > 0
             ? mensalidades.reduce((s: number, p: any) => s + Number(p.value), 0)
             : 0;
-          const desc = mensalidades[0]?.description || "Curso Profissionalizante";
+          const rawDesc = mensalidades[0]?.description || payments[0]?.description || "Curso Profissionalizante";
 
           const contract = {
             unit_id: profile.unit_id,
@@ -195,7 +195,7 @@ Deno.serve(async (req) => {
             cpf: profile.cpf,
             phone: profile.phone,
             email: profile.email,
-            description: desc.replace(/Parcela \d+ de \d+\.?\s*/i, "").trim() || "Curso Profissionalizante",
+            description: cleanDescription(rawDesc),
             total_value: totalValue > 0 ? Math.round(totalValue * 100) / 100 : 0,
             installments: mensalidades.length || 1,
             start_date: firstDue || profile.created_at?.split("T")[0] || new Date().toISOString().split("T")[0],
