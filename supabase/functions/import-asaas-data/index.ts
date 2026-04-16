@@ -189,6 +189,29 @@ async function fetchAllPages<T>(baseUrl: string, path: string, apiKey: string): 
   return all;
 }
 
+async function fetchAllSupabaseRows<T>(
+  fetchPage: (from: number, to: number) => Promise<{ data: T[] | null; error: { message?: string } | null }>,
+  pageSize = 1000,
+) {
+  const allRows: T[] = [];
+
+  for (let from = 0; ; from += pageSize) {
+    const to = from + pageSize - 1;
+    const { data, error } = await fetchPage(from, to);
+
+    if (error) {
+      throw new Error(error.message || "Erro ao buscar dados paginados no banco");
+    }
+
+    const page = data || [];
+    allRows.push(...page);
+
+    if (page.length < pageSize) break;
+  }
+
+  return allRows;
+}
+
 async function fetchAsaasCustomerById(baseUrl: string, customerId: string, apiKey: string): Promise<AsaasCustomer | null> {
   const response = await fetch(`${baseUrl}/customers/${customerId}`, {
     headers: { access_token: apiKey },
@@ -333,19 +356,36 @@ Deno.serve(async (req) => {
 
     console.log(`[import] Starting import for unit ${unitId}`);
 
-    const [asaasCustomers, asaasPayments, profilesRes, studentsRes, paymentsRes, authUsers, responsibleRolesRes] = await Promise.all([
+    const [asaasCustomers, asaasPayments, allProfiles, localStudents, existingPayments, authUsers, responsibleRolesRes] = await Promise.all([
       fetchAllPages<AsaasCustomer>(baseUrl, "/customers", apiKey),
       fetchAllPages<AsaasPayment>(baseUrl, "/payments", apiKey),
-      supabaseAdmin.from("profiles").select("id, cpf, full_name, phone, email, address, unit_id, asaas_customer_id"),
-      supabaseAdmin.from("students").select("id, full_name, responsible_id").eq("unit_id", unitId),
-      supabaseAdmin.from("payments").select("id, asaas_payment_id, responsible_id, student_id").eq("unit_id", unitId),
+      fetchAllSupabaseRows<ProfileRow>((from, to) =>
+        supabaseAdmin
+          .from("profiles")
+          .select("id, cpf, full_name, phone, email, address, unit_id, asaas_customer_id")
+          .order("created_at", { ascending: true })
+          .range(from, to),
+      ),
+      fetchAllSupabaseRows<StudentRow>((from, to) =>
+        supabaseAdmin
+          .from("students")
+          .select("id, full_name, responsible_id")
+          .eq("unit_id", unitId)
+          .order("created_at", { ascending: true })
+          .range(from, to),
+      ),
+      fetchAllSupabaseRows<PaymentRow>((from, to) =>
+        supabaseAdmin
+          .from("payments")
+          .select("id, asaas_payment_id, responsible_id, student_id")
+          .eq("unit_id", unitId)
+          .order("created_at", { ascending: true })
+          .range(from, to),
+      ),
       fetchAllAuthUsers(supabaseAdmin),
       supabaseAdmin.from("user_roles").select("user_id").eq("role", "RESPONSAVEL"),
     ]);
 
-    const allProfiles = (profilesRes.data || []) as ProfileRow[];
-    const localStudents = (studentsRes.data || []) as StudentRow[];
-    const existingPayments = (paymentsRes.data || []) as PaymentRow[];
     const existingResponsibleRoleIds = new Set(
       ((responsibleRolesRes.data || []) as Array<{ user_id: string }>).map((entry) => entry.user_id),
     );
