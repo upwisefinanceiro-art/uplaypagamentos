@@ -29,16 +29,16 @@ interface AsaasCustomer {
   id: string;
   name: string;
   cpfCnpj?: string;
-  email?: string | null;
-  phone?: string | null;
-  mobilePhone?: string | null;
-  address?: string | null;
-  addressNumber?: string | null;
-  complement?: string | null;
-  province?: string | null;
-  postalCode?: string | null;
-  city?: string | null;
-  state?: string | null;
+  email?: string;
+  phone?: string;
+  mobilePhone?: string;
+  address?: string;
+  addressNumber?: string;
+  complement?: string;
+  province?: string;
+  postalCode?: string;
+  city?: string;
+  state?: string;
 }
 
 interface AsaasPayment {
@@ -47,8 +47,6 @@ interface AsaasPayment {
   billingType: string;
   value: number;
   netValue?: number;
-  originalValue?: number | null;
-  receivedValue?: number | null;
   dueDate: string;
   status: string;
   description?: string;
@@ -60,12 +58,6 @@ interface AsaasPayment {
   clientPaymentDate?: string;
   installmentNumber?: number;
   externalReference?: string;
-  discount?: {
-    value: number;
-    type: string;
-    limitDate?: string | null;
-    dueDateLimitDays?: number;
-  };
 }
 
 interface ProfileRow {
@@ -164,18 +156,6 @@ function chunkArray<T>(items: T[], size: number) {
     chunks.push(items.slice(index, index + size));
   }
   return chunks;
-}
-
-function roundCurrency(value: number) {
-  return Math.round(value * 100) / 100;
-}
-
-function getFaceValue(payment: Pick<AsaasPayment, "value" | "originalValue">) {
-  return roundCurrency(Number(payment.originalValue ?? payment.value ?? 0));
-}
-
-function getPaidAmount(payment: Pick<AsaasPayment, "value" | "originalValue" | "receivedValue">) {
-  return roundCurrency(Number(payment.receivedValue ?? payment.value ?? payment.originalValue ?? 0));
 }
 
 async function fetchAllPages<T>(baseUrl: string, path: string, apiKey: string): Promise<T[]> {
@@ -283,15 +263,15 @@ Deno.serve(async (req) => {
     }
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+    const callerClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
 
     const token = authHeader.replace("Bearer ", "");
-    let callerId: string | null = null;
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      callerId = payload.sub || null;
-    } catch { /* invalid token */ }
+    const { data: claimsData, error: claimsError } = await callerClient.auth.getClaims(token);
+    const callerId = claimsData?.claims?.sub;
 
-    if (!callerId) {
+    if (claimsError || !callerId) {
       return jsonResponse({ success: false, error: "Não autorizado" }, 401);
     }
 
@@ -738,34 +718,14 @@ Deno.serve(async (req) => {
           ? payment.paymentDate || payment.confirmedDate || payment.clientPaymentDate || null
           : null;
 
-      const faceValue = getFaceValue(payment);
-      const paidAmount = getPaidAmount(payment);
-
-      // Calculate discount from Asaas
-      const discountValue = payment.discount?.value || 0;
-      const discountType = payment.discount?.type || "FIXED";
-      const configuredDiscount = discountType === "PERCENTAGE"
-        ? roundCurrency(faceValue * discountValue / 100)
-        : roundCurrency(discountValue);
-      const inferredDiscount = roundCurrency(Math.max(faceValue - paidAmount, 0));
-      const punctualityDiscount = Math.max(configuredDiscount, inferredDiscount);
-
-      // For PAID: final_value = amount actually paid by the client
-      // For unpaid: final_value = face value, keeping the discount metadata separate
-      const isPaid = status === "PAID";
-      const finalValue = isPaid
-        ? paidAmount
-        : faceValue;
-
       paymentRowsByAsaasId.set(payment.id, {
         asaas_payment_id: payment.id,
         responsible_id: responsibleId,
         student_id: studentId,
         unit_id: unitId,
-        value: faceValue,
-        original_value: faceValue,
-        final_value: finalValue,
-        punctuality_discount: punctualityDiscount,
+        value: payment.value || 0,
+        original_value: payment.value || 0,
+        final_value: payment.netValue || payment.value || 0,
         due_date: payment.dueDate,
         status,
         payment_method: paymentMethod,
@@ -789,7 +749,7 @@ Deno.serve(async (req) => {
 
       const { data, error } = await supabaseAdmin
         .from("payments")
-        .upsert(chunk, { onConflict: "asaas_payment_id,unit_id", ignoreDuplicates: true })
+        .insert(chunk)
         .select("id, asaas_payment_id, payment_method, status");
 
       if (!error) {

@@ -41,12 +41,3 @@ verify_jwt = false
 
 [functions.import-asaas-data]
 verify_jwt = false
-
-[functions.fix-payment-values]
-verify_jwt = false
-
-[functions.migrate-contracts]
-verify_jwt = false
-
-[functions.sync-client-emails]
-verify_jwt = false

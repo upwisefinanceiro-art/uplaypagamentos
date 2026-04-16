@@ -45,33 +45,6 @@ function mapBillingTypeToPaymentMethod(billingType?: string | null): string | nu
   return billingTypeMap[billingType] || null;
 }
 
-function roundCurrency(value: number) {
-  return Math.round(value * 100) / 100;
-}
-
-function getFaceValue(payment: { value?: number | null; originalValue?: number | null }) {
-  return roundCurrency(Number(payment.originalValue ?? payment.value ?? 0));
-}
-
-function getPaidAmount(payment: { value?: number | null; originalValue?: number | null; receivedValue?: number | null }) {
-  return roundCurrency(Number(payment.receivedValue ?? payment.value ?? payment.originalValue ?? 0));
-}
-
-function getPunctualityDiscount(payment: {
-  value?: number | null;
-  originalValue?: number | null;
-  receivedValue?: number | null;
-  discount?: { value?: number | null; type?: string | null } | null;
-}) {
-  const faceValue = getFaceValue(payment);
-  const configuredDiscountValue = Number(payment.discount?.value ?? 0);
-  const configuredDiscount = payment.discount?.type === "PERCENTAGE"
-    ? roundCurrency(faceValue * configuredDiscountValue / 100)
-    : roundCurrency(configuredDiscountValue);
-  const inferredDiscount = roundCurrency(Math.max(faceValue - getPaidAmount(payment), 0));
-  return Math.max(configuredDiscount, inferredDiscount);
-}
-
 async function fetchPixData(baseUrl: string, asaasPaymentId: string, apiKey: string) {
   try {
     const pixRes = await fetch(`${baseUrl}/payments/${asaasPaymentId}/pixQrCode`, {
@@ -107,15 +80,12 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    const token = authHeader.replace("Bearer ", "");
-    let callerId: string | null = null;
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      callerId = payload.sub || null;
-    } catch { /* invalid token */ }
+    const supabaseUser = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
 
-    if (!callerId) return respond({ error: "Não autorizado" }, 401);
-    const caller = { id: callerId };
+    const { data: { user: caller } } = await supabaseUser.auth.getUser();
+    if (!caller) return respond({ error: "Não autorizado" }, 401);
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
     const body = await req.json();
@@ -228,13 +198,8 @@ Deno.serve(async (req) => {
 
       const resolvedStatus = mapAsaasStatus(asaasData.status) || payment.status;
       const resolvedMethod = mapBillingTypeToPaymentMethod(asaasData.billingType) || payment.payment_method || null;
-      const faceValue = getFaceValue(asaasData);
 
       const updateData: Record<string, unknown> = {
-        value: faceValue,
-        original_value: faceValue,
-        final_value: resolvedStatus === "PAID" ? getPaidAmount(asaasData) : faceValue,
-        punctuality_discount: getPunctualityDiscount(asaasData),
         invoice_url: asaasData.invoiceUrl || payment.invoice_url,
         boleto_url: asaasData.bankSlipUrl || payment.boleto_url,
         boleto_barcode: asaasData.identificationField || payment.boleto_barcode,
@@ -249,8 +214,6 @@ Deno.serve(async (req) => {
 
       if (resolvedStatus === "PAID" && !payment.paid_at) {
         updateData.paid_at = asaasData.paymentDate || new Date().toISOString();
-      } else if (resolvedStatus !== "PAID" && payment.paid_at) {
-        updateData.paid_at = null;
       }
 
       const { error: updateErr } = await supabaseAdmin.from("payments").update(updateData).eq("id", payment_id);
@@ -282,7 +245,7 @@ Deno.serve(async (req) => {
         payment_method: updateData.payment_method,
         billing_type: asaasData.billingType || null,
         customer: asaasData.customer || null,
-        value: updateData.final_value ?? updateData.value ?? payment.final_value ?? payment.value,
+        value: asaasData.value ?? payment.final_value ?? payment.value,
       });
     }
 

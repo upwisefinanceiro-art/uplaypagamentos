@@ -31,19 +31,16 @@ Deno.serve(async (req) => {
     }
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+    const callerClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
 
-    const token = authHeader.replace("Bearer ", "");
-    let callerId: string | null = null;
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      callerId = payload.sub || null;
-    } catch { /* invalid token */ }
-
-    if (!callerId) {
+    const { data: authData, error: authError } = await callerClient.auth.getUser();
+    if (authError || !authData.user) {
       return jsonResponse({ error: "Não autorizado" });
     }
 
-    // callerId already set above from JWT
+    const callerId = authData.user.id;
 
     const { data: callerRoles } = await supabaseAdmin
       .from("user_roles")

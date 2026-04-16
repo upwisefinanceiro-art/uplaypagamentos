@@ -35,33 +35,6 @@ async function fetchPixData(baseUrl: string, asaasPaymentId: string, apiKey: str
   }
 }
 
-function roundCurrency(value: number) {
-  return Math.round(value * 100) / 100;
-}
-
-function getFaceValue(payment: { value?: number | null; originalValue?: number | null }) {
-  return roundCurrency(Number(payment.originalValue ?? payment.value ?? 0));
-}
-
-function getPaidAmount(payment: { value?: number | null; originalValue?: number | null; receivedValue?: number | null }) {
-  return roundCurrency(Number(payment.receivedValue ?? payment.value ?? payment.originalValue ?? 0));
-}
-
-function getPunctualityDiscount(payment: {
-  value?: number | null;
-  originalValue?: number | null;
-  receivedValue?: number | null;
-  discount?: { value?: number | null; type?: string | null } | null;
-}) {
-  const faceValue = getFaceValue(payment);
-  const configuredDiscountValue = Number(payment.discount?.value ?? 0);
-  const configuredDiscount = payment.discount?.type === "PERCENTAGE"
-    ? roundCurrency(faceValue * configuredDiscountValue / 100)
-    : roundCurrency(configuredDiscountValue);
-  const inferredDiscount = roundCurrency(Math.max(faceValue - getPaidAmount(payment), 0));
-  return Math.max(configuredDiscount, inferredDiscount);
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -69,12 +42,6 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
-    const internalKey = req.headers.get("x-internal-key");
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const isInternalCall = internalKey === serviceRoleKey;
-
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Não autorizado" }), {
         status: 401,
@@ -82,43 +49,38 @@ Deno.serve(async (req) => {
       });
     }
 
-    const token = (authHeader || "").replace("Bearer ", "");
-    let isServiceRole = false;
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      if (payload.role === "service_role") isServiceRole = true;
-    } catch { /* */ }
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+    const supabaseUser = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: { user: caller } } = await supabaseUser.auth.getUser();
+    if (!caller) {
+      return new Response(JSON.stringify({ error: "Não autorizado" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    if (!isServiceRole && !isInternalCall) {
-      let callerId: string | null = null;
-      try {
-        const p = JSON.parse(atob(token.split(".")[1]));
-        callerId = p.sub || null;
-      } catch { /* invalid token */ }
+    // Check admin
+    const { data: callerRoles } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", caller.id);
 
-      if (!callerId) {
-        return new Response(JSON.stringify({ error: "Não autorizado" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const { data: callerRoles } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", callerId);
-
-      const isAdmin = callerRoles?.some((r: { role: string }) =>
-        r.role === "ADMIN_MASTER" || r.role === "ADMIN_UNIDADE"
-      );
-      if (!isAdmin) {
-        return new Response(JSON.stringify({ error: "Sem permissão" }), {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+    const isAdmin = callerRoles?.some((r: { role: string }) =>
+      r.role === "ADMIN_MASTER" || r.role === "ADMIN_UNIDADE"
+    );
+    if (!isAdmin) {
+      return new Response(JSON.stringify({ error: "Sem permissão" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Get optional unit_id filter
@@ -133,7 +95,7 @@ Deno.serve(async (req) => {
       .from("payments")
       .select("id, asaas_payment_id, unit_id, status, paid_at, pix_qr_code, pix_copy_paste")
       .not("asaas_payment_id", "is", null)
-      .in("status", ["PENDING", "OVERDUE", "PAID"]);
+      .in("status", ["PENDING", "OVERDUE"]);
 
     if (unitFilter) refreshQuery = refreshQuery.eq("unit_id", unitFilter);
 
@@ -195,13 +157,8 @@ Deno.serve(async (req) => {
 
         const asaasData = await res.json();
         const newStatus = statusMap[asaasData.status] || payment.status;
-        const faceValue = getFaceValue(asaasData);
 
         const updateData: Record<string, unknown> = {
-          value: faceValue,
-          original_value: faceValue,
-          final_value: newStatus === "PAID" ? getPaidAmount(asaasData) : faceValue,
-          punctuality_discount: getPunctualityDiscount(asaasData),
           status: newStatus,
           invoice_url: asaasData.invoiceUrl || undefined,
           boleto_url: asaasData.bankSlipUrl || undefined,
@@ -211,8 +168,6 @@ Deno.serve(async (req) => {
 
         if (newStatus === "PAID" && !payment.paid_at) {
           updateData.paid_at = asaasData.paymentDate || new Date().toISOString();
-        } else if (newStatus !== "PAID" && payment.paid_at) {
-          updateData.paid_at = null;
         }
 
         // Fetch PIX if needed

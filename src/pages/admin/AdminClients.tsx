@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, ChevronUp, Loader2, MessageCircle, Plus, RefreshCcw, Search } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,11 +19,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { openWhatsApp } from "@/lib/whatsapp-utils";
-import { buildClientAccessMessage, isValidEmail } from "@/lib/client-access";
 import UserEditDialog from "@/components/admin/UserEditDialog";
 import UserActionButtons from "@/components/admin/UserActionButtons";
 
@@ -67,11 +64,6 @@ interface PaymentRow {
   unit_id: string;
 }
 
-interface PaymentCountRow {
-  responsible_id: string;
-  count: number;
-}
-
 interface ContractLinkRow {
   id: string;
   responsible_id: string;
@@ -80,18 +72,11 @@ interface ContractLinkRow {
   email: string | null;
   phone: string | null;
   address: string | null;
-  address_number?: string | null;
-  complement?: string | null;
-  neighborhood?: string | null;
-  city?: string | null;
-  state?: string | null;
-  zip_code?: string | null;
   unit_id: string;
   student_id: string | null;
   description: string;
   status: string;
   contract_number: string | null;
-  rg?: string | null;
 }
 
 type ActionType = "deactivate" | "reactivate" | "permanent_delete";
@@ -125,8 +110,6 @@ const AdminClients = () => {
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [units, setUnits] = useState<UnitRow[]>([]);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
-  const [paymentCounts, setPaymentCounts] = useState<Map<string, number>>(new Map());
-  const [expandedPayments, setExpandedPayments] = useState<Map<string, PaymentRow[]>>(new Map());
   const [contracts, setContracts] = useState<ContractLinkRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -143,43 +126,24 @@ const AdminClients = () => {
   const [formName, setFormName] = useState("");
   const [formCpf, setFormCpf] = useState("");
   const [formPhone, setFormPhone] = useState("");
-  const [formEmail, setFormEmail] = useState("");
   const [formPassword, setFormPassword] = useState("");
   const [formStudentName, setFormStudentName] = useState("");
   const [formUnitId, setFormUnitId] = useState("");
-  const [syncingClientId, setSyncingClientId] = useState<string | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
 
-    const [profilesRes, rolesRes, studentsRes, unitsRes, contractsRes] = await Promise.all([
+    const [profilesRes, rolesRes, studentsRes, unitsRes, paymentsRes, contractsRes] = await Promise.all([
       supabase.from("profiles").select("id, full_name, cpf, phone, unit_id, active, email, address").order("full_name"),
       supabase.from("user_roles").select("user_id").eq("role", "RESPONSAVEL"),
       supabase.from("students").select("id, full_name, responsible_id").order("full_name"),
       supabase.from("units").select("id, name").order("name"),
-      supabase.from("contracts").select("id, responsible_id, responsible_name, cpf, email, phone, address, address_number, complement, neighborhood, city, state, zip_code, rg, unit_id, student_id, description, status, contract_number"),
-    ]);
-
-    // Fetch ALL payment counts using pagination to avoid 1000 row limit
-    const allPaymentRows: Array<{ responsible_id: string }> = [];
-    let from = 0;
-    const pageSize = 1000;
-    while (true) {
-      const { data: batch } = await supabase
+      supabase
         .from("payments")
-        .select("responsible_id")
-        .range(from, from + pageSize - 1);
-      if (!batch || batch.length === 0) break;
-      allPaymentRows.push(...(batch as Array<{ responsible_id: string }>));
-      if (batch.length < pageSize) break;
-      from += pageSize;
-    }
-
-    const countMap = new Map<string, number>();
-    for (const row of allPaymentRows) {
-      countMap.set(row.responsible_id, (countMap.get(row.responsible_id) || 0) + 1);
-    }
-    setPaymentCounts(countMap);
+        .select("id, responsible_id, contract_id, student_id, description, payment_type, installment_number, due_date, status, value, final_value, unit_id")
+        .order("due_date", { ascending: false }),
+      supabase.from("contracts").select("id, responsible_id, responsible_name, cpf, email, phone, address, unit_id, student_id, description, status, contract_number"),
+    ]);
 
     if (profilesRes.data && rolesRes.data && studentsRes.data && contractsRes.data) {
       const responsibleIds = new Set(rolesRes.data.map((row: { user_id: string }) => row.user_id));
@@ -235,46 +199,9 @@ const AdminClients = () => {
 
     if (studentsRes.data) setStudents(studentsRes.data as StudentRow[]);
     if (unitsRes.data) setUnits(unitsRes.data as UnitRow[]);
+    if (paymentsRes.data) setPayments(paymentsRes.data as PaymentRow[]);
     if (contractsRes.data) setContracts(contractsRes.data as ContractLinkRow[]);
     setLoading(false);
-  };
-
-  const fetchClientPayments = async (clientId: string, contractIds: string[]) => {
-    // Fetch all payments for this specific client with pagination
-    const allRows: PaymentRow[] = [];
-    let from = 0;
-    const pageSize = 1000;
-    while (true) {
-      const { data: batch } = await supabase
-        .from("payments")
-        .select("id, responsible_id, contract_id, student_id, description, payment_type, installment_number, due_date, status, value, final_value, unit_id")
-        .eq("responsible_id", clientId)
-        .order("due_date", { ascending: false })
-        .range(from, from + pageSize - 1);
-      if (!batch || batch.length === 0) break;
-      allRows.push(...(batch as PaymentRow[]));
-      if (batch.length < pageSize) break;
-      from += pageSize;
-    }
-
-    // Also fetch payments linked to contracts if any
-    if (contractIds.length > 0) {
-      for (const contractId of contractIds) {
-        const { data: contractPayments } = await supabase
-          .from("payments")
-          .select("id, responsible_id, contract_id, student_id, description, payment_type, installment_number, due_date, status, value, final_value, unit_id")
-          .eq("contract_id", contractId)
-          .order("due_date", { ascending: false });
-        if (contractPayments) {
-          const existingIds = new Set(allRows.map(r => r.id));
-          for (const p of contractPayments as PaymentRow[]) {
-            if (!existingIds.has(p.id)) allRows.push(p);
-          }
-        }
-      }
-    }
-
-    return allRows;
   };
 
   useEffect(() => {
@@ -292,7 +219,6 @@ const AdminClients = () => {
     setFormName("");
     setFormCpf("");
     setFormPhone("");
-    setFormEmail("");
     setFormPassword("");
     setFormStudentName("");
     setFormUnitId(profile?.unit_id || "");
@@ -305,15 +231,6 @@ const AdminClients = () => {
       toast({
         title: "Preencha os campos obrigatórios",
         description: "Nome, CPF e senha são obrigatórios.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (formEmail.trim() && !isValidEmail(formEmail.trim())) {
-      toast({
-        title: "E-mail inválido",
-        description: "Informe um e-mail válido para o cliente.",
         variant: "destructive",
       });
       return;
@@ -332,7 +249,6 @@ const AdminClients = () => {
         cpf: formCpf,
         full_name: formName,
         phone: formPhone || undefined,
-        email: formEmail || undefined,
         password: formPassword,
         role: "RESPONSAVEL",
         unit_id: unitId,
@@ -436,42 +352,18 @@ const AdminClients = () => {
   };
 
   const getClientPayments = (client: ClientRow) => {
-    return expandedPayments.get(client.id) || [];
-  };
+    const contractIds = new Set(client.contract_ids || []);
 
-  const getClientPaymentCount = (client: ClientRow) => {
-    return paymentCounts.get(client.id) || 0;
-  };
-
-  const handleExpandClient = async (clientId: string, contractIds: string[]) => {
-    if (expandedClientId === clientId) {
-      setExpandedClientId(null);
-      return;
-    }
-    setExpandedClientId(clientId);
-    if (!expandedPayments.has(clientId)) {
-      const clientPayments = await fetchClientPayments(clientId, contractIds);
-      setExpandedPayments(prev => new Map(prev).set(clientId, clientPayments));
-    }
+    return payments.filter((payment) => {
+      if (payment.responsible_id === client.id) return true;
+      if (payment.contract_id && contractIds.has(payment.contract_id)) return true;
+      return false;
+    });
   };
 
   const getClientContracts = (client: ClientRow) => {
     const contractIds = new Set(client.contract_ids || []);
     return contracts.filter((contract) => contract.responsible_id === client.id || contractIds.has(contract.id));
-  };
-
-  const formatContractAddress = (contract?: ContractLinkRow) => {
-    if (!contract) return "";
-
-    return [
-      [contract.address, contract.address_number].filter(Boolean).join(", "),
-      contract.complement,
-      contract.neighborhood,
-      [contract.city, contract.state].filter(Boolean).join("/"),
-      contract.zip_code,
-    ]
-      .filter((value) => !!value && value.trim() !== "")
-      .join(" • ");
   };
 
   const filtered = clients.filter((client) => {
@@ -495,72 +387,6 @@ const AdminClients = () => {
       normalizedPhone.includes(q)
     );
   });
-
-  const handleSendAccess = (client: ClientRow) => {
-    if (!client.phone) {
-      toast({ title: "Cliente sem telefone cadastrado", description: "Edite o cliente e adicione um telefone.", variant: "destructive" });
-      return;
-    }
-
-    const message = buildClientAccessMessage({
-      cpf: client.cpf,
-      email: client.email,
-      fullName: client.full_name,
-    });
-
-    if (!client.cpf && !client.email) {
-      toast({ title: "Cliente sem login definido", description: "É necessário CPF ou e-mail.", variant: "destructive" });
-      return;
-    }
-
-    openWhatsApp(client.phone, message);
-  };
-
-  const handleManualSync = async (client: ClientRow) => {
-    if (client.source !== "profile") {
-      toast({
-        title: "Sincronização indisponível",
-        description: "Esse cadastro existe apenas como snapshot de contrato.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setSyncingClientId(client.id);
-
-    const { data, error } = await supabase.functions.invoke("sync-client-emails", {
-      body: {
-        profile_id: client.id,
-        unit_id: client.unit_id,
-        update_name: true,
-        update_phone: true,
-      },
-    });
-
-    setSyncingClientId(null);
-
-    if (error || data?.error) {
-      toast({
-        title: "Erro ao sincronizar com Asaas",
-        description: error?.message || data?.error,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (data?.updated > 0) {
-      toast({ title: "Cliente sincronizado com Asaas" });
-      await fetchData();
-      return;
-    }
-
-    toast({
-      title: "Nenhuma alteração necessária",
-      description: data?.protected_conflicts > 0
-        ? "Existe um e-mail válido diferente do Asaas e ele foi preservado."
-        : "Os dados já estavam consistentes para este cliente.",
-    });
-  };
 
   const getAlertContent = () => {
     if (!actionTarget) return { title: "", description: "" };
@@ -642,16 +468,6 @@ const AdminClients = () => {
                   <Input className="bg-input border-border text-foreground" placeholder="(00) 00000-0000" value={formPhone} onChange={(e) => setFormPhone(e.target.value)} />
                 </div>
                 <div className="space-y-2 col-span-2">
-                  <Label className="text-foreground">E-mail</Label>
-                  <Input
-                    className="bg-input border-border text-foreground"
-                    type="email"
-                    placeholder="cliente@exemplo.com"
-                    value={formEmail}
-                    onChange={(e) => setFormEmail(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2 col-span-2">
                   <Label className="text-foreground">Nome do Aluno</Label>
                   <Input className="bg-input border-border text-foreground" placeholder="Nome do aluno" value={formStudentName} onChange={(e) => setFormStudentName(e.target.value)} />
                 </div>
@@ -687,17 +503,10 @@ const AdminClients = () => {
       ) : (
         <div className="space-y-3">
           {filtered.map((client) => {
-            const paymentCount = getClientPaymentCount(client);
             const linkedPayments = getClientPayments(client);
             const linkedContracts = getClientContracts(client);
-            const primaryContract = linkedContracts[0];
             const isExpanded = expandedClientId === client.id;
             const studentNames = getStudents(client.id, client.student_names);
-            const displayCpf = client.cpf || primaryContract?.cpf || "CPF não informado";
-            const displayPhone = client.phone || primaryContract?.phone;
-            const displayEmail = client.email || primaryContract?.email;
-            const displayAddress = client.address || formatContractAddress(primaryContract);
-            const displayRg = primaryContract?.rg;
 
             return (
               <div key={`${client.source}-${client.id}-${client.contract_ids?.[0] || "base"}`} className={`glass-card p-4 space-y-4 ${!client.active ? "opacity-60" : ""}`}>
@@ -715,7 +524,7 @@ const AdminClients = () => {
                         </Badge>
                       )}
                       <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                        {paymentCount} parcelas
+                        {linkedPayments.length} parcelas
                       </Badge>
                       {client.source === "contract_snapshot" && (
                         <Badge variant="outline" className="text-[10px] px-1.5 py-0">
@@ -723,16 +532,25 @@ const AdminClients = () => {
                         </Badge>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground">CPF: {displayCpf} • {unitMap[client.unit_id || ""] || "—"}</p>
-                    {(displayPhone || displayEmail) && (
-                      <p className="text-xs text-muted-foreground">{[displayPhone ? `Telefone: ${displayPhone}` : null, displayEmail ? `E-mail: ${displayEmail}` : null].filter(Boolean).join(" • ")}</p>
+                    <p className="text-xs text-muted-foreground">{client.cpf || "CPF não informado"} • {unitMap[client.unit_id || ""] || "—"}</p>
+                    {(client.phone || client.email) && (
+                      <p className="text-xs text-muted-foreground">{[client.phone, client.email].filter(Boolean).join(" • ")}</p>
                     )}
-                    {displayRg && <p className="text-xs text-muted-foreground">RG: {displayRg}</p>}
-                    {displayAddress && <p className="text-xs text-muted-foreground">Endereço: {displayAddress}</p>}
                     {studentNames && <p className="text-xs text-muted-foreground">Aluno(s): {studentNames}</p>}
-                    
+                    {linkedContracts.length > 0 && (
+                      <div className="space-y-1">
+                        {linkedContracts.map((contract) => (
+                          <p key={contract.id} className="text-xs text-muted-foreground">
+                            📄 {contract.contract_number ? `Nº ${contract.contract_number} — ` : ""}{contract.description}
+                            <span className={`ml-1.5 inline-block text-[10px] px-1.5 py-0 rounded-full border font-medium ${contract.status === "ACTIVE" ? "bg-green-500/15 text-green-700 border-green-500/30" : contract.status === "CANCELLED" ? "bg-destructive/15 text-destructive border-destructive/30" : "bg-muted text-muted-foreground border-border"}`}>
+                              {contract.status === "ACTIVE" ? "Ativo" : contract.status === "CANCELLED" ? "Cancelado" : contract.status}
+                            </span>
+                          </p>
+                        ))}
+                      </div>
+                    )}
                     <div className="flex flex-wrap gap-2 pt-1">
-                      <Button variant="outline" size="sm" onClick={() => handleExpandClient(client.id, client.contract_ids || [])}>
+                      <Button variant="outline" size="sm" onClick={() => setExpandedClientId(isExpanded ? null : client.id)}>
                         {isExpanded ? <ChevronUp size={14} className="mr-1" /> : <ChevronDown size={14} className="mr-1" />}
                         Parcelas vinculadas
                       </Button>
@@ -741,37 +559,6 @@ const AdminClients = () => {
                       </Button>
                       <Button variant="outline" size="sm" onClick={() => navigate(`/admin/cobrancas?responsible=${client.id}&create=manual`)}>
                         Adicionar parcela
-                      </Button>
-                      {client.source === "profile" && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-1.5"
-                          onClick={() => handleManualSync(client)}
-                          disabled={syncingClientId === client.id}
-                        >
-                          {syncingClientId === client.id ? <Loader2 size={14} className="animate-spin" /> : <RefreshCcw size={14} />}
-                          Sincronizar com Asaas
-                        </Button>
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5 text-green-700 border-green-500/30 hover:bg-green-500/10"
-                        onClick={() => handleSendAccess(client)}
-                        disabled={!client.active || !client.phone || client.source !== "profile"}
-                        title={
-                          client.source !== "profile"
-                            ? "Disponível apenas para clientes com acesso ao app"
-                            : !client.active
-                              ? "Cliente sem login ativo"
-                              : client.phone
-                                ? "Enviar credenciais via WhatsApp"
-                                : "Sem telefone cadastrado"
-                        }
-                      >
-                        <MessageCircle size={14} />
-                        Notificar APP
                       </Button>
                     </div>
                   </div>

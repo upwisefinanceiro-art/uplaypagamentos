@@ -36,20 +36,20 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    const token = authHeader.replace("Bearer ", "");
-    let callerId: string | null = null;
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      callerId = payload.sub || null;
-    } catch { /* invalid token */ }
+    const supabaseUser = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
 
-    if (!callerId) {
+    const {
+      data: { user: caller },
+    } = await supabaseUser.auth.getUser();
+
+    if (!caller) {
       return new Response(JSON.stringify({ error: "Não autorizado" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const caller = { id: callerId };
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
     const body: ChargeInput = await req.json();
