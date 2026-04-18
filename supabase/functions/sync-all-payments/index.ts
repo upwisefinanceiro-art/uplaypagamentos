@@ -163,11 +163,16 @@ Deno.serve(async (req) => {
         const asaasData = await res.json();
         const newStatus = statusMap[asaasData.status] || payment.status;
 
+        // Map billing type to payment method
+        const billingTypeMap: Record<string, string> = { PIX: "PIX", BOLETO: "BOLETO", CREDIT_CARD: "CARD" };
+        const resolvedMethod = billingTypeMap[asaasData.billingType] || payment.payment_method;
+
         const updateData: Record<string, unknown> = {
           status: newStatus,
           invoice_url: asaasData.invoiceUrl || undefined,
           boleto_url: asaasData.bankSlipUrl || undefined,
           boleto_barcode: asaasData.identificationField || undefined,
+          payment_method: resolvedMethod || undefined,
           raw_response: asaasData,
         };
 
@@ -190,6 +195,17 @@ Deno.serve(async (req) => {
 
         if (newStatus !== payment.status) {
           results.push({ id: payment.id, action: "refreshed", oldStatus: payment.status, newStatus });
+          // Log status change for audit
+          await supabase.from("webhook_logs").insert({
+            event: "SYNC_ALL_STATUS_CHANGED",
+            asaas_payment_id: payment.asaas_payment_id,
+            local_payment_id: payment.id,
+            unit_id: payment.unit_id,
+            old_status: payment.status,
+            new_status: newStatus,
+            payload: { source: "sync-all-payments", asaas_status: asaasData.status, payment_date: asaasData.paymentDate || null },
+            processed: true,
+          });
         }
         synced++;
       } catch {
