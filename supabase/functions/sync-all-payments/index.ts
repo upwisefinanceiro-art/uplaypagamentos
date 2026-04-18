@@ -91,11 +91,16 @@ Deno.serve(async (req) => {
     } catch { /* no body */ }
 
     // ── PHASE 1: Refresh existing Asaas payments ──
+    // Scope: PENDING/OVERDUE always + PAID nos últimos 90 dias (revalidação)
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    const ninetyDaysAgoStr = ninetyDaysAgo.toISOString();
+
     let refreshQuery = supabase
       .from("payments")
-      .select("id, asaas_payment_id, unit_id, status, paid_at, pix_qr_code, pix_copy_paste")
+      .select("id, asaas_payment_id, unit_id, status, paid_at, pix_qr_code, pix_copy_paste, payment_method")
       .not("asaas_payment_id", "is", null)
-      .in("status", ["PENDING", "OVERDUE"]);
+      .or(`status.in.(PENDING,OVERDUE),and(status.eq.PAID,updated_at.gte.${ninetyDaysAgoStr})`);
 
     if (unitFilter) refreshQuery = refreshQuery.eq("unit_id", unitFilter);
 
