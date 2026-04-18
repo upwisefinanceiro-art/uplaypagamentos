@@ -53,42 +53,48 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    const supabaseUser = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    // Parse body once
+    let parsedBody: { unit_id?: string; scheduled?: boolean } = {};
+    try {
+      parsedBody = await req.json();
+    } catch { /* no body */ }
 
-    const { data: { user: caller } } = await supabaseUser.auth.getUser();
-    if (!caller) {
-      return new Response(JSON.stringify({ error: "Não autorizado" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const unitFilter: string | null = parsedBody.unit_id || null;
+    const isScheduled = parsedBody.scheduled === true;
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Check admin
-    const { data: callerRoles } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", caller.id);
-
-    const isAdmin = callerRoles?.some((r: { role: string }) =>
-      r.role === "ADMIN_MASTER" || r.role === "ADMIN_UNIDADE"
-    );
-    if (!isAdmin) {
-      return new Response(JSON.stringify({ error: "Sem permissão" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // Authorize: scheduled cron OR admin user
+    if (!isScheduled) {
+      const supabaseUser = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
       });
-    }
 
-    // Get optional unit_id filter
-    let unitFilter: string | null = null;
-    try {
-      const body = await req.json();
-      unitFilter = body.unit_id || null;
-    } catch { /* no body */ }
+      const { data: { user: caller } } = await supabaseUser.auth.getUser();
+      if (!caller) {
+        return new Response(JSON.stringify({ error: "Não autorizado" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: callerRoles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", caller.id);
+
+      const isAdmin = callerRoles?.some((r: { role: string }) =>
+        r.role === "ADMIN_MASTER" || r.role === "ADMIN_UNIDADE" || r.role === "SUPER_ADMIN"
+      );
+      if (!isAdmin) {
+        return new Response(JSON.stringify({ error: "Sem permissão" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    } else {
+      console.log("[sync-all-payments] Execução agendada (cron diário)");
+    }
 
     // ── PHASE 1: Refresh existing Asaas payments ──
     // Scope: PENDING/OVERDUE always + PAID nos últimos 90 dias (revalidação)
