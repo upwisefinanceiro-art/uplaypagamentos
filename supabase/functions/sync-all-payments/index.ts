@@ -53,49 +53,60 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    const supabaseUser = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    // Parse body once
+    let parsedBody: { unit_id?: string; scheduled?: boolean } = {};
+    try {
+      parsedBody = await req.json();
+    } catch { /* no body */ }
 
-    const { data: { user: caller } } = await supabaseUser.auth.getUser();
-    if (!caller) {
-      return new Response(JSON.stringify({ error: "Não autorizado" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const unitFilter: string | null = parsedBody.unit_id || null;
+    const isScheduled = parsedBody.scheduled === true;
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Check admin
-    const { data: callerRoles } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", caller.id);
-
-    const isAdmin = callerRoles?.some((r: { role: string }) =>
-      r.role === "ADMIN_MASTER" || r.role === "ADMIN_UNIDADE"
-    );
-    if (!isAdmin) {
-      return new Response(JSON.stringify({ error: "Sem permissão" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // Authorize: scheduled cron OR admin user
+    if (!isScheduled) {
+      const supabaseUser = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
       });
+
+      const { data: { user: caller } } = await supabaseUser.auth.getUser();
+      if (!caller) {
+        return new Response(JSON.stringify({ error: "Não autorizado" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: callerRoles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", caller.id);
+
+      const isAdmin = callerRoles?.some((r: { role: string }) =>
+        r.role === "ADMIN_MASTER" || r.role === "ADMIN_UNIDADE" || r.role === "SUPER_ADMIN"
+      );
+      if (!isAdmin) {
+        return new Response(JSON.stringify({ error: "Sem permissão" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    } else {
+      console.log("[sync-all-payments] Execução agendada (cron diário)");
     }
 
-    // Get optional unit_id filter
-    let unitFilter: string | null = null;
-    try {
-      const body = await req.json();
-      unitFilter = body.unit_id || null;
-    } catch { /* no body */ }
-
     // ── PHASE 1: Refresh existing Asaas payments ──
+    // Scope: PENDING/OVERDUE always + PAID nos últimos 90 dias (revalidação)
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    const ninetyDaysAgoStr = ninetyDaysAgo.toISOString();
+
     let refreshQuery = supabase
       .from("payments")
-      .select("id, asaas_payment_id, unit_id, status, paid_at, pix_qr_code, pix_copy_paste")
+      .select("id, asaas_payment_id, unit_id, status, paid_at, pix_qr_code, pix_copy_paste, payment_method")
       .not("asaas_payment_id", "is", null)
-      .in("status", ["PENDING", "OVERDUE"]);
+      .or(`status.in.(PENDING,OVERDUE),and(status.eq.PAID,updated_at.gte.${ninetyDaysAgoStr})`);
 
     if (unitFilter) refreshQuery = refreshQuery.eq("unit_id", unitFilter);
 
@@ -158,11 +169,16 @@ Deno.serve(async (req) => {
         const asaasData = await res.json();
         const newStatus = statusMap[asaasData.status] || payment.status;
 
+        // Map billing type to payment method
+        const billingTypeMap: Record<string, string> = { PIX: "PIX", BOLETO: "BOLETO", CREDIT_CARD: "CARD" };
+        const resolvedMethod = billingTypeMap[asaasData.billingType] || payment.payment_method;
+
         const updateData: Record<string, unknown> = {
           status: newStatus,
           invoice_url: asaasData.invoiceUrl || undefined,
           boleto_url: asaasData.bankSlipUrl || undefined,
           boleto_barcode: asaasData.identificationField || undefined,
+          payment_method: resolvedMethod || undefined,
           raw_response: asaasData,
         };
 
@@ -185,6 +201,17 @@ Deno.serve(async (req) => {
 
         if (newStatus !== payment.status) {
           results.push({ id: payment.id, action: "refreshed", oldStatus: payment.status, newStatus });
+          // Log status change for audit
+          await supabase.from("webhook_logs").insert({
+            event: "SYNC_ALL_STATUS_CHANGED",
+            asaas_payment_id: payment.asaas_payment_id,
+            local_payment_id: payment.id,
+            unit_id: payment.unit_id,
+            old_status: payment.status,
+            new_status: newStatus,
+            payload: { source: "sync-all-payments", asaas_status: asaasData.status, payment_date: asaasData.paymentDate || null },
+            processed: true,
+          });
         }
         synced++;
       } catch {
