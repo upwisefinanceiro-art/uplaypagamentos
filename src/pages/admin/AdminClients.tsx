@@ -221,6 +221,55 @@ const AdminClients = () => {
     fetchData();
   }, []);
 
+  const handleSyncAllAsaas = async () => {
+    if (!profile?.unit_id && !hasRole("ADMIN_MASTER") && !hasRole("SUPER_ADMIN")) return;
+
+    setSyncingAll(true);
+    try {
+      // For ADMIN_MASTER, sync all units of the company sequentially
+      const targetUnits = hasRole("ADMIN_MASTER") || hasRole("SUPER_ADMIN")
+        ? units.map((u) => u.id)
+        : profile?.unit_id ? [profile.unit_id] : [];
+
+      if (!targetUnits.length) {
+        toast({ title: "Nenhuma unidade disponível", variant: "destructive" });
+        return;
+      }
+
+      let totalUpdated = 0;
+      let totalProcessed = 0;
+      let totalErrors = 0;
+
+      for (const uid of targetUnits) {
+        const { data, error } = await supabase.functions.invoke("sync-clients-asaas", {
+          body: { unit_id: uid },
+        });
+        if (error || data?.error) {
+          totalErrors++;
+          continue;
+        }
+        totalUpdated += data?.updated || 0;
+        totalProcessed += data?.processed || 0;
+        totalErrors += data?.errors || 0;
+      }
+
+      toast({
+        title: "Sincronização concluída",
+        description: `${totalUpdated} cliente(s) atualizado(s) de ${totalProcessed} processado(s)${totalErrors ? ` — ${totalErrors} erro(s)` : ""}`,
+      });
+
+      await fetchData();
+    } catch (err) {
+      toast({
+        title: "Erro ao sincronizar",
+        description: err instanceof Error ? err.message : "Erro inesperado",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncingAll(false);
+    }
+  };
+
   useEffect(() => {
     if (profile?.unit_id && !formUnitId) setFormUnitId(profile.unit_id);
   }, [profile, formUnitId]);
