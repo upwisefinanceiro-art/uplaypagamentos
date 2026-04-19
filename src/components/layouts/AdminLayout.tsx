@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   KeyRound,
   Package,
+  TrendingUp,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -26,6 +27,7 @@ const menuItems = [
   { path: "/admin/clientes", icon: UserCheck, label: "Clientes", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
   { path: "/admin/contratos", icon: FileText, label: "Contratos", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
   { path: "/admin/cobrancas", icon: CreditCard, label: "Cobranças", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
+  { path: "/admin/financeiro", icon: TrendingUp, label: "Financeiro Avançado", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
   { path: "/admin/estoque", icon: Package, label: "Estoque", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
   { path: "/admin/cobrancas-saas", icon: CreditCard, label: "Cobranças SaaS", roles: ["ADMIN_MASTER"] },
   { path: "/admin/planos-saas", icon: Package, label: "Planos SaaS", roles: ["ADMIN_MASTER"] },
