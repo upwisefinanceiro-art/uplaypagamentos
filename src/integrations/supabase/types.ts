@@ -435,6 +435,90 @@ export type Database = {
           },
         ]
       }
+      payment_inconsistencies: {
+        Row: {
+          asaas_due_date: string | null
+          asaas_paid_at: string | null
+          asaas_payment_id: string | null
+          asaas_status: string | null
+          asaas_value: number | null
+          company_id: string | null
+          created_at: string
+          details: Json | null
+          detection_count: number
+          error_type: string
+          id: string
+          last_detected_at: string
+          payment_id: string | null
+          resolution_action: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          responsible_id: string | null
+          responsible_name: string | null
+          severity: string
+          system_due_date: string | null
+          system_paid_at: string | null
+          system_status: string | null
+          system_value: number | null
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          asaas_due_date?: string | null
+          asaas_paid_at?: string | null
+          asaas_payment_id?: string | null
+          asaas_status?: string | null
+          asaas_value?: number | null
+          company_id?: string | null
+          created_at?: string
+          details?: Json | null
+          detection_count?: number
+          error_type: string
+          id?: string
+          last_detected_at?: string
+          payment_id?: string | null
+          resolution_action?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          responsible_id?: string | null
+          responsible_name?: string | null
+          severity?: string
+          system_due_date?: string | null
+          system_paid_at?: string | null
+          system_status?: string | null
+          system_value?: number | null
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          asaas_due_date?: string | null
+          asaas_paid_at?: string | null
+          asaas_payment_id?: string | null
+          asaas_status?: string | null
+          asaas_value?: number | null
+          company_id?: string | null
+          created_at?: string
+          details?: Json | null
+          detection_count?: number
+          error_type?: string
+          id?: string
+          last_detected_at?: string
+          payment_id?: string | null
+          resolution_action?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          responsible_id?: string | null
+          responsible_name?: string | null
+          severity?: string
+          system_due_date?: string | null
+          system_paid_at?: string | null
+          system_status?: string | null
+          system_value?: number | null
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           asaas_payment_id: string | null
