@@ -125,7 +125,7 @@ const AdminClients = () => {
   const [dependencyBlocker, setDependencyBlocker] = useState<{ client: ClientRow; paymentCount: number; contractCount: number } | null>(null);
   const [syncingAll, setSyncingAll] = useState(false);
   const { toast } = useToast();
-  const { profile, hasRole } = useAuth();
+  const { user, profile, hasRole } = useAuth();
 
   const [formName, setFormName] = useState("");
   const [formCpf, setFormCpf] = useState("");
