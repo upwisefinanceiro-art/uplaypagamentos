@@ -1104,6 +1104,36 @@ export type Database = {
           },
         ]
       }
+      unit_financial_costs: {
+        Row: {
+          cost_per_student: number
+          created_at: string
+          fixed_monthly_cost: number
+          id: string
+          notes: string | null
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          cost_per_student?: number
+          created_at?: string
+          fixed_monthly_cost?: number
+          id?: string
+          notes?: string | null
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          cost_per_student?: number
+          created_at?: string
+          fixed_monthly_cost?: number
+          id?: string
+          notes?: string | null
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       units: {
         Row: {
           active: boolean
