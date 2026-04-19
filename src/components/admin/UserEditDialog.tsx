@@ -110,6 +110,55 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
     );
   };
 
+  const handleSyncAsaas = async () => {
+    if (!user) return;
+    setSyncingAsaas(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-clients-asaas", {
+        body: { profile_id: user.id },
+      });
+      if (error || data?.error) {
+        toast({
+          title: "Erro ao sincronizar",
+          description: error?.message || data?.error,
+          variant: "destructive",
+        });
+        return;
+      }
+      if (data?.updated > 0) {
+        const fields = data.details?.[0]?.fields?.join(", ") || "";
+        toast({
+          title: "Dados atualizados do Asaas",
+          description: fields ? `Campos: ${fields}` : "Cliente sincronizado.",
+        });
+        // Reload profile from DB
+        const { data: fresh } = await supabase
+          .from("profiles")
+          .select("full_name, cpf, phone, email, address, unit_id")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (fresh) {
+          setName(fresh.full_name || "");
+          setCpf(fresh.cpf || "");
+          setPhone(fresh.phone || "");
+          setEmail(fresh.email || "");
+          setAddress(fresh.address || "");
+        }
+        await Promise.resolve(onSaved());
+      } else {
+        toast({ title: "Nenhuma atualização necessária", description: "Dados já estão alinhados com o Asaas." });
+      }
+    } catch (err) {
+      toast({
+        title: "Erro ao sincronizar",
+        description: err instanceof Error ? err.message : "Erro inesperado",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncingAsaas(false);
+    }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
