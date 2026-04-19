@@ -460,6 +460,9 @@ const AdminClients = () => {
     }
 
     toast({ title: "WhatsApp aberto", description: `Mensagem pronta para ${client.full_name}.` });
+  };
+
+  const getStudents = (responsibleId: string, fallbackNames?: string[]) => {
     const namesFromStudents = students
       .filter((student) => student.responsible_id === responsibleId)
       .map((student) => student.full_name);
