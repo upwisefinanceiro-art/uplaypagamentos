@@ -44,6 +44,57 @@ export type Database = {
         }
         Relationships: []
       }
+      backup_logs: {
+        Row: {
+          action: string
+          company_id: string | null
+          created_at: string
+          error_message: string | null
+          format: string
+          id: string
+          metadata: Json | null
+          performed_by: string
+          performed_by_name: string | null
+          scope: string
+          size_bytes: number | null
+          status: string
+          tables_included: string[] | null
+          total_records: number | null
+        }
+        Insert: {
+          action?: string
+          company_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          format?: string
+          id?: string
+          metadata?: Json | null
+          performed_by: string
+          performed_by_name?: string | null
+          scope?: string
+          size_bytes?: number | null
+          status?: string
+          tables_included?: string[] | null
+          total_records?: number | null
+        }
+        Update: {
+          action?: string
+          company_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          format?: string
+          id?: string
+          metadata?: Json | null
+          performed_by?: string
+          performed_by_name?: string | null
+          scope?: string
+          size_bytes?: number | null
+          status?: string
+          tables_included?: string[] | null
+          total_records?: number | null
+        }
+        Relationships: []
+      }
       client_notifications: {
         Row: {
           created_at: string
