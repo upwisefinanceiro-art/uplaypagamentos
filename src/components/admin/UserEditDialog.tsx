@@ -224,6 +224,20 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
         <DialogHeader>
           <DialogTitle className="text-foreground">Editar Cadastro</DialogTitle>
         </DialogHeader>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="w-full gap-2"
+          onClick={handleSyncAsaas}
+          disabled={syncingAsaas || !user}
+        >
+          {syncingAsaas ? (
+            <><Loader2 size={14} className="animate-spin" /> Buscando dados no Asaas...</>
+          ) : (
+            <><RefreshCw size={14} /> Atualizar dados do Asaas</>
+          )}
+        </Button>
         <form className="space-y-4" onSubmit={handleSave}>
           <div className="space-y-2">
             <Label className="text-foreground">Nome *</Label>
