@@ -123,6 +123,7 @@ const AdminClients = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [editTarget, setEditTarget] = useState<ClientRow | null>(null);
   const [dependencyBlocker, setDependencyBlocker] = useState<{ client: ClientRow; paymentCount: number; contractCount: number } | null>(null);
+  const [syncingAll, setSyncingAll] = useState(false);
   const { toast } = useToast();
   const { profile, hasRole } = useAuth();
 
