@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Trash2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,6 +47,7 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
   const [address, setAddress] = useState("");
   const [unitId, setUnitId] = useState("");
   const [saving, setSaving] = useState(false);
+  const [syncingAsaas, setSyncingAsaas] = useState(false);
   const [studentsEdit, setStudentsEdit] = useState<StudentEdit[]>([]);
   const [contractsEdit, setContractsEdit] = useState<ContractEdit[]>([]);
   const [loadingRelated, setLoadingRelated] = useState(false);
@@ -107,6 +108,55 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
     setContractsEdit((prev) =>
       prev.map((c, i) => (i === index ? { ...c, contract_number: value, dirty: true } : c))
     );
+  };
+
+  const handleSyncAsaas = async () => {
+    if (!user) return;
+    setSyncingAsaas(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-clients-asaas", {
+        body: { profile_id: user.id },
+      });
+      if (error || data?.error) {
+        toast({
+          title: "Erro ao sincronizar",
+          description: error?.message || data?.error,
+          variant: "destructive",
+        });
+        return;
+      }
+      if (data?.updated > 0) {
+        const fields = data.details?.[0]?.fields?.join(", ") || "";
+        toast({
+          title: "Dados atualizados do Asaas",
+          description: fields ? `Campos: ${fields}` : "Cliente sincronizado.",
+        });
+        // Reload profile from DB
+        const { data: fresh } = await supabase
+          .from("profiles")
+          .select("full_name, cpf, phone, email, address, unit_id")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (fresh) {
+          setName(fresh.full_name || "");
+          setCpf(fresh.cpf || "");
+          setPhone(fresh.phone || "");
+          setEmail(fresh.email || "");
+          setAddress(fresh.address || "");
+        }
+        await Promise.resolve(onSaved());
+      } else {
+        toast({ title: "Nenhuma atualização necessária", description: "Dados já estão alinhados com o Asaas." });
+      }
+    } catch (err) {
+      toast({
+        title: "Erro ao sincronizar",
+        description: err instanceof Error ? err.message : "Erro inesperado",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncingAsaas(false);
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -174,6 +224,20 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
         <DialogHeader>
           <DialogTitle className="text-foreground">Editar Cadastro</DialogTitle>
         </DialogHeader>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="w-full gap-2"
+          onClick={handleSyncAsaas}
+          disabled={syncingAsaas || !user}
+        >
+          {syncingAsaas ? (
+            <><Loader2 size={14} className="animate-spin" /> Buscando dados no Asaas...</>
+          ) : (
+            <><RefreshCw size={14} /> Atualizar dados do Asaas</>
+          )}
+        </Button>
         <form className="space-y-4" onSubmit={handleSave}>
           <div className="space-y-2">
             <Label className="text-foreground">Nome *</Label>

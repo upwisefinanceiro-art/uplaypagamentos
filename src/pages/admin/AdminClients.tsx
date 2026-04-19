@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, ChevronDown, ChevronUp, Loader2, Plus, Search } from "lucide-react";
+import { Bell, ChevronDown, ChevronUp, Loader2, Plus, RefreshCw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -123,6 +123,7 @@ const AdminClients = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [editTarget, setEditTarget] = useState<ClientRow | null>(null);
   const [dependencyBlocker, setDependencyBlocker] = useState<{ client: ClientRow; paymentCount: number; contractCount: number } | null>(null);
+  const [syncingAll, setSyncingAll] = useState(false);
   const { toast } = useToast();
   const { profile, hasRole } = useAuth();
 
@@ -219,6 +220,55 @@ const AdminClients = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const handleSyncAllAsaas = async () => {
+    if (!profile?.unit_id && !hasRole("ADMIN_MASTER") && !hasRole("SUPER_ADMIN")) return;
+
+    setSyncingAll(true);
+    try {
+      // For ADMIN_MASTER, sync all units of the company sequentially
+      const targetUnits = hasRole("ADMIN_MASTER") || hasRole("SUPER_ADMIN")
+        ? units.map((u) => u.id)
+        : profile?.unit_id ? [profile.unit_id] : [];
+
+      if (!targetUnits.length) {
+        toast({ title: "Nenhuma unidade disponível", variant: "destructive" });
+        return;
+      }
+
+      let totalUpdated = 0;
+      let totalProcessed = 0;
+      let totalErrors = 0;
+
+      for (const uid of targetUnits) {
+        const { data, error } = await supabase.functions.invoke("sync-clients-asaas", {
+          body: { unit_id: uid },
+        });
+        if (error || data?.error) {
+          totalErrors++;
+          continue;
+        }
+        totalUpdated += data?.updated || 0;
+        totalProcessed += data?.processed || 0;
+        totalErrors += data?.errors || 0;
+      }
+
+      toast({
+        title: "Sincronização concluída",
+        description: `${totalUpdated} cliente(s) atualizado(s) de ${totalProcessed} processado(s)${totalErrors ? ` — ${totalErrors} erro(s)` : ""}`,
+      });
+
+      await fetchData();
+    } catch (err) {
+      toast({
+        title: "Erro ao sincronizar",
+        description: err instanceof Error ? err.message : "Erro inesperado",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncingAll(false);
+    }
+  };
 
   useEffect(() => {
     if (profile?.unit_id && !formUnitId) setFormUnitId(profile.unit_id);
@@ -429,9 +479,22 @@ const AdminClients = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h1 className="text-xl font-bold text-foreground">Clientes (Responsáveis)</h1>
-        <Dialog
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={handleSyncAllAsaas}
+            disabled={syncingAll || loading}
+            title="Atualiza nome, email, telefone e endereço dos clientes a partir do Asaas"
+          >
+            {syncingAll ? (
+              <><Loader2 size={16} className="mr-2 animate-spin" /> Sincronizando...</>
+            ) : (
+              <><RefreshCw size={16} className="mr-2" /> Sincronizar do Asaas</>
+            )}
+          </Button>
+          <Dialog
           open={dialogOpen}
           onOpenChange={(open) => {
             setDialogOpen(open);
@@ -495,6 +558,7 @@ const AdminClients = () => {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="flex items-center gap-4">
