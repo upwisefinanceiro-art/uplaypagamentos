@@ -1007,6 +1007,41 @@ const AdminClients = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={bulkConfirmOpen} onOpenChange={(open) => !bulkSending && setBulkConfirmOpen(open)}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-foreground">Notificar App em massa</AlertDialogTitle>
+            <AlertDialogDescription>
+              {bulkEligible.length === 0 ? (
+                <>Nenhum cliente elegível encontrado. Critérios: ativo, com e-mail real cadastrado, com WhatsApp válido e que ainda não recebeu o convite.</>
+              ) : (
+                <>
+                  Serão abertas <strong>{bulkEligible.length}</strong> aba(s) do WhatsApp em sequência, uma para cada cliente elegível (ativo, com e-mail real, telefone válido e sem convite anterior).
+                  <br /><br />
+                  <span className="text-warning font-medium">Importante:</span> seu navegador pode pedir permissão para abrir múltiplas janelas. Em cada aba, basta clicar em <em>Enviar</em> no WhatsApp.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-border" disabled={bulkSending}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleRunBulkInvite();
+              }}
+              disabled={bulkSending || bulkEligible.length === 0}
+              className="bg-success hover:bg-success/90 text-success-foreground"
+            >
+              {bulkSending ? <Loader2 size={14} className="animate-spin mr-2" /> : <MessageCircle size={14} className="mr-2" />}
+              Enviar para {bulkEligible.length} cliente(s)
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
