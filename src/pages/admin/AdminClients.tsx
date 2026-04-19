@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, ChevronDown, ChevronUp, Loader2, Plus, RefreshCw, Search } from "lucide-react";
+import { Bell, ChevronDown, ChevronUp, Loader2, MessageCircle, Plus, RefreshCw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
