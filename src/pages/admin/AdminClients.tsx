@@ -643,6 +643,18 @@ const AdminClients = () => {
               <><RefreshCw size={16} className="mr-2" /> Sincronizar do Asaas</>
             )}
           </Button>
+          <Button
+            className="bg-success hover:bg-success/90 text-success-foreground"
+            onClick={handleOpenBulkInvite}
+            disabled={bulkLoading || loading}
+            title="Envia convite de acesso ao app via WhatsApp para clientes ativos que ainda não receberam"
+          >
+            {bulkLoading ? (
+              <><Loader2 size={16} className="mr-2 animate-spin" /> Calculando...</>
+            ) : (
+              <><MessageCircle size={16} className="mr-2" /> Notificar App em massa</>
+            )}
+          </Button>
           <Dialog
           open={dialogOpen}
           onOpenChange={(open) => {
