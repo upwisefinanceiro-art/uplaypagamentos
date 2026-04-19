@@ -404,33 +404,9 @@ const AdminClients = () => {
     await fetchData();
   };
 
-  const handleNotifyAppWhatsApp = async (client: ClientRow) => {
-    if (!client.email || /@imported\.uplay\.app$/i.test(client.email) || /@uplay\.app$/i.test(client.email)) {
-      toast({
-        title: "E-mail inválido para envio",
-        description: "Este cliente não possui e-mail real cadastrado. Atualize o cadastro antes de enviar o acesso.",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (!client.phone) {
-      toast({
-        title: "Cliente sem WhatsApp cadastrado",
-        description: "Adicione um telefone ao cliente para enviar o acesso.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const cleanPhone = client.phone.replace(/\D/g, "");
-    if (cleanPhone.length < 10 || cleanPhone.length > 13) {
-      toast({ title: "Telefone inválido", variant: "destructive" });
-      return;
-    }
-    const fullPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
-
+  const buildAppAccessMessage = (client: ClientRow) => {
     const firstName = client.full_name.split(" ")[0] || client.full_name;
-    const message =
+    return (
       `Olá, *${firstName}*! 👋\n\n` +
       `Aqui é da *UPLAY Pagamentos*.\n\n` +
       `Seu acesso ao aplicativo já está disponível ✅\n\n` +
@@ -438,12 +414,43 @@ const AdminClients = () => {
       `📧 *E-mail:* ${client.email}\n` +
       `🔒 *Senha:* 12345678\n\n` +
       `Por favor, acesse o app e acompanhe seus pagamentos.\n\n` +
-      `Qualquer dúvida estamos à disposição! 😊`;
+      `Qualquer dúvida estamos à disposição! 😊`
+    );
+  };
 
+  const isEmailValidForInvite = (email: string | null | undefined) =>
+    !!email && !/@imported\.uplay\.app$/i.test(email) && !/@uplay\.app$/i.test(email);
+
+  const normalizePhoneToWa = (phone: string | null | undefined): string | null => {
+    if (!phone) return null;
+    const clean = phone.replace(/\D/g, "");
+    if (clean.length < 10 || clean.length > 13) return null;
+    return clean.startsWith("55") ? clean : `55${clean}`;
+  };
+
+  const handleNotifyAppWhatsApp = async (client: ClientRow) => {
+    if (!isEmailValidForInvite(client.email)) {
+      toast({
+        title: "E-mail inválido para envio",
+        description: "Este cliente não possui e-mail real cadastrado. Atualize o cadastro antes de enviar o acesso.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const fullPhone = normalizePhoneToWa(client.phone);
+    if (!fullPhone) {
+      toast({
+        title: "Cliente sem WhatsApp cadastrado",
+        description: "Adicione um telefone válido ao cliente para enviar o acesso.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const message = buildAppAccessMessage(client);
     const url = `https://wa.me/${fullPhone}?text=${encodeURIComponent(message)}`;
     window.open(url, "_blank");
 
-    // Log (non-blocking)
     if (user) {
       supabase
         .from("whatsapp_message_logs")
@@ -461,6 +468,86 @@ const AdminClients = () => {
 
     toast({ title: "WhatsApp aberto", description: `Mensagem pronta para ${client.full_name}.` });
   };
+
+  const getEligibleForBulkInvite = async (): Promise<ClientRow[]> => {
+    // Filter unit-scoped active profile clients with valid email + phone
+    const candidates = clients.filter(
+      (c) =>
+        c.source === "profile" &&
+        c.active &&
+        isEmailValidForInvite(c.email) &&
+        normalizePhoneToWa(c.phone) !== null,
+    );
+    if (!candidates.length) return [];
+
+    // Exclude those who already received APP_ACCESS_INVITE
+    const ids = candidates.map((c) => c.id);
+    const { data: alreadySent } = await supabase
+      .from("whatsapp_message_logs")
+      .select("responsible_id")
+      .eq("channel", "APP_ACCESS_INVITE")
+      .in("responsible_id", ids);
+    const sentSet = new Set((alreadySent || []).map((r: { responsible_id: string }) => r.responsible_id));
+    return candidates.filter((c) => !sentSet.has(c.id));
+  };
+
+  const handleOpenBulkInvite = async () => {
+    setBulkLoading(true);
+    try {
+      const eligible = await getEligibleForBulkInvite();
+      setBulkEligible(eligible);
+      setBulkConfirmOpen(true);
+    } catch (err) {
+      toast({
+        title: "Erro ao calcular elegíveis",
+        description: err instanceof Error ? err.message : "Erro inesperado",
+        variant: "destructive",
+      });
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleRunBulkInvite = async () => {
+    if (!bulkEligible.length || !user) {
+      setBulkConfirmOpen(false);
+      return;
+    }
+    setBulkSending(true);
+    let opened = 0;
+    let logFailures = 0;
+
+    for (let i = 0; i < bulkEligible.length; i++) {
+      const client = bulkEligible[i];
+      const fullPhone = normalizePhoneToWa(client.phone);
+      if (!fullPhone) continue;
+      const message = buildAppAccessMessage(client);
+      const url = `https://wa.me/${fullPhone}?text=${encodeURIComponent(message)}`;
+      const win = window.open(url, "_blank");
+      if (win) opened++;
+
+      const { error } = await supabase.from("whatsapp_message_logs").insert({
+        responsible_id: client.id,
+        phone: fullPhone,
+        message_text: message,
+        channel: "APP_ACCESS_INVITE",
+        sent_by: user.id,
+      });
+      if (error) logFailures++;
+
+      // Small delay so the browser doesn't block popups
+      await new Promise((r) => setTimeout(r, 350));
+    }
+
+    setBulkSending(false);
+    setBulkConfirmOpen(false);
+    setBulkEligible([]);
+    toast({
+      title: "Envio em massa concluído",
+      description: `${opened} aba(s) do WhatsApp aberta(s)${logFailures ? ` — ${logFailures} log(s) falharam` : ""}.`,
+    });
+  };
+
 
   const getStudents = (responsibleId: string, fallbackNames?: string[]) => {
     const namesFromStudents = students
