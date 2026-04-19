@@ -47,6 +47,7 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
   const [address, setAddress] = useState("");
   const [unitId, setUnitId] = useState("");
   const [saving, setSaving] = useState(false);
+  const [syncingAsaas, setSyncingAsaas] = useState(false);
   const [studentsEdit, setStudentsEdit] = useState<StudentEdit[]>([]);
   const [contractsEdit, setContractsEdit] = useState<ContractEdit[]>([]);
   const [loadingRelated, setLoadingRelated] = useState(false);
