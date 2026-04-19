@@ -707,10 +707,19 @@ const AdminClients = () => {
                       <Button variant="outline" size="sm" onClick={() => navigate(`/admin/cobrancas?responsible=${client.id}&create=manual`)}>
                         Adicionar parcela
                       </Button>
+                      <Button
+                        size="sm"
+                        className="bg-success hover:bg-success/90 text-success-foreground"
+                        onClick={() => handleNotifyAppWhatsApp(client)}
+                        title="Enviar acesso ao app via WhatsApp"
+                      >
+                        <MessageCircle size={14} className="mr-1" />
+                        Notificar App
+                      </Button>
                       {client.source === "profile" && (
                         <Button variant="outline" size="sm" onClick={() => setNotifyTarget(client)}>
                           <Bell size={14} className="mr-1" />
-                          Notificar app
+                          Notificação no app
                         </Button>
                       )}
                     </div>
