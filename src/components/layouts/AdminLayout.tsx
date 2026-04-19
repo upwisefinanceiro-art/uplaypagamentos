@@ -13,6 +13,7 @@ import {
   KeyRound,
   Package,
   TrendingUp,
+  Database,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -31,6 +32,7 @@ const menuItems = [
   { path: "/admin/estoque", icon: Package, label: "Estoque", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
   { path: "/admin/cobrancas-saas", icon: CreditCard, label: "Cobranças SaaS", roles: ["ADMIN_MASTER"] },
   { path: "/admin/planos-saas", icon: Package, label: "Planos SaaS", roles: ["ADMIN_MASTER"] },
+  { path: "/admin/backup", icon: Database, label: "Backup", roles: ["ADMIN_MASTER"] },
 ];
 
 const AdminLayout = () => {

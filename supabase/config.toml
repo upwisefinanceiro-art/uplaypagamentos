@@ -44,3 +44,9 @@ verify_jwt = false
 
 [functions.detect-payment-inconsistencies]
 verify_jwt = false
+
+[functions.generate-backup]
+verify_jwt = false
+
+[functions.restore-backup]
+verify_jwt = false

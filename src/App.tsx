@@ -29,6 +29,7 @@ import AdminStock from "./pages/admin/AdminStock";
 import AdminCompanies from "./pages/admin/AdminCompanies";
 import AdminSaasBilling from "./pages/admin/AdminSaasBilling";
 import AdminSaasPlans from "./pages/admin/AdminSaasPlans";
+import AdminBackup from "./pages/admin/AdminBackup";
 import SuperAdminLayout from "./components/layouts/SuperAdminLayout";
 import SuperDashboard from "./pages/super/SuperDashboard";
 import SuperCompanies from "./pages/super/SuperCompanies";
@@ -93,6 +94,7 @@ const App = () => {
                 <Route path="estoque" element={<AdminStock />} />
                 <Route path="cobrancas-saas" element={<AdminSaasBilling />} />
                 <Route path="planos-saas" element={<AdminSaasPlans />} />
+                <Route path="backup" element={<AdminBackup />} />
                 <Route path="alterar-senha" element={<AppChangePassword />} />
               </Route>
 
