@@ -404,7 +404,62 @@ const AdminClients = () => {
     await fetchData();
   };
 
-  const getStudents = (responsibleId: string, fallbackNames?: string[]) => {
+  const handleNotifyAppWhatsApp = async (client: ClientRow) => {
+    if (!client.email || /@imported\.uplay\.app$/i.test(client.email) || /@uplay\.app$/i.test(client.email)) {
+      toast({
+        title: "E-mail inválido para envio",
+        description: "Este cliente não possui e-mail real cadastrado. Atualize o cadastro antes de enviar o acesso.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!client.phone) {
+      toast({
+        title: "Cliente sem WhatsApp cadastrado",
+        description: "Adicione um telefone ao cliente para enviar o acesso.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const cleanPhone = client.phone.replace(/\D/g, "");
+    if (cleanPhone.length < 10 || cleanPhone.length > 13) {
+      toast({ title: "Telefone inválido", variant: "destructive" });
+      return;
+    }
+    const fullPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
+
+    const firstName = client.full_name.split(" ")[0] || client.full_name;
+    const message =
+      `Olá, *${firstName}*! 👋\n\n` +
+      `Aqui é da *UPLAY Pagamentos*.\n\n` +
+      `Seu acesso ao aplicativo já está disponível ✅\n\n` +
+      `📲 *Acesse pelo link:*\nhttps://uplaypagamento.com.br\n\n` +
+      `📧 *E-mail:* ${client.email}\n` +
+      `🔒 *Senha:* 12345678\n\n` +
+      `Por favor, acesse o app e acompanhe seus pagamentos.\n\n` +
+      `Qualquer dúvida estamos à disposição! 😊`;
+
+    const url = `https://wa.me/${fullPhone}?text=${encodeURIComponent(message)}`;
+    window.open(url, "_blank");
+
+    // Log (non-blocking)
+    if (user) {
+      supabase
+        .from("whatsapp_message_logs")
+        .insert({
+          responsible_id: client.id,
+          phone: fullPhone,
+          message_text: message,
+          channel: "APP_ACCESS_INVITE",
+          sent_by: user.id,
+        })
+        .then(({ error }) => {
+          if (error) console.warn("[notify-app-wa] log failed", error.message);
+        });
+    }
+
+    toast({ title: "WhatsApp aberto", description: `Mensagem pronta para ${client.full_name}.` });
     const namesFromStudents = students
       .filter((student) => student.responsible_id === responsibleId)
       .map((student) => student.full_name);
