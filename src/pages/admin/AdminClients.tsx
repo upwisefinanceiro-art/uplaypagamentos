@@ -124,6 +124,10 @@ const AdminClients = () => {
   const [editTarget, setEditTarget] = useState<ClientRow | null>(null);
   const [dependencyBlocker, setDependencyBlocker] = useState<{ client: ClientRow; paymentCount: number; contractCount: number } | null>(null);
   const [syncingAll, setSyncingAll] = useState(false);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkSending, setBulkSending] = useState(false);
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const [bulkEligible, setBulkEligible] = useState<ClientRow[]>([]);
   const { toast } = useToast();
   const { user, profile, hasRole } = useAuth();
 
