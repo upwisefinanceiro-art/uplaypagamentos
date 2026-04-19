@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.import-asaas-data]
 verify_jwt = false
+
+[functions.detect-payment-inconsistencies]
+verify_jwt = false

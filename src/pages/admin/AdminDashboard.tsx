@@ -43,6 +43,7 @@ import DashboardUnitSummary from "@/components/dashboard/DashboardUnitSummary";
 import DashboardBirthdays, { type BirthdayPerson } from "@/components/dashboard/DashboardBirthdays";
 import DashboardDeliveries from "@/components/dashboard/DashboardDeliveries";
 import DashboardLowStock from "@/components/dashboard/DashboardLowStock";
+import DashboardInconsistencies from "@/components/dashboard/DashboardInconsistencies";
 import { useToast } from "@/hooks/use-toast";
 import { resolveWhatsAppChargeData } from "@/lib/asaas-payment";
 
@@ -479,6 +480,9 @@ const AdminDashboard = () => {
           </Select>
         </div>
       </div>
+
+      {/* Inconsistências Asaas × Sistema (alerta prioritário) */}
+      <DashboardInconsistencies unitFilter={unitFilter} units={units} />
 
       {/* KPI Cards */}
       <DashboardKpiCards
