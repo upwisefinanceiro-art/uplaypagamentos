@@ -67,6 +67,7 @@ export type DashboardPayment = {
   payment_method: string | null;
   payment_type: string;
   student_id: string | null;
+  raw_response: unknown;
 };
 
 export type DashboardUnit = {
@@ -144,7 +145,7 @@ const AdminDashboard = () => {
     const fetchData = async () => {
       setLoading(true);
       const [paymentsRes, unitsRes, profilesRes, studentsRes] = await Promise.all([
-        supabase.from("payments").select("id, status, value, final_value, due_date, paid_at, unit_id, responsible_id, installment_number, contract_id, checkout_url, invoice_url, boleto_url, pix_copy_paste, payment_method, payment_type, student_id"),
+        supabase.from("payments").select("id, status, value, final_value, due_date, paid_at, unit_id, responsible_id, installment_number, contract_id, checkout_url, invoice_url, boleto_url, pix_copy_paste, payment_method, payment_type, student_id, raw_response"),
         isMaster
           ? supabase.from("units").select("id, name").eq("active", true)
           : supabase.from("units").select("id, name").eq("id", userProfile?.unit_id ?? ""),
@@ -212,6 +213,15 @@ const AdminDashboard = () => {
       return d >= dateStart && d <= dateEnd;
     });
     const totalReceived = paidInPeriod.reduce((sum, p) => sum + (p.final_value ?? p.value), 0);
+
+    // Custo com taxas Asaas (despesa interna): bruto - líquido
+    const totalAsaasFees = paidInPeriod.reduce((sum, p) => {
+      const raw = (p.raw_response || {}) as Record<string, unknown>;
+      const v = typeof raw.value === "number" ? raw.value : Number(raw.value ?? 0);
+      const n = typeof raw.netValue === "number" ? raw.netValue : Number(raw.netValue ?? v);
+      const fee = v - n;
+      return sum + (fee > 0 ? fee : 0);
+    }, 0);
 
     // A receber: only FUTURE pending (due_date >= today, not overdue)
     const pendingFuture = fp.filter((p) => {
