@@ -104,7 +104,7 @@ Deno.serve(async (req) => {
 
     let refreshQuery = supabase
       .from("payments")
-      .select("id, asaas_payment_id, unit_id, status, paid_at, pix_qr_code, pix_copy_paste, payment_method")
+      .select("id, asaas_payment_id, unit_id, status, paid_at, pix_qr_code, pix_copy_paste, payment_method, value, original_value, final_value, due_date")
       .not("asaas_payment_id", "is", null)
       .or(`status.in.(PENDING,OVERDUE),and(status.eq.PAID,updated_at.gte.${ninetyDaysAgoStr})`);
 
@@ -182,8 +182,25 @@ Deno.serve(async (req) => {
           raw_response: asaasData,
         };
 
-        if (newStatus === "PAID" && !payment.paid_at) {
-          updateData.paid_at = asaasData.paymentDate || new Date().toISOString();
+        if (newStatus === "PAID") {
+          if (!payment.paid_at) {
+            updateData.paid_at = asaasData.paymentDate || new Date().toISOString();
+          }
+          // ── REGRA DE PONTUALIDADE: recalcula valor pago ──
+          const paymentDateStr = asaasData.paymentDate || (payment.paid_at ? String(payment.paid_at).slice(0, 10) : null);
+          const dueDateStr = asaasData.dueDate || payment.due_date;
+          const originalValue = Number((payment as any).original_value ?? payment.value);
+          const asaasNet = typeof asaasData.netValue === "number" ? asaasData.netValue : null;
+          const asaasValue = typeof asaasData.value === "number" ? asaasData.value : null;
+          let realPaidValue: number;
+          if (paymentDateStr && dueDateStr && paymentDateStr <= dueDateStr) {
+            realPaidValue = Number((payment as any).final_value ?? asaasNet ?? asaasValue ?? originalValue);
+          } else {
+            realPaidValue = Number(asaasValue ?? originalValue);
+          }
+          if (Number.isFinite(realPaidValue) && realPaidValue > 0) {
+            updateData.final_value = realPaidValue;
+          }
         }
 
         // Fetch PIX if needed

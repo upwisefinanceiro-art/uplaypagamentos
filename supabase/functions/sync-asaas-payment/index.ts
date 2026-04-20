@@ -212,8 +212,29 @@ Deno.serve(async (req) => {
         raw_response: asaasData,
       };
 
-      if (resolvedStatus === "PAID" && !payment.paid_at) {
-        updateData.paid_at = asaasData.paymentDate || new Date().toISOString();
+      if (resolvedStatus === "PAID") {
+        if (!payment.paid_at) {
+          updateData.paid_at = asaasData.paymentDate || new Date().toISOString();
+        }
+        // ── REGRA DE PONTUALIDADE: recalcula valor pago ──
+        // Fonte da verdade: Asaas (netValue / value) + datas (paymentDate vs dueDate)
+        const paymentDateStr = asaasData.paymentDate || (payment.paid_at ? String(payment.paid_at).slice(0, 10) : null);
+        const dueDateStr = asaasData.dueDate || payment.due_date;
+        const originalValue = Number(payment.original_value ?? payment.value);
+        const asaasNet = typeof asaasData.netValue === "number" ? asaasData.netValue : null;
+        const asaasValue = typeof asaasData.value === "number" ? asaasData.value : null;
+
+        let realPaidValue: number;
+        if (paymentDateStr && dueDateStr && paymentDateStr <= dueDateStr) {
+          // Pago no prazo: aplica desconto de pontualidade (mantém final_value local) ou usa netValue do Asaas
+          realPaidValue = Number(payment.final_value ?? asaasNet ?? asaasValue ?? originalValue);
+        } else {
+          // Pago em atraso: valor cheio (sem desconto)
+          realPaidValue = Number(asaasValue ?? originalValue);
+        }
+        if (Number.isFinite(realPaidValue) && realPaidValue > 0) {
+          updateData.final_value = realPaidValue;
+        }
       }
 
       const { error: updateErr } = await supabaseAdmin.from("payments").update(updateData).eq("id", payment_id);
