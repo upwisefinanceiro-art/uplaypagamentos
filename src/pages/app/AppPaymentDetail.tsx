@@ -387,7 +387,6 @@ const AppPaymentDetail = () => {
             </p>
           </div>
 
-        <div className="grid grid-cols-2 gap-3">
           {status === "PAID" ? (
             <div className="rounded-lg border border-success/40 bg-success/5 p-3 space-y-1">
               <p className="text-[11px] text-muted-foreground font-medium">Valor pago</p>
@@ -401,10 +400,7 @@ const AppPaymentDetail = () => {
                     )}
                     <p className="text-lg font-bold text-success">{formatCurrency(finalValue)}</p>
                     {showOriginalStrike && (
-                      <p className="text-[10px] text-success font-medium">✓ pago no prazo, com desconto</p>
-                    )}
-                    {!paidOnTime && payment.paid_at && (
-                      <p className="text-[10px] text-muted-foreground">pago em {new Date(payment.paid_at).toLocaleDateString("pt-BR")}</p>
+                      <p className="text-[10px] text-success font-medium">✓ pago no prazo</p>
                     )}
                   </>
                 );
