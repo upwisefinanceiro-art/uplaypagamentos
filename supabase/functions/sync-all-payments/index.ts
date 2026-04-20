@@ -186,18 +186,11 @@ Deno.serve(async (req) => {
           if (!payment.paid_at) {
             updateData.paid_at = asaasData.paymentDate || new Date().toISOString();
           }
-          // ── REGRA DE PONTUALIDADE: recalcula valor pago ──
-          const paymentDateStr = asaasData.paymentDate || (payment.paid_at ? String(payment.paid_at).slice(0, 10) : null);
-          const dueDateStr = asaasData.dueDate || payment.due_date;
+          // ── VALOR BRUTO ── usa Asaas.value (cobrança). netValue (líquido)
+          // é despesa interna e jamais é exibido ao cliente.
           const originalValue = Number((payment as any).original_value ?? payment.value);
-          const asaasNet = typeof asaasData.netValue === "number" ? asaasData.netValue : null;
           const asaasValue = typeof asaasData.value === "number" ? asaasData.value : null;
-          let realPaidValue: number;
-          if (paymentDateStr && dueDateStr && paymentDateStr <= dueDateStr) {
-            realPaidValue = Number(asaasNet ?? asaasValue ?? (payment as any).final_value ?? originalValue);
-          } else {
-            realPaidValue = Number(asaasValue ?? originalValue);
-          }
+          const realPaidValue = Number(asaasValue ?? originalValue);
           if (Number.isFinite(realPaidValue) && realPaidValue > 0) {
             updateData.final_value = realPaidValue;
           }

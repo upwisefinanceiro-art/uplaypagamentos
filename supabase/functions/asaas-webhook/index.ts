@@ -254,22 +254,16 @@ Deno.serve(async (req) => {
       boleto_url: payment.bankSlipUrl || undefined,
     };
 
-    // Set paid_at if status changed to PAID + recompute final_value via punctuality rule
+    // Set paid_at if status changed to PAID + grava VALOR BRUTO em final_value.
+    // NUNCA usar netValue (líquido) — netValue é despesa interna (taxa Asaas)
+    // exibida somente no painel administrativo /admin/taxas-asaas.
     if (newStatus === "PAID") {
       if (!localPayment.paid_at) {
         updateData.paid_at = payment.paymentDate || new Date().toISOString();
       }
-      const paymentDateStr = payment.paymentDate || (localPayment.paid_at ? String(localPayment.paid_at).slice(0, 10) : null);
-      const dueDateStr = payment.dueDate || (localPayment as any).due_date;
       const originalValue = Number((localPayment as any).original_value ?? (localPayment as any).value);
-      const asaasNet = typeof payment.netValue === "number" ? payment.netValue : null;
       const asaasValue = typeof payment.value === "number" ? payment.value : null;
-      let realPaidValue: number;
-      if (paymentDateStr && dueDateStr && paymentDateStr <= dueDateStr) {
-        realPaidValue = Number(asaasNet ?? asaasValue ?? (localPayment as any).final_value ?? originalValue);
-      } else {
-        realPaidValue = Number(asaasValue ?? originalValue);
-      }
+      const realPaidValue = Number(asaasValue ?? originalValue);
       if (Number.isFinite(realPaidValue) && realPaidValue > 0) {
         updateData.final_value = realPaidValue;
       }
