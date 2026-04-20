@@ -143,7 +143,7 @@ const AdminContracts = () => {
   const [cancelTarget, setCancelTarget] = useState<ContractRow | null>(null);
   const [contractPayments, setContractPayments] = useState<{ id: string; contract_id: string | null; status: string; due_date: string }[]>([]);
   const [accessModalOpen, setAccessModalOpen] = useState(false);
-  const [accessModalData, setAccessModalData] = useState<{ responsibleName: string; studentName: string; cpf: string; email?: string | null; phone?: string | null } | null>(null);
+  const [accessModalData, setAccessModalData] = useState<{ responsibleName: string; studentName: string; cpf: string; email?: string | null; phone?: string | null; unitId?: string | null } | null>(null);
   const { toast } = useToast();
   const { profile, hasRole } = useAuth();
 
@@ -516,6 +516,7 @@ const AdminContracts = () => {
           cpf: cpf.replace(/\D/g, ""),
           email: email || null,
           phone: phone || null,
+          unitId: resolvedUnitId || null,
         });
         setAccessModalOpen(true);
       }
