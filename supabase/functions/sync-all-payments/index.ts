@@ -194,7 +194,7 @@ Deno.serve(async (req) => {
           const asaasValue = typeof asaasData.value === "number" ? asaasData.value : null;
           let realPaidValue: number;
           if (paymentDateStr && dueDateStr && paymentDateStr <= dueDateStr) {
-            realPaidValue = Number((payment as any).final_value ?? asaasNet ?? asaasValue ?? originalValue);
+            realPaidValue = Number(asaasNet ?? asaasValue ?? (payment as any).final_value ?? originalValue);
           } else {
             realPaidValue = Number(asaasValue ?? originalValue);
           }

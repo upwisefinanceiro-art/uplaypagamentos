@@ -226,8 +226,8 @@ Deno.serve(async (req) => {
 
         let realPaidValue: number;
         if (paymentDateStr && dueDateStr && paymentDateStr <= dueDateStr) {
-          // Pago no prazo: aplica desconto de pontualidade (mantém final_value local) ou usa netValue do Asaas
-          realPaidValue = Number(payment.final_value ?? asaasNet ?? asaasValue ?? originalValue);
+          // Pago no prazo: usar sempre o valor real recebido do Asaas
+          realPaidValue = Number(asaasNet ?? asaasValue ?? payment.final_value ?? originalValue);
         } else {
           // Pago em atraso: valor cheio (sem desconto)
           realPaidValue = Number(asaasValue ?? originalValue);
