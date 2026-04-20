@@ -200,7 +200,7 @@ Deno.serve(async (req) => {
     // Find payment in our database (regular unit payments)
     const { data: localPayment, error: findErr } = await supabase
       .from("payments")
-      .select("id, unit_id, status, paid_at, pix_qr_code, pix_copy_paste, payment_method")
+      .select("id, unit_id, status, paid_at, pix_qr_code, pix_copy_paste, payment_method, value, original_value, final_value, due_date")
       .eq("asaas_payment_id", asaasPaymentId)
       .maybeSingle();
 
@@ -254,9 +254,25 @@ Deno.serve(async (req) => {
       boleto_url: payment.bankSlipUrl || undefined,
     };
 
-    // Set paid_at if status changed to PAID
-    if (newStatus === "PAID" && !localPayment.paid_at) {
-      updateData.paid_at = payment.paymentDate || new Date().toISOString();
+    // Set paid_at if status changed to PAID + recompute final_value via punctuality rule
+    if (newStatus === "PAID") {
+      if (!localPayment.paid_at) {
+        updateData.paid_at = payment.paymentDate || new Date().toISOString();
+      }
+      const paymentDateStr = payment.paymentDate || (localPayment.paid_at ? String(localPayment.paid_at).slice(0, 10) : null);
+      const dueDateStr = payment.dueDate || (localPayment as any).due_date;
+      const originalValue = Number((localPayment as any).original_value ?? (localPayment as any).value);
+      const asaasNet = typeof payment.netValue === "number" ? payment.netValue : null;
+      const asaasValue = typeof payment.value === "number" ? payment.value : null;
+      let realPaidValue: number;
+      if (paymentDateStr && dueDateStr && paymentDateStr <= dueDateStr) {
+        realPaidValue = Number((localPayment as any).final_value ?? asaasNet ?? asaasValue ?? originalValue);
+      } else {
+        realPaidValue = Number(asaasValue ?? originalValue);
+      }
+      if (Number.isFinite(realPaidValue) && realPaidValue > 0) {
+        updateData.final_value = realPaidValue;
+      }
     }
 
     // Save billing type from Asaas if we don't have a payment_method yet

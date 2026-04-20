@@ -387,13 +387,34 @@ const AppPaymentDetail = () => {
             </p>
           </div>
 
-          <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 space-y-1">
-            <p className="text-[11px] text-muted-foreground font-medium">Valor a pagar</p>
-            <p className="text-lg font-bold text-primary">{formatCurrency(finalValue)}</p>
-            {hasDiscount && dueDate >= today && (
-              <p className="text-[10px] text-muted-foreground">até {dueDateStr}</p>
-            )}
-          </div>
+          {status === "PAID" ? (
+            <div className="rounded-lg border border-success/40 bg-success/5 p-3 space-y-1">
+              <p className="text-[11px] text-muted-foreground font-medium">Valor pago</p>
+              {(() => {
+                const paidOnTime = payment.paid_at && payment.due_date && String(payment.paid_at).slice(0, 10) <= payment.due_date;
+                const showOriginalStrike = paidOnTime && originalValue > finalValue;
+                return (
+                  <>
+                    {showOriginalStrike && (
+                      <p className="text-[11px] text-muted-foreground line-through">{formatCurrency(originalValue)}</p>
+                    )}
+                    <p className="text-lg font-bold text-success">{formatCurrency(finalValue)}</p>
+                    {showOriginalStrike && (
+                      <p className="text-[10px] text-success font-medium">✓ pago no prazo</p>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 space-y-1">
+              <p className="text-[11px] text-muted-foreground font-medium">Valor a pagar</p>
+              <p className="text-lg font-bold text-primary">{formatCurrency(finalValue)}</p>
+              {hasDiscount && dueDate >= today && (
+                <p className="text-[10px] text-muted-foreground">até {dueDateStr}</p>
+              )}
+            </div>
+          )}
 
           <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-1">
             <p className="text-[11px] text-muted-foreground font-medium">Vencimento</p>
