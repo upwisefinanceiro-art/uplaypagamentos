@@ -846,7 +846,7 @@ Deno.serve(async (req) => {
         unit_id: unitId,
         value: payment.value || 0,
         original_value: payment.value || 0,
-        final_value: payment.netValue || payment.value || 0,
+        final_value: payment.value || 0,
         due_date: payment.dueDate,
         status,
         payment_method: paymentMethod,

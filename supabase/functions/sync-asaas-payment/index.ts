@@ -216,22 +216,13 @@ Deno.serve(async (req) => {
         if (!payment.paid_at) {
           updateData.paid_at = asaasData.paymentDate || new Date().toISOString();
         }
-        // ── REGRA DE PONTUALIDADE: recalcula valor pago ──
-        // Fonte da verdade: Asaas (netValue / value) + datas (paymentDate vs dueDate)
-        const paymentDateStr = asaasData.paymentDate || (payment.paid_at ? String(payment.paid_at).slice(0, 10) : null);
-        const dueDateStr = asaasData.dueDate || payment.due_date;
+        // ── VALOR BRUTO (cliente sempre vê o valor cheio cobrado/pago) ──
+        // Fonte da verdade: Asaas.value (BRUTO). NUNCA usar netValue (líquido) aqui,
+        // pois o netValue é o valor descontado da taxa Asaas — isso é despesa interna,
+        // exibida apenas no painel /admin/taxas-asaas.
         const originalValue = Number(payment.original_value ?? payment.value);
-        const asaasNet = typeof asaasData.netValue === "number" ? asaasData.netValue : null;
         const asaasValue = typeof asaasData.value === "number" ? asaasData.value : null;
-
-        let realPaidValue: number;
-        if (paymentDateStr && dueDateStr && paymentDateStr <= dueDateStr) {
-          // Pago no prazo: usar sempre o valor real recebido do Asaas
-          realPaidValue = Number(asaasNet ?? asaasValue ?? payment.final_value ?? originalValue);
-        } else {
-          // Pago em atraso: valor cheio (sem desconto)
-          realPaidValue = Number(asaasValue ?? originalValue);
-        }
+        const realPaidValue = Number(asaasValue ?? originalValue);
         if (Number.isFinite(realPaidValue) && realPaidValue > 0) {
           updateData.final_value = realPaidValue;
         }
