@@ -1,4 +1,4 @@
-import { CheckCircle2, Clock, AlertTriangle, Users, TrendingUp } from "lucide-react";
+import { CheckCircle2, Clock, AlertTriangle, Users, TrendingUp, Receipt } from "lucide-react";
 
 interface DashboardKpiCardsProps {
   totalReceived: number;
@@ -6,6 +6,7 @@ interface DashboardKpiCardsProps {
   totalOverdue: number;
   activeStudents: number;
   inadimplencia: number;
+  totalAsaasFees?: number;
   formatCurrency: (v: number) => string;
 }
 
@@ -35,6 +36,7 @@ const DashboardKpiCards = ({
   totalOverdue,
   activeStudents,
   inadimplencia,
+  totalAsaasFees = 0,
   formatCurrency,
 }: DashboardKpiCardsProps) => {
   return (
@@ -68,6 +70,22 @@ const DashboardKpiCards = ({
           color="text-primary"
           bgColor="bg-primary/10"
         />
+      </div>
+
+      {/* Custo com taxas Asaas (despesa interna, separado do faturamento) */}
+      <div className="glass-card p-4 border-l-4 border-l-destructive">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-md bg-destructive/10">
+              <Receipt size={16} className="text-destructive" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Custo com taxas Asaas (despesa)</p>
+              <p className="text-xs text-muted-foreground/70">Não confundir com faturamento</p>
+            </div>
+          </div>
+          <span className="text-xl font-bold text-destructive">- {formatCurrency(totalAsaasFees)}</span>
+        </div>
       </div>
 
       {/* Inadimplência indicator */}

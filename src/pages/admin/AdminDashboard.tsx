@@ -300,6 +300,7 @@ const AdminDashboard = () => {
 
     return {
       totalReceived,
+      totalAsaasFees,
       totalToReceive,
       totalOverdue,
       activeStudents: filteredStudents.length,
@@ -501,6 +502,7 @@ const AdminDashboard = () => {
         totalOverdue={filtered.totalOverdue}
         activeStudents={filtered.activeStudents}
         inadimplencia={filtered.inadimplencia}
+        totalAsaasFees={filtered.totalAsaasFees}
         formatCurrency={formatCurrency}
       />
 
