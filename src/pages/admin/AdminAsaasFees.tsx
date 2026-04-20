@@ -56,7 +56,7 @@ const AdminAsaasFees = () => {
         paid_at: string | null;
         value: number;
         final_value: number | null;
-        raw_response: Record<string, unknown> | null;
+        raw_response: unknown;
         responsible_id: string;
         unit_id: string;
       }>((from, to) =>
@@ -65,7 +65,7 @@ const AdminAsaasFees = () => {
           .select("id, due_date, paid_at, value, final_value, raw_response, responsible_id, unit_id")
           .in("status", ["PAID", "RECEIVED", "CONFIRMED"])
           .order("paid_at", { ascending: false, nullsFirst: false })
-          .range(from, to)
+          .range(from, to) as unknown as Promise<{ data: never[]; error: { message: string } | null }>
       );
 
       const mapped: FeeRow[] = payments
