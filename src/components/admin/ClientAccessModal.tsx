@@ -3,6 +3,7 @@ import { Copy, Check, MessageCircle, X, User, GraduationCap, KeyRound, Mail, Pho
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { APP_URL, DEFAULT_PASSWORD, buildAppAccessCopyText, buildAppAccessMessage } from "@/lib/app-access-message";
 
 interface ClientAccessData {
   responsibleName: string;
@@ -10,6 +11,7 @@ interface ClientAccessData {
   cpf: string;
   email?: string | null;
   phone?: string | null;
+  unitId?: string | null;
 }
 
 interface ClientAccessModalProps {
@@ -17,10 +19,6 @@ interface ClientAccessModalProps {
   onOpenChange: (open: boolean) => void;
   data: ClientAccessData | null;
 }
-
-const APP_URL = "https://uplaypagamentos.lovable.app/login";
-const INSTALL_URL = "https://uplaypagamentos.lovable.app/instalar";
-const DEFAULT_PASSWORD = "12345678";
 
 const ClientAccessModal = ({ open, onOpenChange, data }: ClientAccessModalProps) => {
   const [copied, setCopied] = useState(false);
@@ -32,9 +30,19 @@ const ClientAccessModal = ({ open, onOpenChange, data }: ClientAccessModalProps)
     ? data.cpf.replace(/\D/g, "").replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")
     : data.email || "";
 
-  const copyText = `Olá! Seu acesso ao aplicativo da UPLAY foi criado:\n\nLogin: ${login}\nSenha: ${DEFAULT_PASSWORD}\n\nAcesse aqui: ${APP_URL}\n\n📲 Instale o app no celular: ${INSTALL_URL}`;
+  const copyText = buildAppAccessCopyText({
+    fullName: data.responsibleName,
+    email: data.email,
+    unitId: data.unitId,
+    login,
+  });
 
-  const whatsappMessage = `Olá! Seu acesso ao app da UPLAY foi liberado.\n\nLogin: ${login}\nSenha: ${DEFAULT_PASSWORD}\n\nAcesse aqui: ${APP_URL}\n\n📲 *Instale o app no celular:*\n${INSTALL_URL}\n\nEm caso de dúvidas, estamos à disposição.`;
+  const whatsappMessage = buildAppAccessMessage({
+    fullName: data.responsibleName,
+    email: data.email,
+    unitId: data.unitId,
+    login,
+  });
 
   const handleCopy = async () => {
     try {
@@ -99,7 +107,7 @@ const ClientAccessModal = ({ open, onOpenChange, data }: ClientAccessModalProps)
             </div>
             <div className="flex items-center gap-2 pt-1 border-t">
               <span className="text-muted-foreground text-xs">Link:</span>
-              <a href={APP_URL} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline truncate">
+                <a href={APP_URL} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline truncate">
                 {APP_URL}
               </a>
             </div>

@@ -25,6 +25,7 @@ import UserEditDialog from "@/components/admin/UserEditDialog";
 import UserActionButtons from "@/components/admin/UserActionButtons";
 import NotifyClientDialog from "@/components/admin/NotifyClientDialog";
 import { fetchAllPaginated } from "@/lib/fetchAllPaginated";
+import { buildAppAccessMessage } from "@/lib/app-access-message";
 
 interface ClientRow {
   id: string;
@@ -408,41 +409,6 @@ const AdminClients = () => {
     await fetchData();
   };
 
-  // IDs das unidades com mensagem personalizada (Up wise - Serra Verde e Ensinup - Vespasiano)
-  const CUSTOM_MESSAGE_UNIT_IDS = new Set<string>([
-    "9cf070e2-6604-4a3e-8962-440b5d233013", // Up wise - Serra Verde
-    "e339ec3d-c27f-4676-9078-cd52dab7eede", // Ensinup - Vespasiano
-  ]);
-
-  const buildAppAccessMessage = (client: ClientRow) => {
-    const firstName = client.full_name.split(" ")[0] || client.full_name;
-    const isCustomUnit = client.unit_id ? CUSTOM_MESSAGE_UNIT_IDS.has(client.unit_id) : false;
-
-    if (isCustomUnit) {
-      return (
-        `Olá, *${firstName}*! 👋\n\n` +
-        `📚 App da *Escola Up wise / Ensinup* 📚\n\n` +
-        `Aqui é da *UPLAY Pagamentos*. Seu acesso ao aplicativo já está disponível ✅\n\n` +
-        `📲 *Acesse pelo link:*\nhttps://uplaypagamento.com.br\n\n` +
-        `📧 *E-mail:* ${client.email}\n` +
-        `🔒 *Senha:* 12345678\n\n` +
-        `Por favor, acesse o app e acompanhe seus pagamentos.\n\n` +
-        `Qualquer dúvida estamos à disposição! 😊`
-      );
-    }
-
-    return (
-      `Olá, *${firstName}*! 👋\n\n` +
-      `Aqui é da *UPLAY Pagamentos*.\n\n` +
-      `Seu acesso ao aplicativo já está disponível ✅\n\n` +
-      `📲 *Acesse pelo link:*\nhttps://uplaypagamento.com.br\n\n` +
-      `📧 *E-mail:* ${client.email}\n` +
-      `🔒 *Senha:* 12345678\n\n` +
-      `Por favor, acesse o app e acompanhe seus pagamentos.\n\n` +
-      `Qualquer dúvida estamos à disposição! 😊`
-    );
-  };
-
   const isEmailValidForInvite = (email: string | null | undefined) =>
     !!email && !/@imported\.uplay\.app$/i.test(email) && !/@uplay\.app$/i.test(email);
 
@@ -472,7 +438,7 @@ const AdminClients = () => {
       return;
     }
 
-    const message = buildAppAccessMessage(client);
+    const message = buildAppAccessMessage({ fullName: client.full_name, email: client.email, unitId: client.unit_id });
     const url = `https://wa.me/${fullPhone}?text=${encodeURIComponent(message)}`;
     window.open(url, "_blank");
 
@@ -546,7 +512,7 @@ const AdminClients = () => {
       const client = bulkEligible[i];
       const fullPhone = normalizePhoneToWa(client.phone);
       if (!fullPhone) continue;
-      const message = buildAppAccessMessage(client);
+      const message = buildAppAccessMessage({ fullName: client.full_name, email: client.email, unitId: client.unit_id });
       const url = `https://wa.me/${fullPhone}?text=${encodeURIComponent(message)}`;
       const win = window.open(url, "_blank");
       if (win) opened++;
