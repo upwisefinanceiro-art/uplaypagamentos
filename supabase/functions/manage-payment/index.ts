@@ -106,10 +106,13 @@ Deno.serve(async (req) => {
         .single();
 
       if (unitError || !unit?.asaas_api_key) {
-        return { ok: false, error: "A unidade não possui integração financeira configurada." };
+        return { ok: false, error: "A unidade não possui integração financeira configurada.", status: 0 };
       }
 
-      const response = await fetch(`${unit.asaas_base_url || "https://api.asaas.com/v3"}${path}`, {
+      const url = `${unit.asaas_base_url || "https://api.asaas.com/v3"}${path}`;
+      console.log(`[manage-payment] Asaas ${method} ${url}`);
+
+      const response = await fetch(url, {
         method,
         headers: {
           access_token: unit.asaas_api_key,
@@ -119,14 +122,21 @@ Deno.serve(async (req) => {
       });
 
       const responseBody = await response.json().catch(() => null);
+      console.log(`[manage-payment] Asaas response ${response.status}:`, JSON.stringify(responseBody));
+
       if (!response.ok) {
+        const errDesc = responseBody?.errors?.[0]?.description || responseBody?.message || "Erro ao sincronizar cobrança externa";
         return {
           ok: false,
-          error: responseBody?.errors?.[0]?.description || responseBody?.message || "Erro ao sincronizar cobrança externa",
+          error: errDesc,
+          status: response.status,
+          code: responseBody?.errors?.[0]?.code || null,
+          notFound: response.status === 404 || /n[aã]o encontrad|not found|removid/i.test(errDesc),
+          paid: /pag[ao]|received|confirmed|recebid/i.test(errDesc),
         };
       }
 
-      return { ok: true, data: responseBody };
+      return { ok: true, data: responseBody, status: response.status };
     };
 
     const loadPayment = async (paymentId?: string) => {
@@ -327,7 +337,7 @@ Deno.serve(async (req) => {
 
       if (payment.asaas_payment_id) {
         const deletedExternally = await syncAsaasRequest(payment.unit_id, `/payments/${payment.asaas_payment_id}`, "DELETE");
-        if (!deletedExternally.ok) {
+        if (!deletedExternally.ok && !deletedExternally.notFound) {
           return jsonResponse({ error: deletedExternally.error || "Erro ao excluir cobrança externa" });
         }
       }
@@ -351,7 +361,7 @@ Deno.serve(async (req) => {
 
       if (payment.asaas_payment_id) {
         const cancelledExternally = await syncAsaasRequest(payment.unit_id, `/payments/${payment.asaas_payment_id}`, "DELETE");
-        if (!cancelledExternally.ok) {
+        if (!cancelledExternally.ok && !cancelledExternally.notFound) {
           return jsonResponse({ error: cancelledExternally.error || "Erro ao cancelar cobrança externa" });
         }
       }
@@ -392,6 +402,9 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "Cobranças online pagas devem ser conciliadas automaticamente pelo financeiro externo." });
       }
 
+      let asaasIdToKeep: string | null = payment.asaas_payment_id;
+      let asaasWarning: string | null = null;
+
       if (payment.asaas_payment_id && payload.status !== "CANCELLED") {
         const syncedUpdate = await syncAsaasRequest(payment.unit_id, `/payments/${payment.asaas_payment_id}`, "PUT", {
           value: Number(payload.value),
@@ -400,31 +413,45 @@ Deno.serve(async (req) => {
         });
 
         if (!syncedUpdate.ok) {
-          return jsonResponse({ error: syncedUpdate.error || "Erro ao atualizar cobrança externa" });
+          // Se a cobrança foi removida no Asaas, desvincular localmente e seguir
+          if (syncedUpdate.notFound) {
+            console.log(`[manage-payment] Cobrança ${payment.asaas_payment_id} não existe mais no Asaas. Desvinculando.`);
+            asaasIdToKeep = null;
+            asaasWarning = "A cobrança original foi removida do Asaas. Os dados foram atualizados localmente e o vínculo externo foi removido. Gere uma nova cobrança se necessário.";
+          } else if (syncedUpdate.paid) {
+            // Já está paga no Asaas — disparar sync para refletir
+            console.log(`[manage-payment] Cobrança ${payment.asaas_payment_id} já está paga no Asaas. Disparando sync.`);
+            await supabaseAdmin.functions.invoke("sync-asaas-payment", { body: { payment_id: payment.id } }).catch(() => null);
+            return jsonResponse({ error: "Esta cobrança já consta como paga no Asaas. O sistema foi sincronizado — recarregue a tela." });
+          } else {
+            return jsonResponse({ error: syncedUpdate.error || "Erro ao atualizar cobrança externa" });
+          }
         }
       }
 
       if (payload.status === "CANCELLED") {
         if (payment.asaas_payment_id) {
           const cancelledExternally = await syncAsaasRequest(payment.unit_id, `/payments/${payment.asaas_payment_id}`, "DELETE");
-          if (!cancelledExternally.ok) {
+          if (!cancelledExternally.ok && !cancelledExternally.notFound) {
             return jsonResponse({ error: cancelledExternally.error || "Erro ao cancelar cobrança externa" });
           }
+          asaasIdToKeep = null;
         }
       }
 
-      const updatePayload = {
+      const updatePayload: Record<string, unknown> = {
         value: Number(payload.value),
         final_value: Number(payload.value),
         due_date: payload.due_date,
         description: payload.description.trim(),
         status: payload.status,
         paid_at: payload.status === "PAID" ? now : null,
-        invoice_url: payload.status === "CANCELLED" ? null : payment.invoice_url,
-        boleto_url: payload.status === "CANCELLED" ? null : payment.boleto_url,
-        checkout_url: payload.status === "CANCELLED" ? null : payment.checkout_url,
-        pix_copy_paste: payload.status === "CANCELLED" ? null : payment.pix_copy_paste,
-        pix_qr_code: payload.status === "CANCELLED" ? null : payment.pix_qr_code,
+        invoice_url: payload.status === "CANCELLED" || asaasIdToKeep === null ? null : payment.invoice_url,
+        boleto_url: payload.status === "CANCELLED" || asaasIdToKeep === null ? null : payment.boleto_url,
+        checkout_url: payload.status === "CANCELLED" || asaasIdToKeep === null ? null : payment.checkout_url,
+        pix_copy_paste: payload.status === "CANCELLED" || asaasIdToKeep === null ? null : payment.pix_copy_paste,
+        pix_qr_code: payload.status === "CANCELLED" || asaasIdToKeep === null ? null : payment.pix_qr_code,
+        asaas_payment_id: asaasIdToKeep,
         updated_at: now,
       };
 
@@ -436,9 +463,10 @@ Deno.serve(async (req) => {
       await logAudit("UPDATE_PAYMENT", payment.id, {
         before: payment,
         after: updatePayload,
+        asaas_warning: asaasWarning,
       });
 
-      return jsonResponse({ success: true });
+      return jsonResponse({ success: true, warning: asaasWarning });
     }
 
     return jsonResponse({ error: "Ação inválida" });
