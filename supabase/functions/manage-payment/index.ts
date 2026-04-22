@@ -106,10 +106,13 @@ Deno.serve(async (req) => {
         .single();
 
       if (unitError || !unit?.asaas_api_key) {
-        return { ok: false, error: "A unidade não possui integração financeira configurada." };
+        return { ok: false, error: "A unidade não possui integração financeira configurada.", status: 0 };
       }
 
-      const response = await fetch(`${unit.asaas_base_url || "https://api.asaas.com/v3"}${path}`, {
+      const url = `${unit.asaas_base_url || "https://api.asaas.com/v3"}${path}`;
+      console.log(`[manage-payment] Asaas ${method} ${url}`);
+
+      const response = await fetch(url, {
         method,
         headers: {
           access_token: unit.asaas_api_key,
@@ -119,14 +122,21 @@ Deno.serve(async (req) => {
       });
 
       const responseBody = await response.json().catch(() => null);
+      console.log(`[manage-payment] Asaas response ${response.status}:`, JSON.stringify(responseBody));
+
       if (!response.ok) {
+        const errDesc = responseBody?.errors?.[0]?.description || responseBody?.message || "Erro ao sincronizar cobrança externa";
         return {
           ok: false,
-          error: responseBody?.errors?.[0]?.description || responseBody?.message || "Erro ao sincronizar cobrança externa",
+          error: errDesc,
+          status: response.status,
+          code: responseBody?.errors?.[0]?.code || null,
+          notFound: response.status === 404 || /n[aã]o encontrad|not found|removid/i.test(errDesc),
+          paid: /pag[ao]|received|confirmed|recebid/i.test(errDesc),
         };
       }
 
-      return { ok: true, data: responseBody };
+      return { ok: true, data: responseBody, status: response.status };
     };
 
     const loadPayment = async (paymentId?: string) => {
