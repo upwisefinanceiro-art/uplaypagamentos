@@ -15,6 +15,37 @@ const statusMap: Record<string, string> = {
   RECEIVED_IN_CASH: "PAID",
 };
 
+const eventStatusMap: Record<string, string> = {
+  PAYMENT_RECEIVED: "PAID",
+  PAYMENT_CONFIRMED: "PAID",
+  PAYMENT_OVERDUE: "OVERDUE",
+  PAYMENT_DELETED: "CANCELLED",
+  PAYMENT_REFUNDED: "CANCELLED",
+};
+
+function resolvePaymentStatus(params: {
+  currentStatus: string;
+  event: string;
+  asaasStatus?: string | null;
+  paymentDate?: string | null;
+}) {
+  const { currentStatus, event, asaasStatus, paymentDate } = params;
+
+  const eventDrivenStatus = eventStatusMap[event];
+  const mappedStatus = statusMap[asaasStatus || ""];
+  const resolvedStatus = paymentDate ? "PAID" : eventDrivenStatus || mappedStatus || currentStatus;
+
+  if (currentStatus === "PAID" && resolvedStatus !== "PAID" && resolvedStatus !== "CANCELLED") {
+    return "PAID";
+  }
+
+  if (currentStatus === "CANCELLED") {
+    return "CANCELLED";
+  }
+
+  return resolvedStatus;
+}
+
 async function logWebhook(
   supabase: ReturnType<typeof createClient>,
   data: {
@@ -246,7 +277,12 @@ Deno.serve(async (req) => {
 
     // Map Asaas status
     const oldStatus = localPayment.status;
-    const newStatus = statusMap[payment.status] || localPayment.status;
+    const newStatus = resolvePaymentStatus({
+      currentStatus: localPayment.status,
+      event,
+      asaasStatus: payment.status,
+      paymentDate: payment.paymentDate,
+    });
 
     const updateData: Record<string, unknown> = {
       status: newStatus,

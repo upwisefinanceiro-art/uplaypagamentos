@@ -15,6 +15,16 @@ const statusMap: Record<string, string> = {
   RECEIVED_IN_CASH: "PAID",
 };
 
+function resolvePaymentStatus(currentStatus: string, asaasStatus?: string | null, paymentDate?: string | null) {
+  const mappedStatus = (asaasStatus && statusMap[asaasStatus]) || currentStatus;
+
+  if (paymentDate) return "PAID";
+  if (currentStatus === "PAID" && mappedStatus !== "PAID" && mappedStatus !== "CANCELLED") return "PAID";
+  if (currentStatus === "CANCELLED") return "CANCELLED";
+
+  return mappedStatus;
+}
+
 function validateCpf(cpf: string): boolean {
   const clean = cpf.replace(/\D/g, "");
   if (clean.length !== 11 && clean.length !== 14) return false;
@@ -41,14 +51,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Não autorizado" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -61,11 +63,19 @@ Deno.serve(async (req) => {
 
     const unitFilter: string | null = parsedBody.unit_id || null;
     const isScheduled = parsedBody.scheduled === true;
+    const authHeader = req.headers.get("Authorization");
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     // Authorize: scheduled cron OR admin user
     if (!isScheduled) {
+      if (!authHeader) {
+        return new Response(JSON.stringify({ error: "Não autorizado" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const supabaseUser = createClient(supabaseUrl, anonKey, {
         global: { headers: { Authorization: authHeader } },
       });
@@ -167,7 +177,7 @@ Deno.serve(async (req) => {
         if (!res.ok) { errors++; continue; }
 
         const asaasData = await res.json();
-        const newStatus = statusMap[asaasData.status] || payment.status;
+        const newStatus = resolvePaymentStatus(payment.status, asaasData.status, asaasData.paymentDate);
 
         // Map billing type to payment method
         const billingTypeMap: Record<string, string> = { PIX: "PIX", BOLETO: "BOLETO", CREDIT_CARD: "CARD" };
