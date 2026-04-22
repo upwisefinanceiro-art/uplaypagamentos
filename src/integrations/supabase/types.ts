@@ -486,6 +486,66 @@ export type Database = {
           },
         ]
       }
+      finance_entries: {
+        Row: {
+          amount: number
+          category: string | null
+          company_id: string | null
+          competence_date: string
+          created_at: string
+          created_by: string | null
+          description: string
+          direction: string
+          due_date: string
+          entry_type: string
+          id: string
+          notes: string | null
+          paid_date: string | null
+          reconciliation_status: string
+          recurrence: string
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          category?: string | null
+          company_id?: string | null
+          competence_date?: string
+          created_at?: string
+          created_by?: string | null
+          description: string
+          direction?: string
+          due_date?: string
+          entry_type: string
+          id?: string
+          notes?: string | null
+          paid_date?: string | null
+          reconciliation_status?: string
+          recurrence?: string
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          category?: string | null
+          company_id?: string | null
+          competence_date?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          direction?: string
+          due_date?: string
+          entry_type?: string
+          id?: string
+          notes?: string | null
+          paid_date?: string | null
+          reconciliation_status?: string
+          recurrence?: string
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       payment_inconsistencies: {
         Row: {
           asaas_due_date: string | null
@@ -989,6 +1049,7 @@ export type Database = {
         Row: {
           active: boolean
           category: string | null
+          cost_price: number
           created_at: string
           description: string | null
           id: string
@@ -1001,6 +1062,7 @@ export type Database = {
         Insert: {
           active?: boolean
           category?: string | null
+          cost_price?: number
           created_at?: string
           description?: string | null
           id?: string
@@ -1013,6 +1075,7 @@ export type Database = {
         Update: {
           active?: boolean
           category?: string | null
+          cost_price?: number
           created_at?: string
           description?: string | null
           id?: string

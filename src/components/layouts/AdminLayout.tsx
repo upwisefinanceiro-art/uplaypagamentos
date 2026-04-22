@@ -15,6 +15,7 @@ import {
   TrendingUp,
   Database,
   Receipt,
+  Activity,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -30,6 +31,7 @@ const menuItems = [
   { path: "/admin/contratos", icon: FileText, label: "Contratos", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
   { path: "/admin/cobrancas", icon: CreditCard, label: "Cobranças", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
   { path: "/admin/financeiro", icon: TrendingUp, label: "Financeiro Avançado", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
+  { path: "/admin/financeiro-pro", icon: Activity, label: "Financeiro Pro", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
   { path: "/admin/taxas-asaas", icon: Receipt, label: "Taxas Asaas", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
   { path: "/admin/estoque", icon: Package, label: "Estoque", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
   { path: "/admin/cobrancas-saas", icon: CreditCard, label: "Cobranças SaaS", roles: ["ADMIN_MASTER"] },
