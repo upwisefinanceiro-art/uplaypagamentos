@@ -337,7 +337,7 @@ Deno.serve(async (req) => {
 
       if (payment.asaas_payment_id) {
         const deletedExternally = await syncAsaasRequest(payment.unit_id, `/payments/${payment.asaas_payment_id}`, "DELETE");
-        if (!deletedExternally.ok) {
+        if (!deletedExternally.ok && !deletedExternally.notFound) {
           return jsonResponse({ error: deletedExternally.error || "Erro ao excluir cobrança externa" });
         }
       }
