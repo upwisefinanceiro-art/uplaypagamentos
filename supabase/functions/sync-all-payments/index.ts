@@ -51,14 +51,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Não autorizado" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -71,11 +63,19 @@ Deno.serve(async (req) => {
 
     const unitFilter: string | null = parsedBody.unit_id || null;
     const isScheduled = parsedBody.scheduled === true;
+    const authHeader = req.headers.get("Authorization");
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     // Authorize: scheduled cron OR admin user
     if (!isScheduled) {
+      if (!authHeader) {
+        return new Response(JSON.stringify({ error: "Não autorizado" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const supabaseUser = createClient(supabaseUrl, anonKey, {
         global: { headers: { Authorization: authHeader } },
       });
