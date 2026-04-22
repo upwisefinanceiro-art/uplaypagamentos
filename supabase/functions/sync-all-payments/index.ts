@@ -15,6 +15,16 @@ const statusMap: Record<string, string> = {
   RECEIVED_IN_CASH: "PAID",
 };
 
+function resolvePaymentStatus(currentStatus: string, asaasStatus?: string | null, paymentDate?: string | null) {
+  const mappedStatus = (asaasStatus && statusMap[asaasStatus]) || currentStatus;
+
+  if (paymentDate) return "PAID";
+  if (currentStatus === "PAID" && mappedStatus !== "PAID" && mappedStatus !== "CANCELLED") return "PAID";
+  if (currentStatus === "CANCELLED") return "CANCELLED";
+
+  return mappedStatus;
+}
+
 function validateCpf(cpf: string): boolean {
   const clean = cpf.replace(/\D/g, "");
   if (clean.length !== 11 && clean.length !== 14) return false;
@@ -167,7 +177,7 @@ Deno.serve(async (req) => {
         if (!res.ok) { errors++; continue; }
 
         const asaasData = await res.json();
-        const newStatus = statusMap[asaasData.status] || payment.status;
+        const newStatus = resolvePaymentStatus(payment.status, asaasData.status, asaasData.paymentDate);
 
         // Map billing type to payment method
         const billingTypeMap: Record<string, string> = { PIX: "PIX", BOLETO: "BOLETO", CREDIT_CARD: "CARD" };
