@@ -16,6 +16,8 @@ interface DeliveryNotification {
   quantity: number;
   status: string;
   created_at: string;
+  payment_id: string;
+  payments?: { description: string | null; payment_type: string | null } | null;
 }
 
 interface Props {
@@ -33,7 +35,7 @@ const DashboardDeliveries = ({ unitFilter = "all" }: Props) => {
     setLoading(true);
     let query = supabase
       .from("delivery_notifications")
-      .select("id, unit_id, student_name, responsible_name, enrollment_id, item_name, quantity, status, created_at")
+      .select("id, unit_id, student_name, responsible_name, enrollment_id, item_name, quantity, status, created_at, payment_id, payments(description, payment_type)")
       .eq("status", "PENDING")
       .order("created_at", { ascending: false });
 
@@ -108,12 +110,21 @@ const DashboardDeliveries = ({ unitFilter = "all" }: Props) => {
                 <span className="text-[10px] text-muted-foreground">
                   Qtd: {d.quantity}
                 </span>
+                {d.payments?.description && (
+                  <span className="text-[10px] text-muted-foreground italic truncate max-w-[260px]">
+                    • {d.payments.description}
+                  </span>
+                )}
               </div>
               <p className="text-sm font-medium text-foreground mt-1 truncate">
                 🎓 {d.student_name ?? "Sem aluno"}
-                {d.enrollment_id && (
+                {d.enrollment_id ? (
                   <span className="text-xs text-muted-foreground ml-1">
                     (Mat: {d.enrollment_id})
+                  </span>
+                ) : (
+                  <span className="text-xs text-yellow-500 ml-1">
+                    (sem matrícula)
                   </span>
                 )}
               </p>
