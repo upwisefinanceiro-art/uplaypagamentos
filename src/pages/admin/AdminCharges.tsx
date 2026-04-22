@@ -513,7 +513,14 @@ const AdminCharges = () => {
       return;
     }
 
-    toast({ title: "Parcela atualizada com sucesso!" });
+    if (data?.warning) {
+      toast({
+        title: "Parcela atualizada (com aviso)",
+        description: data.warning,
+      });
+    } else {
+      toast({ title: "Parcela atualizada com sucesso!" });
+    }
     setEditDialogOpen(false);
     setEditForm(emptyEditForm);
     fetchData();
