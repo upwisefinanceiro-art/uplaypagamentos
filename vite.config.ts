@@ -98,8 +98,9 @@ export default defineConfig(({ mode }) => ({
         clientsClaim: true,
         cleanupOutdatedCaches: true,
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-        navigateFallback: "/index.html",
+        // Não cacheia HTML — força sempre buscar a versão mais recente da rede
+        globPatterns: ["**/*.{js,css,ico,png,svg,woff2}"],
+        navigateFallback: null,
         navigateFallbackDenylist: [/^\/~oauth/, /^\/api\//],
         runtimeCaching: [
           {
