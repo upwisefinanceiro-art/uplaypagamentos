@@ -45,6 +45,16 @@ function mapBillingTypeToPaymentMethod(billingType?: string | null): string | nu
   return billingTypeMap[billingType] || null;
 }
 
+function resolvePaymentStatus(currentStatus: string, asaasStatus?: string | null, paymentDate?: string | null) {
+  const mappedStatus = mapAsaasStatus(asaasStatus) || currentStatus;
+
+  if (paymentDate) return "PAID";
+  if (currentStatus === "PAID" && mappedStatus !== "PAID" && mappedStatus !== "CANCELLED") return "PAID";
+  if (currentStatus === "CANCELLED") return "CANCELLED";
+
+  return mappedStatus;
+}
+
 async function fetchPixData(baseUrl: string, asaasPaymentId: string, apiKey: string) {
   try {
     const pixRes = await fetch(`${baseUrl}/payments/${asaasPaymentId}/pixQrCode`, {
@@ -196,7 +206,7 @@ Deno.serve(async (req) => {
         pixCopyPaste = pixData.payload || null;
       }
 
-      const resolvedStatus = mapAsaasStatus(asaasData.status) || payment.status;
+      const resolvedStatus = resolvePaymentStatus(payment.status, asaasData.status, asaasData.paymentDate);
       const resolvedMethod = mapBillingTypeToPaymentMethod(asaasData.billingType) || payment.payment_method || null;
 
       const updateData: Record<string, unknown> = {
@@ -428,7 +438,7 @@ Deno.serve(async (req) => {
 
     // ── Update payment record ──
     const resolvedMethod = payment.payment_method === "ASAAS" ? "BOLETO" : payment.payment_method;
-    const resolvedStatus = mapAsaasStatus(chargeData.status) || payment.status;
+    const resolvedStatus = resolvePaymentStatus(payment.status, chargeData.status, chargeData.paymentDate);
 
     const updateData = {
       asaas_payment_id: chargeData.id,
