@@ -282,6 +282,34 @@ const AdminCharges = () => {
     fetchData();
   }, []);
 
+  // Realtime: atualiza a lista quando o webhook do Asaas alterar pagamentos
+  useEffect(() => {
+    const channel = supabase
+      .channel("admin-charges-payments")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "payments" },
+        (payload) => {
+          setPayments((current) => {
+            if (payload.eventType === "DELETE") {
+              return current.filter((p) => p.id !== (payload.old as PaymentRow).id);
+            }
+            const newRow = payload.new as PaymentRow;
+            const exists = current.some((p) => p.id === newRow.id);
+            if (payload.eventType === "INSERT" && !exists) {
+              return [newRow, ...current];
+            }
+            return current.map((p) => (p.id === newRow.id ? { ...p, ...newRow } : p));
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   useEffect(() => {
     if (loadingData) return;
     if (!shouldOpenManual) return;
