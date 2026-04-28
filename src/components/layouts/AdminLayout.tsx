@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   KeyRound,
   Package,
+  GraduationCap,
   TrendingUp,
   Database,
   Receipt,
