@@ -331,6 +331,7 @@ Deno.serve(async (req) => {
       pix_copy_paste: pixCopyPaste,
       boleto_url: boletoUrl,
       checkout_url: checkoutUrl,
+      whatsapp_notification_scheduled: whatsappNotificationScheduled,
     }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
