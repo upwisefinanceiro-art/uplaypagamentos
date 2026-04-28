@@ -302,7 +302,7 @@ const AdminContracts = () => {
     if (!resolvedUnitId) return "Unidade é obrigatória";
     if (responsibleMode === "existing" && !studentId) return "Selecione o aluno";
     if (responsibleMode === "new" && !newStudentName.trim()) return "Nome do aluno é obrigatório";
-    if (responsibleMode === "new" && saveResponsibleToBase && !password.trim()) return "Senha do responsável é obrigatória para salvar na base";
+    // Senha padrão sempre aplicada (12345678) — não é mais campo do formulário
     if (!description.trim()) return "Curso/descrição é obrigatório";
     if (!startDate) return "Data de início é obrigatória";
     if (!firstDueDate) return "Data do 1º vencimento é obrigatória";
@@ -342,7 +342,7 @@ const AdminContracts = () => {
             cpf: cpf.replace(/\D/g, ""),
             full_name: responsibleName,
             phone,
-            password,
+            password: "12345678",
             role: "RESPONSAVEL",
             unit_id: unitId,
           },
