@@ -551,7 +551,7 @@ const AdminContracts = () => {
         if (asaasErr === 0) {
           toast({
             title: "Cobranças enviadas ao Asaas!",
-            description: `${asaasOk} parcela(s) registrada(s) com sucesso.`,
+            description: `${asaasOk} parcela(s) registrada(s). 📱 Notificações via WhatsApp agendadas no gateway.`,
           });
         } else {
           toast({
