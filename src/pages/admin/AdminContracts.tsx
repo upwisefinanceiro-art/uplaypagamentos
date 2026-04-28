@@ -291,7 +291,7 @@ const AdminContracts = () => {
     setIncludeApostilas(false); setApostilasTotal(""); setApostilasQty("1");
     setApostilasStartDate(""); setApostilasInterval("3"); setApostilaStockItemId("");
     setIncludeMatricula(false); setMatriculaValue(""); setMatriculaDueDate(""); setMatriculaDescription("Matrícula");
-    setNewStudentName(""); setStudentBirthDate("");
+    setNewStudentName(""); setStudentBirthDate(""); setSelectedCourseId("");
   };
 
   const validateForm = (): string | null => {
