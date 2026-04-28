@@ -726,8 +726,9 @@ const AdminContracts = () => {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
-            <Label className="text-foreground text-xs">Telefone *</Label>
+            <Label className="text-foreground text-xs">Celular (WhatsApp) *</Label>
             <Input className="bg-input border-border text-foreground" placeholder="(31) 99999-9999" value={phone} onChange={e => setPhone(e.target.value)} />
+            <p className="text-[10px] text-muted-foreground mt-1">Obrigatório – usado para enviar cobranças via WhatsApp.</p>
           </div>
           <div className="space-y-1">
             <Label className="text-foreground text-xs">E-mail *</Label>
