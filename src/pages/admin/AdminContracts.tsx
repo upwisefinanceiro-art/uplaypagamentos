@@ -180,7 +180,7 @@ const AdminContracts = () => {
   const [notes, setNotes] = useState("");
   const [password, setPassword] = useState("");
   const [contractNumber, setContractNumber] = useState("");
-  const [saveResponsibleToBase, setSaveResponsibleToBase] = useState(false);
+  const [saveResponsibleToBase, setSaveResponsibleToBase] = useState(true);
 
   // Apostilas state
   const [includeApostilas, setIncludeApostilas] = useState(false);
@@ -278,7 +278,7 @@ const AdminContracts = () => {
     setZipCode(""); setUnitId(""); setDescription(""); setStartDate("");
     setFirstDueDate(""); setCourseRealValue(""); setPunctualityDiscount("0");
     setInstallments("1"); setPaymentMethod(""); setNotes("");
-    setPassword(""); setContractNumber(""); setStep("form"); setSaveResponsibleToBase(false);
+    setPassword(""); setContractNumber(""); setStep("form"); setSaveResponsibleToBase(true);
     setIncludeApostilas(false); setApostilasTotal(""); setApostilasQty("1");
     setApostilasStartDate(""); setApostilasInterval("3"); setApostilaStockItemId("");
     setIncludeMatricula(false); setMatriculaValue(""); setMatriculaDueDate(""); setMatriculaDescription("Matrícula");
@@ -290,7 +290,6 @@ const AdminContracts = () => {
     if (!birthDate) return "Data de nascimento é obrigatória";
     if (!cpf.trim()) return "CPF é obrigatório";
     if (!validarCPF(cpf)) return "CPF inválido";
-    if (!rg.trim()) return "RG é obrigatório";
     if (!phone.trim()) return "Telefone é obrigatório";
     if (!email.trim()) return "E-mail é obrigatório";
     if (!validarEmail(email)) return "E-mail inválido";
@@ -303,7 +302,7 @@ const AdminContracts = () => {
     if (!resolvedUnitId) return "Unidade é obrigatória";
     if (responsibleMode === "existing" && !studentId) return "Selecione o aluno";
     if (responsibleMode === "new" && !newStudentName.trim()) return "Nome do aluno é obrigatório";
-    if (responsibleMode === "new" && saveResponsibleToBase && !password.trim()) return "Senha do responsável é obrigatória para salvar na base";
+    // Senha padrão sempre aplicada (12345678) — não é mais campo do formulário
     if (!description.trim()) return "Curso/descrição é obrigatório";
     if (!startDate) return "Data de início é obrigatória";
     if (!firstDueDate) return "Data do 1º vencimento é obrigatória";
@@ -343,7 +342,7 @@ const AdminContracts = () => {
             cpf: cpf.replace(/\D/g, ""),
             full_name: responsibleName,
             phone,
-            password,
+            password: "12345678",
             role: "RESPONSAVEL",
             unit_id: unitId,
           },
@@ -501,12 +500,61 @@ const AdminContracts = () => {
         });
       }
 
-      const { error: paymentsErr } = await supabase.from("payments").insert(payments);
+      const { data: insertedPayments, error: paymentsErr } = await supabase
+        .from("payments")
+        .insert(payments)
+        .select("id");
       if (paymentsErr) throw paymentsErr;
 
-      const totalParcelas = payments.length;
-      toast({ title: "Contrato criado!", description: `${totalParcelas} parcelas geradas com sucesso.` });
+      const totalParcelas = insertedPayments?.length || payments.length;
+
+      // Fechar diálogo e mostrar progresso da geração no Asaas
       setDialogOpen(false);
+      toast({
+        title: "Contrato criado!",
+        description: `${totalParcelas} parcelas geradas. Enviando para o Asaas...`,
+      });
+
+      // Disparar criação automática no Asaas (síncrono, em paralelo controlado)
+      if (insertedPayments && insertedPayments.length > 0) {
+        const ids = insertedPayments.map((p: any) => p.id);
+        const CHUNK_SIZE = 3;
+        let asaasOk = 0;
+        let asaasErr = 0;
+
+        for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+          const chunk = ids.slice(i, i + CHUNK_SIZE);
+          const results = await Promise.allSettled(
+            chunk.map((payment_id) =>
+              supabase.functions.invoke("sync-asaas-payment", {
+                body: { payment_id },
+              }),
+            ),
+          );
+          for (const r of results) {
+            if (r.status === "fulfilled" && !r.value.error && !(r.value.data as any)?.error) {
+              asaasOk++;
+            } else {
+              asaasErr++;
+              console.error("[asaas-sync] falha", r);
+            }
+          }
+        }
+
+        if (asaasErr === 0) {
+          toast({
+            title: "Cobranças enviadas ao Asaas!",
+            description: `${asaasOk} parcela(s) registrada(s) com sucesso.`,
+          });
+        } else {
+          toast({
+            title: `${asaasOk} de ${ids.length} parcelas enviadas`,
+            description: `${asaasErr} falharam. Use 'Sincronizar com Asaas' em Cobranças para reprocessar.`,
+            variant: "destructive",
+          });
+        }
+      }
+
 
       // Show access modal if user was created
       if (responsibleMode === "new" && saveResponsibleToBase) {
@@ -619,23 +667,15 @@ const AdminContracts = () => {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex items-center gap-2 p-3 rounded-md border border-border bg-muted/30">
-            <Checkbox
-              id="save-responsible"
-              checked={saveResponsibleToBase}
-              onCheckedChange={(checked) => setSaveResponsibleToBase(checked === true)}
-            />
-            <label htmlFor="save-responsible" className="text-xs text-foreground cursor-pointer flex items-center gap-1.5">
-              <Save size={13} className="text-primary" />
-              Salvar responsável na base (para reaproveitar depois)
-            </label>
-          </div>
-          {saveResponsibleToBase && (
-            <div className="space-y-1">
-              <Label className="text-foreground text-xs">Senha de acesso do responsável *</Label>
-              <Input className="bg-input border-border text-foreground" type="password" placeholder="Mínimo 6 caracteres" value={password} onChange={e => setPassword(e.target.value)} />
+          <div className="p-3 rounded-md border border-primary/30 bg-primary/5">
+            <div className="flex items-start gap-2">
+              <Save size={14} className="text-primary mt-0.5" />
+              <div className="flex-1">
+                <p className="text-xs font-medium text-foreground">Cliente será cadastrado automaticamente</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Login pelo CPF. Senha inicial: <span className="font-mono font-semibold text-foreground">12345678</span> (cliente poderá alterar no app).</p>
+              </div>
             </div>
-          )}
+          </div>
         </div>
       )}
 
@@ -673,7 +713,7 @@ const AdminContracts = () => {
             <Input className="bg-input border-border text-foreground" placeholder="000.000.000-00" value={cpf} onChange={e => setCpf(e.target.value)} />
           </div>
           <div className="space-y-1">
-            <Label className="text-foreground text-xs">RG / Identidade *</Label>
+            <Label className="text-foreground text-xs">RG / Identidade</Label>
             <Input className="bg-input border-border text-foreground" value={rg} onChange={e => setRg(e.target.value)} />
           </div>
         </div>

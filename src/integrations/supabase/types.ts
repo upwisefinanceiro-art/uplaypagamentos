@@ -655,7 +655,7 @@ export type Database = {
           responsible_id: string
           status: string
           stock_item_id: string | null
-          stock_quantity: number
+          stock_quantity: number | null
           student_id: string | null
           unit_id: string
           updated_at: string
@@ -685,7 +685,7 @@ export type Database = {
           responsible_id: string
           status?: string
           stock_item_id?: string | null
-          stock_quantity?: number
+          stock_quantity?: number | null
           student_id?: string | null
           unit_id: string
           updated_at?: string
@@ -715,7 +715,7 @@ export type Database = {
           responsible_id?: string
           status?: string
           stock_item_id?: string | null
-          stock_quantity?: number
+          stock_quantity?: number | null
           student_id?: string | null
           unit_id?: string
           updated_at?: string
