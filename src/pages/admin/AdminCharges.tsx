@@ -637,6 +637,32 @@ const AdminCharges = () => {
     }
   };
 
+  const handleUpdateAllWhatsappNotifs = async () => {
+    if (!confirm("Atualizar TODOS os clientes para receberem cobranças exclusivamente via WhatsApp no Asaas? Esta ação desabilita Email/SMS no gateway.")) return;
+    setUpdatingNotifs(true);
+    try {
+      const body: Record<string, string> = {};
+      if (unitFilter !== "ALL") body.unit_id = unitFilter;
+      const { data, error } = await supabase.functions.invoke("update-asaas-notifications", { body });
+      if (error) {
+        toast({ title: "Erro ao atualizar notificações", description: error.message, variant: "destructive" });
+        return;
+      }
+      if (data?.error) {
+        toast({ title: "Erro", description: data.error, variant: "destructive" });
+        return;
+      }
+      toast({
+        title: "📱 WhatsApp configurado!",
+        description: data?.message || "Notificações atualizadas no gateway.",
+      });
+    } catch (err: unknown) {
+      toast({ title: "Erro inesperado", description: err instanceof Error ? err.message : "Erro", variant: "destructive" });
+    } finally {
+      setUpdatingNotifs(false);
+    }
+  };
+
   const handleImportAsaas = async () => {
     setImportingAsaas(true);
     try {
