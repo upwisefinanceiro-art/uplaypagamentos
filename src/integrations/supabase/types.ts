@@ -393,6 +393,84 @@ export type Database = {
           },
         ]
       }
+      course_apostilas: {
+        Row: {
+          course_id: string
+          created_at: string
+          display_order: number
+          id: string
+          stock_item_id: string
+          unit_value: number
+        }
+        Insert: {
+          course_id: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          stock_item_id: string
+          unit_value?: number
+        }
+        Update: {
+          course_id?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          stock_item_id?: string
+          unit_value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_apostilas_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_apostilas_stock_item_id_fkey"
+            columns: ["stock_item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      courses: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          suggested_installments: number
+          suggested_value: number
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          suggested_installments?: number
+          suggested_value?: number
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          suggested_installments?: number
+          suggested_value?: number
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       delivery_notifications: {
         Row: {
           created_at: string
