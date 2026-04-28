@@ -330,6 +330,7 @@ Deno.serve(async (req) => {
         name: responsible.full_name.trim(),
         cpfCnpj: cpfClean,
         email: responsible.email || `${cpfClean}@uplay.app`,
+        notificationDisabled: false,
       };
 
       // Only add phone if valid
@@ -337,6 +338,7 @@ Deno.serve(async (req) => {
         const phoneClean = responsible.phone.replace(/\D/g, "");
         if (phoneClean.length >= 10 && phoneClean.length <= 11) {
           customerPayload.mobilePhone = phoneClean;
+          customerPayload.phone = phoneClean;
         }
       }
 
@@ -367,7 +369,50 @@ Deno.serve(async (req) => {
       asaasCustomerId = customerData.id;
       await supabaseAdmin.from("profiles").update({ asaas_customer_id: asaasCustomerId }).eq("id", payment.responsible_id);
       console.log("Customer criado:", asaasCustomerId);
+    } else if (responsible.phone) {
+      // Garante mobilePhone no customer existente (essencial para WhatsApp)
+      const phoneClean = responsible.phone.replace(/\D/g, "");
+      if (phoneClean.length >= 10 && phoneClean.length <= 11) {
+        try {
+          await fetch(`${baseUrl}/customers/${asaasCustomerId}`, {
+            method: "POST",
+            headers: { access_token: unit.asaas_api_key, "Content-Type": "application/json" },
+            body: JSON.stringify({ mobilePhone: phoneClean, phone: phoneClean, notificationDisabled: false }),
+          });
+        } catch (e) { console.warn("update customer mobilePhone falhou", e); }
+      }
     }
+
+    // Configura notificações: WhatsApp ON / Email+SMS OFF (idempotente)
+    try {
+      const notifRes = await fetch(`${baseUrl}/customers/${asaasCustomerId}/notifications`, {
+        headers: { access_token: unit.asaas_api_key },
+      });
+      if (notifRes.ok) {
+        const notifData = await notifRes.json();
+        const items: Array<{ id: string }> = notifData?.data || [];
+        for (const n of items) {
+          await fetch(`${baseUrl}/notifications/${n.id}`, {
+            method: "PUT",
+            headers: { access_token: unit.asaas_api_key, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              enabled: true,
+              emailEnabledForProvider: false,
+              emailEnabledForCustomer: false,
+              smsEnabledForProvider: false,
+              smsEnabledForCustomer: false,
+              phoneCallEnabledForCustomer: false,
+              whatsappEnabledForProvider: true,
+              whatsappEnabledForCustomer: true,
+            }),
+          });
+        }
+        console.log(`Notificações WhatsApp-only configuradas para ${items.length} eventos`);
+      }
+    } catch (e) {
+      console.warn("Falha ao configurar notificações WhatsApp-only:", e);
+    }
+
 
     // ── Determine billing type ──
     const billingTypeMap: Record<string, string> = {

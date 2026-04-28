@@ -189,6 +189,7 @@ const AdminCharges = () => {
   const [syncingPaymentId, setSyncingPaymentId] = useState<string | null>(null);
   const [syncingAll, setSyncingAll] = useState(false);
   const [importingAsaas, setImportingAsaas] = useState(false);
+  const [updatingNotifs, setUpdatingNotifs] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkAction, setBulkAction] = useState<"delete" | "cancel" | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
@@ -636,6 +637,32 @@ const AdminCharges = () => {
     }
   };
 
+  const handleUpdateAllWhatsappNotifs = async () => {
+    if (!confirm("Atualizar TODOS os clientes para receberem cobranças exclusivamente via WhatsApp no Asaas? Esta ação desabilita Email/SMS no gateway.")) return;
+    setUpdatingNotifs(true);
+    try {
+      const body: Record<string, string> = {};
+      if (unitFilter !== "ALL") body.unit_id = unitFilter;
+      const { data, error } = await supabase.functions.invoke("update-asaas-notifications", { body });
+      if (error) {
+        toast({ title: "Erro ao atualizar notificações", description: error.message, variant: "destructive" });
+        return;
+      }
+      if (data?.error) {
+        toast({ title: "Erro", description: data.error, variant: "destructive" });
+        return;
+      }
+      toast({
+        title: "📱 WhatsApp configurado!",
+        description: data?.message || "Notificações atualizadas no gateway.",
+      });
+    } catch (err: unknown) {
+      toast({ title: "Erro inesperado", description: err instanceof Error ? err.message : "Erro", variant: "destructive" });
+    } finally {
+      setUpdatingNotifs(false);
+    }
+  };
+
   const handleImportAsaas = async () => {
     setImportingAsaas(true);
     try {
@@ -750,6 +777,16 @@ const AdminCharges = () => {
           >
             {importingAsaas ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
             Importar do Asaas
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-1.5"
+            disabled={updatingNotifs}
+            onClick={handleUpdateAllWhatsappNotifs}
+            title="Configura todos os clientes no Asaas para receberem cobranças apenas via WhatsApp"
+          >
+            {updatingNotifs ? <Loader2 size={16} className="animate-spin" /> : <MessageCircle size={16} />}
+            WhatsApp em Massa
           </Button>
 
           <Dialog

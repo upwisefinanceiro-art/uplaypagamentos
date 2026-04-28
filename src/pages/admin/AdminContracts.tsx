@@ -292,7 +292,12 @@ const AdminContracts = () => {
     if (!birthDate) return "Data de nascimento é obrigatória";
     if (!cpf.trim()) return "CPF é obrigatório";
     if (!validarCPF(cpf)) return "CPF inválido";
-    if (!phone.trim()) return "Telefone é obrigatório";
+    if (!phone.trim()) return "Telefone celular é obrigatório (necessário para notificações via WhatsApp)";
+    {
+      const ph = phone.replace(/\D/g, "");
+      if (ph.length !== 11) return "Telefone celular inválido. Use DDD + 9 dígitos (ex.: 31 99999-9999)";
+      if (ph[2] !== "9") return "Telefone deve ser celular (começar com 9 após o DDD)";
+    }
     if (!email.trim()) return "E-mail é obrigatório";
     if (!validarEmail(email)) return "E-mail inválido";
     if (!address.trim()) return "Logradouro é obrigatório";
@@ -546,7 +551,7 @@ const AdminContracts = () => {
         if (asaasErr === 0) {
           toast({
             title: "Cobranças enviadas ao Asaas!",
-            description: `${asaasOk} parcela(s) registrada(s) com sucesso.`,
+            description: `${asaasOk} parcela(s) registrada(s). 📱 Notificações via WhatsApp agendadas no gateway.`,
           });
         } else {
           toast({
@@ -721,8 +726,9 @@ const AdminContracts = () => {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
-            <Label className="text-foreground text-xs">Telefone *</Label>
+            <Label className="text-foreground text-xs">Celular (WhatsApp) *</Label>
             <Input className="bg-input border-border text-foreground" placeholder="(31) 99999-9999" value={phone} onChange={e => setPhone(e.target.value)} />
+            <p className="text-[10px] text-muted-foreground mt-1">Obrigatório – usado para enviar cobranças via WhatsApp.</p>
           </div>
           <div className="space-y-1">
             <Label className="text-foreground text-xs">E-mail *</Label>
