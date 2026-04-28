@@ -192,6 +192,9 @@ const AdminContracts = () => {
   const [apostilasInterval, setApostilasInterval] = useState("3");
   const [apostilaStockItemId, setApostilaStockItemId] = useState("");
   const [stockItems, setStockItems] = useState<{ id: string; name: string; unit_id: string; quantity: number }[]>([]);
+  const [coursesList, setCoursesList] = useState<{ id: string; unit_id: string; name: string; suggested_value: number; suggested_installments: number }[]>([]);
+  const [courseApostilasMap, setCourseApostilasMap] = useState<{ course_id: string; stock_item_id: string; unit_value: number; display_order: number }[]>([]);
+  const [selectedCourseId, setSelectedCourseId] = useState<string>("");
 
   // Matrícula state
   const [includeMatricula, setIncludeMatricula] = useState(false);
@@ -232,7 +235,7 @@ const AdminContracts = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const [contractsRes, studentsRes, responsiblesRes, unitsRes, adminRolesRes, contractPayments, stockItemsRes] = await Promise.all([
+    const [contractsRes, studentsRes, responsiblesRes, unitsRes, adminRolesRes, contractPayments, stockItemsRes, coursesRes, courseApostilasRes] = await Promise.all([
       supabase.from("contracts").select("*, units(name), students(full_name)").order("created_at", { ascending: false }),
       supabase.from("students").select("id, full_name, responsible_id, unit_id").eq("active", true),
       supabase.from("profiles").select("id, full_name, cpf, phone, email, unit_id, asaas_customer_id").eq("active", true),
@@ -247,6 +250,8 @@ const AdminContracts = () => {
           .range(from, to),
       ),
       supabase.from("stock_items").select("id, name, unit_id, quantity").eq("active", true),
+      supabase.from("courses").select("id, unit_id, name, suggested_value, suggested_installments").eq("active", true).order("name"),
+      supabase.from("course_apostilas").select("course_id, stock_item_id, unit_value, display_order"),
     ]);
     if (contractsRes.data) setContracts(contractsRes.data as any);
     if (studentsRes.data) setStudents(studentsRes.data);
@@ -257,6 +262,8 @@ const AdminContracts = () => {
     if (unitsRes.data) setUnits(unitsRes.data);
     setContractPayments(contractPayments as any);
     if (stockItemsRes.data) setStockItems(stockItemsRes.data as any);
+    if (coursesRes.data) setCoursesList(coursesRes.data as any);
+    if (courseApostilasRes.data) setCourseApostilasMap(courseApostilasRes.data as any);
     setLoading(false);
   };
 
@@ -284,7 +291,7 @@ const AdminContracts = () => {
     setIncludeApostilas(false); setApostilasTotal(""); setApostilasQty("1");
     setApostilasStartDate(""); setApostilasInterval("3"); setApostilaStockItemId("");
     setIncludeMatricula(false); setMatriculaValue(""); setMatriculaDueDate(""); setMatriculaDescription("Matrícula");
-    setNewStudentName(""); setStudentBirthDate("");
+    setNewStudentName(""); setStudentBirthDate(""); setSelectedCourseId("");
   };
 
   const validateForm = (): string | null => {
@@ -788,6 +795,51 @@ const AdminContracts = () => {
     </div>
   );
 
+  const availableCourses = coursesList.filter(c => !resolvedUnitId || c.unit_id === resolvedUnitId);
+
+  const handleCourseSelect = (courseId: string) => {
+    setSelectedCourseId(courseId);
+    if (courseId === "__manual__" || !courseId) {
+      return;
+    }
+    const course = coursesList.find(c => c.id === courseId);
+    if (!course) return;
+
+    // Preenche descrição
+    setDescription(course.name);
+
+    // Preenche valor sugerido (se houver)
+    if (course.suggested_value > 0) {
+      setCourseRealValue(String(course.suggested_value).replace(".", ","));
+    }
+    if (course.suggested_installments > 0) {
+      setInstallments(String(course.suggested_installments));
+    }
+
+    // Auto-preenche apostilas vinculadas
+    const linkedApostilas = courseApostilasMap
+      .filter(ca => ca.course_id === courseId)
+      .sort((a, b) => a.display_order - b.display_order);
+
+    if (linkedApostilas.length > 0) {
+      const totalApostilas = linkedApostilas.reduce((sum, la) => sum + (la.unit_value || 0), 0);
+      setIncludeApostilas(true);
+      setApostilasTotal(String(totalApostilas).replace(".", ","));
+      setApostilasQty(String(linkedApostilas.length));
+      // Vincula o primeiro item de estoque (principal) para baixa automática
+      setApostilaStockItemId(linkedApostilas[0].stock_item_id);
+      toast({
+        title: "Apostilas auto-preenchidas",
+        description: `${linkedApostilas.length} apostila(s) vinculada(s) ao curso. Você pode editar a seção E se necessário.`,
+      });
+    } else {
+      // Curso sem apostilas vinculadas — limpa seção E
+      setIncludeApostilas(false);
+      setApostilasTotal("");
+      setApostilaStockItemId("");
+    }
+  };
+
   const renderFinancialSection = () => (
     <div>
       <h3 className="text-sm font-semibold text-primary mb-3">C. Dados Financeiros</h3>
@@ -800,7 +852,33 @@ const AdminContracts = () => {
           </div>
           <div className="space-y-1">
             <Label className="text-foreground text-xs">Curso / Descrição *</Label>
-            <Input className="bg-input border-border text-foreground" placeholder="Ex: Informática Básica" value={description} onChange={e => setDescription(e.target.value)} />
+            {availableCourses.length > 0 ? (
+              <>
+                <Select value={selectedCourseId || "__manual__"} onValueChange={handleCourseSelect}>
+                  <SelectTrigger className="bg-input border-border text-foreground">
+                    <SelectValue placeholder="Selecione um curso cadastrado" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border-border">
+                    <SelectItem value="__manual__">— Digitar manualmente —</SelectItem>
+                    {availableCourses.map(c => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                        {c.suggested_value > 0 && ` (${fmt(c.suggested_value)})`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  className="bg-input border-border text-foreground mt-1"
+                  placeholder="Ex: Informática Básica"
+                  value={description}
+                  onChange={e => { setDescription(e.target.value); if (selectedCourseId && selectedCourseId !== "__manual__") setSelectedCourseId("__manual__"); }}
+                />
+                <p className="text-[10px] text-muted-foreground">Selecione um curso para auto-preencher valor e apostilas, ou edite livremente.</p>
+              </>
+            ) : (
+              <Input className="bg-input border-border text-foreground" placeholder="Ex: Informática Básica" value={description} onChange={e => setDescription(e.target.value)} />
+            )}
           </div>
         </div>
         {resolvedUnitId && (
