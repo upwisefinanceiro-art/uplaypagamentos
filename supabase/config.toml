@@ -50,3 +50,6 @@ verify_jwt = false
 
 [functions.restore-backup]
 verify_jwt = false
+
+[functions.update-asaas-notifications]
+verify_jwt = false
