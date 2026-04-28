@@ -500,12 +500,61 @@ const AdminContracts = () => {
         });
       }
 
-      const { error: paymentsErr } = await supabase.from("payments").insert(payments);
+      const { data: insertedPayments, error: paymentsErr } = await supabase
+        .from("payments")
+        .insert(payments)
+        .select("id");
       if (paymentsErr) throw paymentsErr;
 
-      const totalParcelas = payments.length;
-      toast({ title: "Contrato criado!", description: `${totalParcelas} parcelas geradas com sucesso.` });
+      const totalParcelas = insertedPayments?.length || payments.length;
+
+      // Fechar diálogo e mostrar progresso da geração no Asaas
       setDialogOpen(false);
+      toast({
+        title: "Contrato criado!",
+        description: `${totalParcelas} parcelas geradas. Enviando para o Asaas...`,
+      });
+
+      // Disparar criação automática no Asaas (síncrono, em paralelo controlado)
+      if (insertedPayments && insertedPayments.length > 0) {
+        const ids = insertedPayments.map((p: any) => p.id);
+        const CHUNK_SIZE = 3;
+        let asaasOk = 0;
+        let asaasErr = 0;
+
+        for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+          const chunk = ids.slice(i, i + CHUNK_SIZE);
+          const results = await Promise.allSettled(
+            chunk.map((payment_id) =>
+              supabase.functions.invoke("sync-asaas-payment", {
+                body: { payment_id },
+              }),
+            ),
+          );
+          for (const r of results) {
+            if (r.status === "fulfilled" && !r.value.error && !(r.value.data as any)?.error) {
+              asaasOk++;
+            } else {
+              asaasErr++;
+              console.error("[asaas-sync] falha", r);
+            }
+          }
+        }
+
+        if (asaasErr === 0) {
+          toast({
+            title: "Cobranças enviadas ao Asaas!",
+            description: `${asaasOk} parcela(s) registrada(s) com sucesso.`,
+          });
+        } else {
+          toast({
+            title: `${asaasOk} de ${ids.length} parcelas enviadas`,
+            description: `${asaasErr} falharam. Use 'Sincronizar com Asaas' em Cobranças para reprocessar.`,
+            variant: "destructive",
+          });
+        }
+      }
+
 
       // Show access modal if user was created
       if (responsibleMode === "new" && saveResponsibleToBase) {
