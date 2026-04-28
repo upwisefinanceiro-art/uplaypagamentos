@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Loader2, UserPlus, UserCheck, Save, Trash2, ExternalLink, Search, CalendarIcon, Pencil, Ban, AlertTriangle } from "lucide-react";
+import { Plus, Loader2, UserPlus, UserCheck, Save, Trash2, ExternalLink, Search, CalendarIcon, Pencil, Ban, AlertTriangle, Bell } from "lucide-react";
 import { format, addMonths, lastDayOfMonth, setDate as setDateFns, startOfDay, isBefore, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
@@ -31,6 +31,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import UserEditDialog from "@/components/admin/UserEditDialog";
 import ContractCancellationDialog from "@/components/admin/ContractCancellationDialog";
 import ClientAccessModal from "@/components/admin/ClientAccessModal";
+import NotifyClientDialog from "@/components/admin/NotifyClientDialog";
 import { fetchAllPaginated } from "@/lib/fetchAllPaginated";
 
 interface ContractRow {
@@ -141,6 +142,7 @@ const AdminContracts = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [editResponsible, setEditResponsible] = useState<{ id: string; full_name: string; cpf: string; phone: string | null; unit_id: string | null; email?: string | null; address?: string | null } | null>(null);
   const [cancelTarget, setCancelTarget] = useState<ContractRow | null>(null);
+  const [notifyTarget, setNotifyTarget] = useState<{ id: string; name: string; unit_id: string } | null>(null);
   const [contractPayments, setContractPayments] = useState<{ id: string; contract_id: string | null; status: string; due_date: string }[]>([]);
   const [accessModalOpen, setAccessModalOpen] = useState(false);
   const [accessModalData, setAccessModalData] = useState<{ responsibleName: string; studentName: string; cpf: string; email?: string | null; phone?: string | null; unitId?: string | null } | null>(null);
@@ -1428,6 +1430,14 @@ const AdminContracts = () => {
                   >
                     <ExternalLink size={12} className="mr-1" /> Parcelas
                   </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => setNotifyTarget({ id: c.responsible_id, name: c.responsible_name || "Cliente", unit_id: c.unit_id })}
+                  >
+                    <Bell size={12} className="mr-1" /> Notificar App
+                  </Button>
                   {c.status === "ACTIVE" && (
                     <Button
                       variant="ghost"
@@ -1499,6 +1509,14 @@ const AdminContracts = () => {
         open={accessModalOpen}
         onOpenChange={setAccessModalOpen}
         data={accessModalData}
+      />
+
+      <NotifyClientDialog
+        open={!!notifyTarget}
+        onOpenChange={(open) => !open && setNotifyTarget(null)}
+        clientId={notifyTarget?.id ?? null}
+        clientName={notifyTarget?.name ?? null}
+        unitId={notifyTarget?.unit_id ?? null}
       />
     </div>
   );
