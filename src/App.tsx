@@ -26,6 +26,7 @@ import AdminContracts from "./pages/admin/AdminContracts";
 import AdminCharges from "./pages/admin/AdminCharges";
 import AdminFinancial from "./pages/admin/AdminFinancial";
 import AdminStock from "./pages/admin/AdminStock";
+import AdminCourses from "./pages/admin/AdminCourses";
 import AdminCompanies from "./pages/admin/AdminCompanies";
 import AdminSaasBilling from "./pages/admin/AdminSaasBilling";
 import AdminSaasPlans from "./pages/admin/AdminSaasPlans";
