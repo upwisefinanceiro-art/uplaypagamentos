@@ -192,6 +192,9 @@ const AdminContracts = () => {
   const [apostilasInterval, setApostilasInterval] = useState("3");
   const [apostilaStockItemId, setApostilaStockItemId] = useState("");
   const [stockItems, setStockItems] = useState<{ id: string; name: string; unit_id: string; quantity: number }[]>([]);
+  const [coursesList, setCoursesList] = useState<{ id: string; unit_id: string; name: string; suggested_value: number; suggested_installments: number }[]>([]);
+  const [courseApostilasMap, setCourseApostilasMap] = useState<{ course_id: string; stock_item_id: string; unit_value: number; display_order: number }[]>([]);
+  const [selectedCourseId, setSelectedCourseId] = useState<string>("");
 
   // Matrícula state
   const [includeMatricula, setIncludeMatricula] = useState(false);
