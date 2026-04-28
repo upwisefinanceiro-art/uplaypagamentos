@@ -292,7 +292,12 @@ const AdminContracts = () => {
     if (!birthDate) return "Data de nascimento é obrigatória";
     if (!cpf.trim()) return "CPF é obrigatório";
     if (!validarCPF(cpf)) return "CPF inválido";
-    if (!phone.trim()) return "Telefone é obrigatório";
+    if (!phone.trim()) return "Telefone celular é obrigatório (necessário para notificações via WhatsApp)";
+    {
+      const ph = phone.replace(/\D/g, "");
+      if (ph.length !== 11) return "Telefone celular inválido. Use DDD + 9 dígitos (ex.: 31 99999-9999)";
+      if (ph[2] !== "9") return "Telefone deve ser celular (começar com 9 após o DDD)";
+    }
     if (!email.trim()) return "E-mail é obrigatório";
     if (!validarEmail(email)) return "E-mail inválido";
     if (!address.trim()) return "Logradouro é obrigatório";
