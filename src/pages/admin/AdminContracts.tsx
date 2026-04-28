@@ -290,7 +290,6 @@ const AdminContracts = () => {
     if (!birthDate) return "Data de nascimento é obrigatória";
     if (!cpf.trim()) return "CPF é obrigatório";
     if (!validarCPF(cpf)) return "CPF inválido";
-    if (!rg.trim()) return "RG é obrigatório";
     if (!phone.trim()) return "Telefone é obrigatório";
     if (!email.trim()) return "E-mail é obrigatório";
     if (!validarEmail(email)) return "E-mail inválido";
@@ -673,7 +672,7 @@ const AdminContracts = () => {
             <Input className="bg-input border-border text-foreground" placeholder="000.000.000-00" value={cpf} onChange={e => setCpf(e.target.value)} />
           </div>
           <div className="space-y-1">
-            <Label className="text-foreground text-xs">RG / Identidade *</Label>
+            <Label className="text-foreground text-xs">RG / Identidade</Label>
             <Input className="bg-input border-border text-foreground" value={rg} onChange={e => setRg(e.target.value)} />
           </div>
         </div>
