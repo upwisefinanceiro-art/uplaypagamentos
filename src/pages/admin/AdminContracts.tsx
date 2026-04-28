@@ -1442,7 +1442,7 @@ const AdminContracts = () => {
                     className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
                     onClick={() => setNotifyTarget({ id: c.responsible_id, name: c.responsible_name || "Cliente", unit_id: c.unit_id })}
                   >
-                    <Bell size={12} className="mr-1" /> Notificar App
+                    <Bell size={12} className="mr-1" /> Notificar Cliente
                   </Button>
                   {c.status === "ACTIVE" && (
                     <Button

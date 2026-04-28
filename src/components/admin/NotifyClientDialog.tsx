@@ -147,7 +147,7 @@ const NotifyClientDialog = ({ open, onOpenChange, clientId, clientName, unitId }
 
         <Tabs defaultValue="app" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="app" className="gap-1.5"><Bell size={14} /> Notificar App</TabsTrigger>
+            <TabsTrigger value="app" className="gap-1.5"><Bell size={14} /> Notificar Cliente</TabsTrigger>
             <TabsTrigger value="whatsapp" className="gap-1.5"><MessageCircle size={14} /> WhatsApp</TabsTrigger>
           </TabsList>
 
