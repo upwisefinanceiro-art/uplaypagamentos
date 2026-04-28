@@ -180,7 +180,7 @@ const AdminContracts = () => {
   const [notes, setNotes] = useState("");
   const [password, setPassword] = useState("");
   const [contractNumber, setContractNumber] = useState("");
-  const [saveResponsibleToBase, setSaveResponsibleToBase] = useState(false);
+  const [saveResponsibleToBase, setSaveResponsibleToBase] = useState(true);
 
   // Apostilas state
   const [includeApostilas, setIncludeApostilas] = useState(false);
@@ -278,7 +278,7 @@ const AdminContracts = () => {
     setZipCode(""); setUnitId(""); setDescription(""); setStartDate("");
     setFirstDueDate(""); setCourseRealValue(""); setPunctualityDiscount("0");
     setInstallments("1"); setPaymentMethod(""); setNotes("");
-    setPassword(""); setContractNumber(""); setStep("form"); setSaveResponsibleToBase(false);
+    setPassword(""); setContractNumber(""); setStep("form"); setSaveResponsibleToBase(true);
     setIncludeApostilas(false); setApostilasTotal(""); setApostilasQty("1");
     setApostilasStartDate(""); setApostilasInterval("3"); setApostilaStockItemId("");
     setIncludeMatricula(false); setMatriculaValue(""); setMatriculaDueDate(""); setMatriculaDescription("Matrícula");
