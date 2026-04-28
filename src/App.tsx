@@ -21,7 +21,7 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminAdmins from "./pages/admin/AdminAdmins";
 import AdminUnits from "./pages/admin/AdminUnits";
 import AdminUsers from "./pages/admin/AdminUsers";
-import AdminClients from "./pages/admin/AdminClients";
+
 import AdminContracts from "./pages/admin/AdminContracts";
 import AdminCharges from "./pages/admin/AdminCharges";
 import AdminFinancial from "./pages/admin/AdminFinancial";
@@ -89,7 +89,7 @@ const App = () => {
                 <Route path="administradores" element={<AdminAdmins />} />
                 <Route path="unidades" element={<AdminUnits />} />
                 <Route path="usuarios" element={<AdminUsers />} />
-                <Route path="clientes" element={<AdminClients />} />
+                <Route path="clientes" element={<Navigate to="/admin/contratos" replace />} />
                 <Route path="contratos" element={<AdminContracts />} />
                 <Route path="cobrancas" element={<AdminCharges />} />
                 <Route path="financeiro" element={<AdminFinancial />} />
