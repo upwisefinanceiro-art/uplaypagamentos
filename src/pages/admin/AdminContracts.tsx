@@ -235,7 +235,7 @@ const AdminContracts = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const [contractsRes, studentsRes, responsiblesRes, unitsRes, adminRolesRes, contractPayments, stockItemsRes] = await Promise.all([
+    const [contractsRes, studentsRes, responsiblesRes, unitsRes, adminRolesRes, contractPayments, stockItemsRes, coursesRes, courseApostilasRes] = await Promise.all([
       supabase.from("contracts").select("*, units(name), students(full_name)").order("created_at", { ascending: false }),
       supabase.from("students").select("id, full_name, responsible_id, unit_id").eq("active", true),
       supabase.from("profiles").select("id, full_name, cpf, phone, email, unit_id, asaas_customer_id").eq("active", true),
@@ -250,6 +250,8 @@ const AdminContracts = () => {
           .range(from, to),
       ),
       supabase.from("stock_items").select("id, name, unit_id, quantity").eq("active", true),
+      supabase.from("courses").select("id, unit_id, name, suggested_value, suggested_installments").eq("active", true).order("name"),
+      supabase.from("course_apostilas").select("course_id, stock_item_id, unit_value, display_order"),
     ]);
     if (contractsRes.data) setContracts(contractsRes.data as any);
     if (studentsRes.data) setStudents(studentsRes.data);
@@ -260,6 +262,8 @@ const AdminContracts = () => {
     if (unitsRes.data) setUnits(unitsRes.data);
     setContractPayments(contractPayments as any);
     if (stockItemsRes.data) setStockItems(stockItemsRes.data as any);
+    if (coursesRes.data) setCoursesList(coursesRes.data as any);
+    if (courseApostilasRes.data) setCourseApostilasMap(courseApostilasRes.data as any);
     setLoading(false);
   };
 
