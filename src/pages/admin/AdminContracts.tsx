@@ -618,23 +618,15 @@ const AdminContracts = () => {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex items-center gap-2 p-3 rounded-md border border-border bg-muted/30">
-            <Checkbox
-              id="save-responsible"
-              checked={saveResponsibleToBase}
-              onCheckedChange={(checked) => setSaveResponsibleToBase(checked === true)}
-            />
-            <label htmlFor="save-responsible" className="text-xs text-foreground cursor-pointer flex items-center gap-1.5">
-              <Save size={13} className="text-primary" />
-              Salvar responsável na base (para reaproveitar depois)
-            </label>
-          </div>
-          {saveResponsibleToBase && (
-            <div className="space-y-1">
-              <Label className="text-foreground text-xs">Senha de acesso do responsável *</Label>
-              <Input className="bg-input border-border text-foreground" type="password" placeholder="Mínimo 6 caracteres" value={password} onChange={e => setPassword(e.target.value)} />
+          <div className="p-3 rounded-md border border-primary/30 bg-primary/5">
+            <div className="flex items-start gap-2">
+              <Save size={14} className="text-primary mt-0.5" />
+              <div className="flex-1">
+                <p className="text-xs font-medium text-foreground">Cliente será cadastrado automaticamente</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Login pelo CPF. Senha inicial: <span className="font-mono font-semibold text-foreground">12345678</span> (cliente poderá alterar no app).</p>
+              </div>
             </div>
-          )}
+          </div>
         </div>
       )}
 
