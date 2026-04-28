@@ -97,6 +97,7 @@ const App = () => {
                 <Route path="financeiro-pro" element={<AdminFinancialPro />} />
                 <Route path="taxas-asaas" element={<AdminAsaasFees />} />
                 <Route path="estoque" element={<AdminStock />} />
+                <Route path="cursos" element={<AdminCourses />} />
                 <Route path="cobrancas-saas" element={<AdminSaasBilling />} />
                 <Route path="planos-saas" element={<AdminSaasPlans />} />
                 <Route path="backup" element={<AdminBackup />} />
