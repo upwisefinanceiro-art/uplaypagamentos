@@ -795,6 +795,51 @@ const AdminContracts = () => {
     </div>
   );
 
+  const availableCourses = coursesList.filter(c => !resolvedUnitId || c.unit_id === resolvedUnitId);
+
+  const handleCourseSelect = (courseId: string) => {
+    setSelectedCourseId(courseId);
+    if (courseId === "__manual__" || !courseId) {
+      return;
+    }
+    const course = coursesList.find(c => c.id === courseId);
+    if (!course) return;
+
+    // Preenche descrição
+    setDescription(course.name);
+
+    // Preenche valor sugerido (se houver)
+    if (course.suggested_value > 0) {
+      setCourseRealValue(String(course.suggested_value).replace(".", ","));
+    }
+    if (course.suggested_installments > 0) {
+      setInstallments(String(course.suggested_installments));
+    }
+
+    // Auto-preenche apostilas vinculadas
+    const linkedApostilas = courseApostilasMap
+      .filter(ca => ca.course_id === courseId)
+      .sort((a, b) => a.display_order - b.display_order);
+
+    if (linkedApostilas.length > 0) {
+      const totalApostilas = linkedApostilas.reduce((sum, la) => sum + (la.unit_value || 0), 0);
+      setIncludeApostilas(true);
+      setApostilasTotal(String(totalApostilas).replace(".", ","));
+      setApostilasQty(String(linkedApostilas.length));
+      // Vincula o primeiro item de estoque (principal) para baixa automática
+      setApostilaStockItemId(linkedApostilas[0].stock_item_id);
+      toast({
+        title: "Apostilas auto-preenchidas",
+        description: `${linkedApostilas.length} apostila(s) vinculada(s) ao curso. Você pode editar a seção E se necessário.`,
+      });
+    } else {
+      // Curso sem apostilas vinculadas — limpa seção E
+      setIncludeApostilas(false);
+      setApostilasTotal("");
+      setApostilaStockItemId("");
+    }
+  };
+
   const renderFinancialSection = () => (
     <div>
       <h3 className="text-sm font-semibold text-primary mb-3">C. Dados Financeiros</h3>
@@ -807,7 +852,33 @@ const AdminContracts = () => {
           </div>
           <div className="space-y-1">
             <Label className="text-foreground text-xs">Curso / Descrição *</Label>
-            <Input className="bg-input border-border text-foreground" placeholder="Ex: Informática Básica" value={description} onChange={e => setDescription(e.target.value)} />
+            {availableCourses.length > 0 ? (
+              <>
+                <Select value={selectedCourseId || "__manual__"} onValueChange={handleCourseSelect}>
+                  <SelectTrigger className="bg-input border-border text-foreground">
+                    <SelectValue placeholder="Selecione um curso cadastrado" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border-border">
+                    <SelectItem value="__manual__">— Digitar manualmente —</SelectItem>
+                    {availableCourses.map(c => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                        {c.suggested_value > 0 && ` (${fmt(c.suggested_value)})`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  className="bg-input border-border text-foreground mt-1"
+                  placeholder="Ex: Informática Básica"
+                  value={description}
+                  onChange={e => { setDescription(e.target.value); if (selectedCourseId && selectedCourseId !== "__manual__") setSelectedCourseId("__manual__"); }}
+                />
+                <p className="text-[10px] text-muted-foreground">Selecione um curso para auto-preencher valor e apostilas, ou edite livremente.</p>
+              </>
+            ) : (
+              <Input className="bg-input border-border text-foreground" placeholder="Ex: Informática Básica" value={description} onChange={e => setDescription(e.target.value)} />
+            )}
           </div>
         </div>
         {resolvedUnitId && (
