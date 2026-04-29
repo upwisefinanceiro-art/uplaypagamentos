@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Loader2, UserPlus, UserCheck, Save, Trash2, ExternalLink, Search, CalendarIcon, Pencil, Ban, AlertTriangle, Bell } from "lucide-react";
+import { Plus, Loader2, UserPlus, UserCheck, Save, Trash2, ExternalLink, Search, CalendarIcon, Pencil, Ban, AlertTriangle, Bell, PlusCircle } from "lucide-react";
 import { format, addMonths, lastDayOfMonth, setDate as setDateFns, startOfDay, isBefore, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
@@ -32,6 +32,7 @@ import UserEditDialog from "@/components/admin/UserEditDialog";
 import ContractCancellationDialog from "@/components/admin/ContractCancellationDialog";
 import ClientAccessModal from "@/components/admin/ClientAccessModal";
 import NotifyClientDialog from "@/components/admin/NotifyClientDialog";
+import AddContractInstallmentsDialog from "@/components/admin/AddContractInstallmentsDialog";
 import { fetchAllPaginated } from "@/lib/fetchAllPaginated";
 
 interface ContractRow {
@@ -143,6 +144,7 @@ const AdminContracts = () => {
   const [editResponsible, setEditResponsible] = useState<{ id: string; full_name: string; cpf: string; phone: string | null; unit_id: string | null; email?: string | null; address?: string | null } | null>(null);
   const [cancelTarget, setCancelTarget] = useState<ContractRow | null>(null);
   const [notifyTarget, setNotifyTarget] = useState<{ id: string; name: string; unit_id: string } | null>(null);
+  const [addInstallmentsTarget, setAddInstallmentsTarget] = useState<ContractRow | null>(null);
   const [contractPayments, setContractPayments] = useState<{ id: string; contract_id: string | null; status: string; due_date: string }[]>([]);
   const [accessModalOpen, setAccessModalOpen] = useState(false);
   const [accessModalData, setAccessModalData] = useState<{ responsibleName: string; studentName: string; cpf: string; email?: string | null; phone?: string | null; unitId?: string | null } | null>(null);
@@ -1517,6 +1519,14 @@ const AdminContracts = () => {
                   <Button
                     variant="ghost"
                     size="sm"
+                    className="h-7 px-2 text-xs text-primary hover:text-primary"
+                    onClick={() => setAddInstallmentsTarget(c)}
+                  >
+                    <PlusCircle size={12} className="mr-1" /> Adicionar Parcelas/Taxas
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
                     onClick={() => setNotifyTarget({ id: c.responsible_id, name: c.responsible_name || "Cliente", unit_id: c.unit_id })}
                   >
@@ -1601,6 +1611,20 @@ const AdminContracts = () => {
         clientId={notifyTarget?.id ?? null}
         clientName={notifyTarget?.name ?? null}
         unitId={notifyTarget?.unit_id ?? null}
+      />
+
+      <AddContractInstallmentsDialog
+        open={!!addInstallmentsTarget}
+        onOpenChange={(open) => !open && setAddInstallmentsTarget(null)}
+        contract={addInstallmentsTarget ? {
+          id: addInstallmentsTarget.id,
+          description: addInstallmentsTarget.description,
+          contract_number: addInstallmentsTarget.contract_number,
+          responsible_id: addInstallmentsTarget.responsible_id,
+          student_id: addInstallmentsTarget.student_id,
+          unit_id: addInstallmentsTarget.unit_id,
+        } : null}
+        onSuccess={fetchData}
       />
     </div>
   );
