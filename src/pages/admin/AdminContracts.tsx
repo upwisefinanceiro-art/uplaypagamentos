@@ -1519,6 +1519,14 @@ const AdminContracts = () => {
                   <Button
                     variant="ghost"
                     size="sm"
+                    className="h-7 px-2 text-xs text-primary hover:text-primary"
+                    onClick={() => setAddInstallmentsTarget(c)}
+                  >
+                    <PlusCircle size={12} className="mr-1" /> Adicionar Parcelas/Taxas
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
                     onClick={() => setNotifyTarget({ id: c.responsible_id, name: c.responsible_name || "Cliente", unit_id: c.unit_id })}
                   >
