@@ -1612,6 +1612,20 @@ const AdminContracts = () => {
         clientName={notifyTarget?.name ?? null}
         unitId={notifyTarget?.unit_id ?? null}
       />
+
+      <AddContractInstallmentsDialog
+        open={!!addInstallmentsTarget}
+        onOpenChange={(open) => !open && setAddInstallmentsTarget(null)}
+        contract={addInstallmentsTarget ? {
+          id: addInstallmentsTarget.id,
+          description: addInstallmentsTarget.description,
+          contract_number: addInstallmentsTarget.contract_number,
+          responsible_id: addInstallmentsTarget.responsible_id,
+          student_id: addInstallmentsTarget.student_id,
+          unit_id: addInstallmentsTarget.unit_id,
+        } : null}
+        onSuccess={fetchData}
+      />
     </div>
   );
 };
