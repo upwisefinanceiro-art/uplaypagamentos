@@ -144,6 +144,7 @@ const AdminContracts = () => {
   const [editResponsible, setEditResponsible] = useState<{ id: string; full_name: string; cpf: string; phone: string | null; unit_id: string | null; email?: string | null; address?: string | null } | null>(null);
   const [cancelTarget, setCancelTarget] = useState<ContractRow | null>(null);
   const [notifyTarget, setNotifyTarget] = useState<{ id: string; name: string; unit_id: string } | null>(null);
+  const [addInstallmentsTarget, setAddInstallmentsTarget] = useState<ContractRow | null>(null);
   const [contractPayments, setContractPayments] = useState<{ id: string; contract_id: string | null; status: string; due_date: string }[]>([]);
   const [accessModalOpen, setAccessModalOpen] = useState(false);
   const [accessModalData, setAccessModalData] = useState<{ responsibleName: string; studentName: string; cpf: string; email?: string | null; phone?: string | null; unitId?: string | null } | null>(null);
