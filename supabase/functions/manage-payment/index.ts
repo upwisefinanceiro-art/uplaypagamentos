@@ -398,14 +398,41 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "Parcelas pagas não podem ser editadas automaticamente. Faça o ajuste manual do financeiro." });
       }
 
-      if (payload.status === "PAID" && payment.asaas_payment_id) {
-        return jsonResponse({ error: "Cobranças online pagas devem ser conciliadas automaticamente pelo financeiro externo." });
-      }
-
       let asaasIdToKeep: string | null = payment.asaas_payment_id;
       let asaasWarning: string | null = null;
+      const isManualReceipt = payload.status === "PAID" && !!payment.asaas_payment_id;
 
-      if (payment.asaas_payment_id && payload.status !== "CANCELLED") {
+      // Baixa manual ("Receber em Dinheiro") quando marcar como PAID com cobrança Asaas vinculada
+      if (isManualReceipt) {
+        const receivedValue = Number(payload.value);
+        const paymentDate = new Date().toISOString().slice(0, 10);
+        const receiveResult = await syncAsaasRequest(
+          payment.unit_id,
+          `/payments/${payment.asaas_payment_id}/receiveInCash`,
+          "POST",
+          {
+            paymentDate,
+            value: receivedValue,
+            notifyCustomer: false,
+          },
+        );
+
+        if (!receiveResult.ok) {
+          if (receiveResult.paid) {
+            // Já consta paga no Asaas — sincroniza e segue
+            console.log(`[manage-payment] Cobrança ${payment.asaas_payment_id} já paga no Asaas. Sincronizando.`);
+            await supabaseAdmin.functions.invoke("sync-asaas-payment", { body: { payment_id: payment.id } }).catch(() => null);
+          } else if (receiveResult.notFound) {
+            asaasIdToKeep = null;
+            asaasWarning = "A cobrança original não foi encontrada no Asaas. A baixa foi registrada apenas localmente.";
+          } else {
+            return jsonResponse({
+              error: "Não foi possível sincronizar a baixa com o Asaas. Verifique a conexão.",
+              details: receiveResult.error,
+            });
+          }
+        }
+      } else if (payment.asaas_payment_id && payload.status !== "CANCELLED") {
         const syncedUpdate = await syncAsaasRequest(payment.unit_id, `/payments/${payment.asaas_payment_id}`, "PUT", {
           value: Number(payload.value),
           dueDate: payload.due_date,
