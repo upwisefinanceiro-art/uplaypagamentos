@@ -64,36 +64,25 @@ const buildDefaultMessage = ({
     return "BOLETO";
   })();
 
-  let msg = `📚 *UPLAY - Gestão de Pagamentos* 📚\n\n`;
-  msg += `Olá, ${responsibleName}! 👋\n\n`;
-  msg += `Aqui é do *financeiro da UPLAY*.\n\n`;
-  if (studentName) msg += `👤 Aluno: ${studentName}\n`;
-  msg += `📋 Referência: ${description}\n`;
-  msg += `💰 Valor: *${formatCurrency(value)}*\n`;
-  msg += `📅 Vencimento: *${formatDate(dueDate)}*\n\n`;
+  let msg = `*Lembrete de Mensalidade* 📲\n\n`;
+  msg += `Olá, ${responsibleName}! Tudo bem?\n\n`;
+  msg += `Passamos para lembrar que o pagamento da sua mensalidade de *${description}*`;
+  if (studentName) msg += ` (aluno: ${studentName})`;
+  msg += ` consta como em aberto no nosso sistema. 💳\n\n`;
+  msg += `💰 *Valor:* ${formatCurrency(value)}\n`;
+  msg += `📅 *Vencimento:* ${formatDate(dueDate)}\n\n`;
 
-  if (resolvedMethod === "BOLETO") {
-    if (paymentLink) {
-      msg += `📄 *Boleto:*\n${paymentLink}\n\n`;
-    }
-  } else if (resolvedMethod === "PIX") {
-    if (pixCopyPaste) {
-      msg += `💳 *PIX (copia e cola):*\n${pixCopyPaste}\n\n`;
-    }
-    if (paymentLink) {
-      msg += `🔗 *Link para pagamento:*\n${paymentLink}\n\n`;
-    }
-  } else if (resolvedMethod === "CARD") {
-    if (paymentLink) {
-      msg += `🔗 *Link para pagamento:*\n${paymentLink}\n\n`;
-    }
+  if (resolvedMethod === "PIX" && pixCopyPaste) {
+    msg += `*PIX (copia e cola):*\n${pixCopyPaste}\n\n`;
+  }
+  if (paymentLink) {
+    msg += `Para sua comodidade, acesse sua fatura ou gere o código PIX/Boleto:\n🔗 ${paymentLink}\n\n`;
   } else {
-    if (paymentLink) {
-      msg += `🔗 *Link para pagamento:*\n${paymentLink}\n\n`;
-    }
+    msg += `Acesse nosso portal: 🔗 https://uplaypagamento.com.br\n\n`;
   }
 
-  msg += `Se tiver qualquer dúvida, estamos à disposição. 😊`;
+  msg += `Caso já tenha realizado o pagamento, por favor, desconsidere esta mensagem. Se precisar de ajuda ou quiser enviar o comprovante, estamos à disposição por aqui! 😊\n\n`;
+  msg += `Atenciosamente,\n*Equipe UPLAY Pagamentos* 🚀`;
 
   return msg;
 };
