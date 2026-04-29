@@ -32,6 +32,7 @@ import UserEditDialog from "@/components/admin/UserEditDialog";
 import ContractCancellationDialog from "@/components/admin/ContractCancellationDialog";
 import ClientAccessModal from "@/components/admin/ClientAccessModal";
 import NotifyClientDialog from "@/components/admin/NotifyClientDialog";
+import AddContractInstallmentsDialog from "@/components/admin/AddContractInstallmentsDialog";
 import { fetchAllPaginated } from "@/lib/fetchAllPaginated";
 
 interface ContractRow {
