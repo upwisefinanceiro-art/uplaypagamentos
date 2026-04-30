@@ -252,6 +252,11 @@ const AdminUnits = () => {
       asaas_webhook_token: form.asaas_webhook_token.trim() || null,
       whatsapp_financeiro: form.whatsapp_financeiro.trim() || null,
       usar_whatsapp_padrao: form.usar_whatsapp_padrao,
+      cora_client_id: form.cora_client_id.trim() || null,
+      cora_certificate: form.cora_certificate.trim() || null,
+      cora_private_key: form.cora_private_key.trim() || null,
+      cora_environment: form.cora_environment || "stage",
+      preferred_bank: form.preferred_bank || "asaas",
     };
 
     let error;
