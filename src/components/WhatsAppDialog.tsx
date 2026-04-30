@@ -119,7 +119,8 @@ const buildSpcMessage = ({
     msg += `\n*PIX (copia e cola):*\n${pixCopyPaste}\n`;
   }
 
-  msg += `\nApós o pagamento, a *baixa na negativação ocorre automaticamente*. Vamos resolver isso hoje? 💪\n\n`;
+  msg += `\nApós o pagamento, a *baixa na negativação ocorre automaticamente*. Verifique se não tem outros débitos para pagar!\n\n`;
+  msg += `Vamos resolver isso hoje? 💪\n\n`;
   msg += `Atenciosamente,\n*Equipe UPLAY Pagamentos* 🚀`;
 
   return msg;
