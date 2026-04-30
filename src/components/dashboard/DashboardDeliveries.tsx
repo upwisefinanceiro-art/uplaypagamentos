@@ -71,21 +71,67 @@ const DashboardDeliveries = ({ unitFilter = "all" }: Props) => {
 
   const confirmDelivery = async (id: string) => {
     setConfirmingId(id);
-    const { error } = await supabase
+    const original = deliveries.find((d) => d.id === id);
+    const nowIso = new Date().toISOString();
+
+    const { data, error } = await supabase
       .from("delivery_notifications")
       .update({
         status: "DELIVERED",
-        delivered_at: new Date().toISOString(),
-        delivered_by: user?.id,
+        delivered_at: nowIso,
+        delivered_by: user?.id ?? null,
       })
-      .eq("id", id);
+      .eq("id", id)
+      .eq("status", "PENDING") // garante idempotência
+      .select("id, status, delivered_at, delivered_by")
+      .maybeSingle();
 
     if (error) {
-      toast({ title: "Erro ao confirmar", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Entrega confirmada! ✅" });
-      setDeliveries((prev) => prev.filter((d) => d.id !== id));
+      console.error("[deliveries] confirm error:", error);
+      toast({
+        title: "Erro ao confirmar entrega",
+        description: error.message ?? "Não foi possível atualizar o registro. Tente novamente.",
+        variant: "destructive",
+      });
+      setConfirmingId(null);
+      return;
     }
+
+    if (!data) {
+      toast({
+        title: "Entrega não atualizada",
+        description: "O registro pode já ter sido confirmado por outro usuário.",
+        variant: "destructive",
+      });
+      await fetchDeliveries();
+      setConfirmingId(null);
+      return;
+    }
+
+    // Audit log (não bloqueante)
+    if (user?.id) {
+      supabase.from("audit_logs").insert({
+        performed_by: user.id,
+        target_id: id,
+        target_table: "delivery_notifications",
+        action: "DELIVERY_CONFIRMED",
+        details: {
+          item_name: original?.item_name,
+          student_name: original?.student_name,
+          responsible_name: original?.responsible_name,
+          enrollment_id: original?.enrollment_id,
+          quantity: original?.quantity,
+          payment_id: original?.payment_id,
+          unit_id: original?.unit_id,
+          delivered_at: nowIso,
+        },
+      }).then(({ error: auditError }) => {
+        if (auditError) console.warn("[deliveries] audit log failed:", auditError);
+      });
+    }
+
+    toast({ title: "Entrega confirmada! ✅", description: original?.item_name });
+    setDeliveries((prev) => prev.filter((d) => d.id !== id));
     setConfirmingId(null);
   };
 
