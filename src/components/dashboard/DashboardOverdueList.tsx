@@ -1,8 +1,16 @@
-import { AlertTriangle, MessageCircle } from "lucide-react";
+import { AlertTriangle, MessageCircle, MoreVertical, ShieldAlert } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import type { DashboardPayment, DashboardStudent } from "@/pages/admin/AdminDashboard";
 
 interface OverduePayment extends DashboardPayment {
@@ -17,6 +25,7 @@ interface Props {
   formatCurrency: (v: number) => string;
   showUnit: boolean;
   onSendWhatsApp: (payment: DashboardPayment) => void;
+  onChanged?: () => void;
 }
 
 const DashboardOverdueList = ({
@@ -27,8 +36,28 @@ const DashboardOverdueList = ({
   formatCurrency,
   showUnit,
   onSendWhatsApp,
+  onChanged,
 }: Props) => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleSendToSpc = async (paymentId: string) => {
+    const { error } = await supabase
+      .from("payments")
+      .update({
+        in_dunning: true,
+        dunning_manual: true,
+        dunning_status: "MANUAL",
+        dunning_synced_at: new Date().toISOString(),
+      })
+      .eq("id", paymentId);
+    if (error) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Movido para SPC" });
+      onChanged?.();
+    }
+  };
   return (
     <div className="glass-card p-4 border-destructive/30">
       <div className="flex items-center gap-2 mb-4">
