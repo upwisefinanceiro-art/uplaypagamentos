@@ -624,6 +624,7 @@ const AdminDashboard = () => {
         paymentMethod={waDialog.paymentMethod}
         paymentId={waDialog.paymentId}
         responsibleId={waDialog.responsibleId}
+        messageTemplate={waDialog.messageTemplate}
       />
 
       {/* Cleanup Test Data - ADMIN_MASTER only */}
