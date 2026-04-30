@@ -44,6 +44,7 @@ import DashboardBirthdays, { type BirthdayPerson } from "@/components/dashboard/
 import DashboardDeliveries from "@/components/dashboard/DashboardDeliveries";
 import DashboardLowStock from "@/components/dashboard/DashboardLowStock";
 import DashboardInconsistencies from "@/components/dashboard/DashboardInconsistencies";
+import DashboardSpcList from "@/components/dashboard/DashboardSpcList";
 import { useToast } from "@/hooks/use-toast";
 import { resolveWhatsAppChargeData } from "@/lib/asaas-payment";
 
@@ -68,6 +69,9 @@ export type DashboardPayment = {
   payment_type: string;
   student_id: string | null;
   raw_response: unknown;
+  in_dunning?: boolean;
+  dunning_status?: string | null;
+  dunning_manual?: boolean;
 };
 
 export type DashboardUnit = {
