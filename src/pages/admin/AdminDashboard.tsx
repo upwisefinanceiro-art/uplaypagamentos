@@ -528,9 +528,8 @@ const AdminDashboard = () => {
       {/* Low stock alerts */}
       <DashboardLowStock unitFilter={unitFilter} units={units} />
 
-      {/* Main lists grid */}
+      {/* Overdue + SPC */}
       <div className="grid lg:grid-cols-2 gap-4">
-        {/* Overdue */}
         <DashboardOverdueList
           overdueList={filtered.overdueList}
           getProfileName={getProfileName}
@@ -539,9 +538,23 @@ const AdminDashboard = () => {
           formatCurrency={formatCurrency}
           showUnit={isMaster && unitFilter === "all"}
           onSendWhatsApp={openWhatsApp}
+          onChanged={fetchData}
         />
 
-        {/* Due Today */}
+        <DashboardSpcList
+          spcList={filtered.spcList}
+          getProfileName={getProfileName}
+          getStudentByResponsible={getStudentByResponsible}
+          getUnitName={getUnitName}
+          formatCurrency={formatCurrency}
+          showUnit={isMaster && unitFilter === "all"}
+          onSendWhatsApp={openWhatsApp}
+          onChanged={fetchData}
+        />
+      </div>
+
+      {/* Vencendo hoje */}
+      <div className="grid lg:grid-cols-2 gap-4">
         <DashboardDueTodayList
           dueTodayList={filtered.dueTodayList}
           getProfileName={getProfileName}
