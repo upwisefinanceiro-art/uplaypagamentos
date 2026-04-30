@@ -145,9 +145,45 @@ const DashboardDeliveries = ({ unitFilter = "all" }: Props) => {
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant="outline" className="text-[10px] border-primary text-primary">
-                  {d.item_name}
-                </Badge>
+                {editingId === d.id ? (
+                  <span className="inline-flex items-center gap-1 rounded-md border border-primary bg-primary px-2 py-0.5 ring-2 ring-primary/40 transition-shadow">
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onBlur={() => saveEditing(d.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") { e.preventDefault(); saveEditing(d.id); }
+                        else if (e.key === "Escape") { e.preventDefault(); cancelEditing(); }
+                      }}
+                      disabled={savingId === d.id}
+                      className="bg-transparent text-[10px] font-semibold text-primary-foreground placeholder:text-primary-foreground/60 outline-none border-0 p-0 m-0 min-w-[80px] w-[160px]"
+                    />
+                    {savingId === d.id && <Loader2 size={10} className="animate-spin text-primary-foreground" />}
+                  </span>
+                ) : (
+                  <span
+                    className="inline-flex items-center gap-1 group cursor-text"
+                    onDoubleClick={() => startEditing(d)}
+                    title="Clique duas vezes ou no lápis para editar"
+                  >
+                    <Badge variant="outline" className="text-[10px] border-primary text-primary">
+                      {d.item_name}
+                    </Badge>
+                    <button
+                      type="button"
+                      onClick={() => startEditing(d)}
+                      className="text-muted-foreground hover:text-primary transition-colors opacity-60 group-hover:opacity-100"
+                      aria-label="Editar nome"
+                    >
+                      <Pencil size={11} />
+                    </button>
+                    {savedId === d.id && (
+                      <Check size={12} className="text-success animate-in fade-in zoom-in duration-300" />
+                    )}
+                  </span>
+                )}
                 <span className="text-[10px] text-muted-foreground">
                   Qtd: {d.quantity}
                 </span>
