@@ -176,6 +176,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    currentUserIdRef.current = null;
     setUser(null);
     setSession(null);
     clearUserData();
