@@ -40,6 +40,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const mountedRef = useRef(false);
   const loadingRef = useRef(true);
   const syncRequestRef = useRef(0);
+  const currentUserIdRef = useRef<string | null>(null);
 
   const clearUserData = () => {
     setProfile(null);
@@ -90,6 +91,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
+      currentUserIdRef.current = nextSession?.user?.id ?? null;
 
       if (!nextSession?.user) {
         clearUserData();
@@ -115,18 +117,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, AUTH_TIMEOUT_MS);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        console.info("[auth] onAuthStateChange", { event: _event, hasSession: !!session });
+      (_event, nextSession) => {
+        console.info("[auth] onAuthStateChange", { event: _event, hasSession: !!nextSession });
 
         if (_event === "INITIAL_SESSION") return;
 
         if (_event === "TOKEN_REFRESHED" || _event === "USER_UPDATED") {
-          setSession(session);
-          setUser(session?.user ?? null);
+          setSession(nextSession);
+          setUser(nextSession?.user ?? null);
           return;
         }
 
-        void syncSession(session);
+        // Evita re-sync (e re-render com loading=true) quando o navegador
+        // dispara SIGNED_IN apenas porque a aba voltou ao foco e a sessão
+        // continua sendo a mesma. Isso preserva o estado de formulários
+        // e a rota atual ao alternar abas.
+        if (_event === "SIGNED_IN" && nextSession?.user?.id && nextSession.user.id === currentUserIdRef.current) {
+          setSession(nextSession);
+          return;
+        }
+
+        void syncSession(nextSession);
       }
     );
 
@@ -165,6 +176,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    currentUserIdRef.current = null;
     setUser(null);
     setSession(null);
     clearUserData();
