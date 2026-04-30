@@ -29,6 +29,7 @@ import AdminStock from "./pages/admin/AdminStock";
 import AdminCourses from "./pages/admin/AdminCourses";
 import AdminCompanies from "./pages/admin/AdminCompanies";
 import AdminSaasBilling from "./pages/admin/AdminSaasBilling";
+import AdminUplayBilling from "./pages/admin/AdminUplayBilling";
 import AdminSaasPlans from "./pages/admin/AdminSaasPlans";
 import AdminBackup from "./pages/admin/AdminBackup";
 import AdminAsaasFees from "./pages/admin/AdminAsaasFees";
@@ -99,6 +100,7 @@ const App = () => {
                 <Route path="estoque" element={<AdminStock />} />
                 <Route path="cursos" element={<AdminCourses />} />
                 <Route path="cobrancas-saas" element={<AdminSaasBilling />} />
+                <Route path="boletos-uplay" element={<AdminUplayBilling />} />
                 <Route path="planos-saas" element={<AdminSaasPlans />} />
                 <Route path="backup" element={<AdminBackup />} />
                 <Route path="alterar-senha" element={<AppChangePassword />} />
