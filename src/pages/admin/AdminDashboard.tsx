@@ -272,12 +272,16 @@ const AdminDashboard = () => {
       .sort((a, b) => (b.final_value ?? b.value) - (a.final_value ?? a.value));
 
     // Overdue list - all, sorted by most days overdue
-    const overdueList = overdueAll
+    const overdueRaw = overdueAll
       .map((p) => ({
         ...p,
         daysOverdue: differenceInDays(today, parseLocalDate(p.due_date)),
       }))
       .sort((a, b) => b.daysOverdue - a.daysOverdue);
+
+    // Separa SPC (em negativação) das cobranças em atraso
+    const spcList = overdueRaw.filter((p) => p.in_dunning === true);
+    const overdueList = overdueRaw.filter((p) => p.in_dunning !== true);
 
     // Recent paid
     const recentPaid = paidInPeriod
@@ -311,6 +315,7 @@ const AdminDashboard = () => {
       activeStudents: filteredStudents.length,
       dueTodayList,
       overdueList,
+      spcList,
       recentPaid,
       inadimplencia,
       perUnit,
