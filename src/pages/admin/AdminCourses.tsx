@@ -50,6 +50,7 @@ interface Course {
   description: string | null;
   suggested_value: number;
   suggested_installments: number;
+  punctuality_discount: number;
   active: boolean;
 }
 
@@ -99,6 +100,7 @@ const AdminCourses = () => {
   const [formDesc, setFormDesc] = useState("");
   const [formValue, setFormValue] = useState("");
   const [formInstallments, setFormInstallments] = useState("12");
+  const [formDiscount, setFormDiscount] = useState("0");
   const [formUnitId, setFormUnitId] = useState("");
   const [selectedApostilas, setSelectedApostilas] = useState<
     { stock_item_id: string; unit_value: string }[]
@@ -131,6 +133,7 @@ const AdminCourses = () => {
     setFormDesc("");
     setFormValue("");
     setFormInstallments("12");
+    setFormDiscount("0");
     setFormUnitId(units.length === 1 ? units[0].id : "");
     setSelectedApostilas([]);
     setDialogOpen(true);
@@ -142,6 +145,7 @@ const AdminCourses = () => {
     setFormDesc(course.description || "");
     setFormValue(String(course.suggested_value || ""));
     setFormInstallments(String(course.suggested_installments || 12));
+    setFormDiscount(String(course.punctuality_discount || 0));
     setFormUnitId(course.unit_id);
     const linked = courseApostilas.filter((ca) => ca.course_id === course.id);
     setSelectedApostilas(
@@ -187,6 +191,7 @@ const AdminCourses = () => {
       description: formDesc.trim() || null,
       suggested_value: parseFloat(formValue.replace(",", ".")) || 0,
       suggested_installments: parseInt(formInstallments) || 1,
+      punctuality_discount: parseFloat(formDiscount.replace(",", ".")) || 0,
     };
 
     let courseId = editing?.id;
@@ -407,6 +412,20 @@ const AdminCourses = () => {
                 <Label>Parcelas sugeridas</Label>
                 <Input type="number" min={1} value={formInstallments} onChange={(e) => setFormInstallments(e.target.value)} />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Desconto de pontualidade (R$)</Label>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={formDiscount}
+                onChange={(e) => setFormDiscount(e.target.value)}
+                placeholder="0,00"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Valor fixo em R$ deduzido da mensalidade quando o cliente paga até o vencimento.
+              </p>
             </div>
 
             <div className="space-y-2">
