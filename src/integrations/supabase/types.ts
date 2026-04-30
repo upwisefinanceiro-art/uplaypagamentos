@@ -1356,6 +1356,10 @@ export type Database = {
           cidade: string | null
           cnpj: string | null
           company_id: string | null
+          cora_certificate: string | null
+          cora_client_id: string | null
+          cora_environment: string | null
+          cora_private_key: string | null
           cpf: string | null
           created_at: string
           email_acesso: string | null
@@ -1364,6 +1368,7 @@ export type Database = {
           id: string
           name: string
           phone: string | null
+          preferred_bank: string
           razao_social: string | null
           rg_ie: string | null
           status: string
@@ -1384,6 +1389,10 @@ export type Database = {
           cidade?: string | null
           cnpj?: string | null
           company_id?: string | null
+          cora_certificate?: string | null
+          cora_client_id?: string | null
+          cora_environment?: string | null
+          cora_private_key?: string | null
           cpf?: string | null
           created_at?: string
           email_acesso?: string | null
@@ -1392,6 +1401,7 @@ export type Database = {
           id?: string
           name: string
           phone?: string | null
+          preferred_bank?: string
           razao_social?: string | null
           rg_ie?: string | null
           status?: string
@@ -1412,6 +1422,10 @@ export type Database = {
           cidade?: string | null
           cnpj?: string | null
           company_id?: string | null
+          cora_certificate?: string | null
+          cora_client_id?: string | null
+          cora_environment?: string | null
+          cora_private_key?: string | null
           cpf?: string | null
           created_at?: string
           email_acesso?: string | null
@@ -1420,6 +1434,7 @@ export type Database = {
           id?: string
           name?: string
           phone?: string | null
+          preferred_bank?: string
           razao_social?: string | null
           rg_ie?: string | null
           status?: string
