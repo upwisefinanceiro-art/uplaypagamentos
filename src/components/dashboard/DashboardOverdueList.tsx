@@ -98,7 +98,7 @@ const DashboardOverdueList = ({
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-1 flex-shrink-0">
                   <div className="text-right">
                     <span className="text-sm font-bold text-destructive block">
                       {formatCurrency(p.final_value ?? p.value)}
@@ -116,6 +116,19 @@ const DashboardOverdueList = ({
                   >
                     <MessageCircle size={14} />
                   </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" title="Mais ações">
+                        <MoreVertical size={14} />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleSendToSpc(p.id)}>
+                        <ShieldAlert size={14} className="mr-2" />
+                        Enviar para SPC
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             );
