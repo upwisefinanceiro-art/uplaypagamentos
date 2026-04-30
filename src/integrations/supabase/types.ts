@@ -1367,6 +1367,7 @@ export type Database = {
           estado: string | null
           id: string
           name: string
+          partnership_plan: string
           phone: string | null
           preferred_bank: string
           razao_social: string | null
@@ -1374,6 +1375,9 @@ export type Database = {
           status: string
           tipo_cadastro: string | null
           updated_at: string
+          uplay_balance: number
+          uplay_fee_type: string
+          uplay_fee_value: number
           usar_whatsapp_padrao: boolean
           whatsapp: string | null
           whatsapp_financeiro: string | null
@@ -1400,6 +1404,7 @@ export type Database = {
           estado?: string | null
           id?: string
           name: string
+          partnership_plan?: string
           phone?: string | null
           preferred_bank?: string
           razao_social?: string | null
@@ -1407,6 +1412,9 @@ export type Database = {
           status?: string
           tipo_cadastro?: string | null
           updated_at?: string
+          uplay_balance?: number
+          uplay_fee_type?: string
+          uplay_fee_value?: number
           usar_whatsapp_padrao?: boolean
           whatsapp?: string | null
           whatsapp_financeiro?: string | null
@@ -1433,6 +1441,7 @@ export type Database = {
           estado?: string | null
           id?: string
           name?: string
+          partnership_plan?: string
           phone?: string | null
           preferred_bank?: string
           razao_social?: string | null
@@ -1440,6 +1449,9 @@ export type Database = {
           status?: string
           tipo_cadastro?: string | null
           updated_at?: string
+          uplay_balance?: number
+          uplay_fee_type?: string
+          uplay_fee_value?: number
           usar_whatsapp_padrao?: boolean
           whatsapp?: string | null
           whatsapp_financeiro?: string | null
@@ -1453,6 +1465,72 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      uplay_partner_transactions: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          description: string | null
+          fee_amount: number
+          fee_type: string
+          fee_value: number
+          gross_value: number
+          id: string
+          net_value: number
+          paid_at: string | null
+          payment_id: string | null
+          responsible_id: string | null
+          responsible_name: string | null
+          status: string
+          transfer_notes: string | null
+          transferred_at: string | null
+          transferred_by: string | null
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          description?: string | null
+          fee_amount?: number
+          fee_type?: string
+          fee_value?: number
+          gross_value?: number
+          id?: string
+          net_value?: number
+          paid_at?: string | null
+          payment_id?: string | null
+          responsible_id?: string | null
+          responsible_name?: string | null
+          status?: string
+          transfer_notes?: string | null
+          transferred_at?: string | null
+          transferred_by?: string | null
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          description?: string | null
+          fee_amount?: number
+          fee_type?: string
+          fee_value?: number
+          gross_value?: number
+          id?: string
+          net_value?: number
+          paid_at?: string | null
+          payment_id?: string | null
+          responsible_id?: string | null
+          responsible_name?: string | null
+          status?: string
+          transfer_notes?: string | null
+          transferred_at?: string | null
+          transferred_by?: string | null
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
