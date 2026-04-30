@@ -733,7 +733,50 @@ const AdminUnits = () => {
               </div>
             </div>
 
-            {/* CONTRATO SAAS */}
+            {/* CORA */}
+            <div className="border-t border-border pt-4 mt-4">
+              <p className="text-xs font-semibold text-muted-foreground mb-3">Integração Banco Cora</p>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Banco preferido (geração de cobranças)</Label>
+                    <Select value={form.preferred_bank} onValueChange={v => setField("preferred_bank", v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="asaas">Asaas</SelectItem>
+                        <SelectItem value="cora">Banco Cora</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Ambiente Cora</Label>
+                    <Select value={form.cora_environment} onValueChange={v => setField("cora_environment", v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="stage">Stage (testes)</SelectItem>
+                        <SelectItem value="production">Produção</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Cora Client ID</Label>
+                  <Input value={form.cora_client_id} onChange={e => setField("cora_client_id", e.target.value)} placeholder="int-app-..." />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Certificado Cora (PEM)</Label>
+                  <Textarea value={form.cora_certificate} onChange={e => setField("cora_certificate", e.target.value)} placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----" rows={4} className="font-mono text-[10px]" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Chave Privada Cora (PEM)</Label>
+                  <Textarea value={form.cora_private_key} onChange={e => setField("cora_private_key", e.target.value)} placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----" rows={4} className="font-mono text-[10px]" />
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Cole o conteúdo completo dos arquivos <code>.pem</code> gerados no painel Cora. Cada unidade pode ter sua própria conta Cora.
+                </p>
+              </div>
+            </div>
+
             <div className="border border-primary/30 bg-primary/5 rounded-lg p-3 mt-4">
               <p className="text-xs font-semibold text-primary mb-3">💰 Contrato SaaS da Empresa</p>
 
