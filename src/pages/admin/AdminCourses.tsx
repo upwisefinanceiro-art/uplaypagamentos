@@ -415,6 +415,20 @@ const AdminCourses = () => {
             </div>
 
             <div className="space-y-2">
+              <Label>Desconto de pontualidade (R$)</Label>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={formDiscount}
+                onChange={(e) => setFormDiscount(e.target.value)}
+                placeholder="0,00"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Valor fixo em R$ deduzido da mensalidade quando o cliente paga até o vencimento.
+              </p>
+            </div>
+
+            <div className="space-y-2">
               <Label>Apostilas vinculadas (itens de estoque)</Label>
               {!formUnitId ? (
                 <p className="text-xs text-muted-foreground">Selecione a unidade primeiro.</p>
