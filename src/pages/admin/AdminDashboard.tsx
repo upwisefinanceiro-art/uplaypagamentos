@@ -145,26 +145,27 @@ const AdminDashboard = () => {
     paymentMethod: null,
   });
 
+  const fetchData = async () => {
+    setLoading(true);
+    const [paymentsRes, unitsRes, profilesRes, studentsRes] = await Promise.all([
+      supabase.from("payments").select("id, status, value, final_value, due_date, paid_at, unit_id, responsible_id, installment_number, contract_id, checkout_url, invoice_url, boleto_url, pix_copy_paste, payment_method, payment_type, student_id, raw_response, in_dunning, dunning_status, dunning_manual"),
+      isMaster
+        ? supabase.from("units").select("id, name").eq("active", true)
+        : supabase.from("units").select("id, name").eq("id", userProfile?.unit_id ?? ""),
+      supabase.from("profiles").select("id, full_name, phone"),
+      supabase.from("students").select("id, active, unit_id, full_name, responsible_id, birth_date"),
+    ]);
+
+    if (paymentsRes.data) setPayments(paymentsRes.data as DashboardPayment[]);
+    if (unitsRes.data) setUnits(unitsRes.data);
+    if (profilesRes.data) setProfiles(profilesRes.data);
+    if (studentsRes.data) setStudents(studentsRes.data);
+    setLoading(false);
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      const [paymentsRes, unitsRes, profilesRes, studentsRes] = await Promise.all([
-        supabase.from("payments").select("id, status, value, final_value, due_date, paid_at, unit_id, responsible_id, installment_number, contract_id, checkout_url, invoice_url, boleto_url, pix_copy_paste, payment_method, payment_type, student_id, raw_response"),
-        isMaster
-          ? supabase.from("units").select("id, name").eq("active", true)
-          : supabase.from("units").select("id, name").eq("id", userProfile?.unit_id ?? ""),
-        supabase.from("profiles").select("id, full_name, phone"),
-        supabase.from("students").select("id, active, unit_id, full_name, responsible_id, birth_date"),
-      ]);
-
-      if (paymentsRes.data) setPayments(paymentsRes.data);
-      if (unitsRes.data) setUnits(unitsRes.data);
-      if (profilesRes.data) setProfiles(profilesRes.data);
-      if (studentsRes.data) setStudents(studentsRes.data);
-      setLoading(false);
-    };
-
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMaster, userProfile?.unit_id]);
 
   // Realtime subscription
