@@ -129,6 +129,7 @@ const AdminDashboard = () => {
     boletoUrl: string | null;
     pixCopyPaste: string | null;
     paymentMethod: string | null;
+    messageTemplate: "default" | "spc";
   }>({
     open: false,
     phone: null,
@@ -143,6 +144,7 @@ const AdminDashboard = () => {
     boletoUrl: null,
     pixCopyPaste: null,
     paymentMethod: null,
+    messageTemplate: "default",
   });
 
   const fetchData = async () => {
