@@ -718,8 +718,13 @@ export type Database = {
           created_at: string
           description: string
           due_date: string
+          dunning_id: string | null
+          dunning_manual: boolean
+          dunning_status: string | null
+          dunning_synced_at: string | null
           final_value: number | null
           id: string
+          in_dunning: boolean
           installment_number: number
           invoice_url: string | null
           original_value: number | null
@@ -748,8 +753,13 @@ export type Database = {
           created_at?: string
           description?: string
           due_date: string
+          dunning_id?: string | null
+          dunning_manual?: boolean
+          dunning_status?: string | null
+          dunning_synced_at?: string | null
           final_value?: number | null
           id?: string
+          in_dunning?: boolean
           installment_number?: number
           invoice_url?: string | null
           original_value?: number | null
@@ -778,8 +788,13 @@ export type Database = {
           created_at?: string
           description?: string
           due_date?: string
+          dunning_id?: string | null
+          dunning_manual?: boolean
+          dunning_status?: string | null
+          dunning_synced_at?: string | null
           final_value?: number | null
           id?: string
+          in_dunning?: boolean
           installment_number?: number
           invoice_url?: string | null
           original_value?: number | null

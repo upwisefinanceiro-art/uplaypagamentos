@@ -44,6 +44,7 @@ import DashboardBirthdays, { type BirthdayPerson } from "@/components/dashboard/
 import DashboardDeliveries from "@/components/dashboard/DashboardDeliveries";
 import DashboardLowStock from "@/components/dashboard/DashboardLowStock";
 import DashboardInconsistencies from "@/components/dashboard/DashboardInconsistencies";
+import DashboardSpcList from "@/components/dashboard/DashboardSpcList";
 import { useToast } from "@/hooks/use-toast";
 import { resolveWhatsAppChargeData } from "@/lib/asaas-payment";
 
@@ -68,6 +69,9 @@ export type DashboardPayment = {
   payment_type: string;
   student_id: string | null;
   raw_response: unknown;
+  in_dunning?: boolean;
+  dunning_status?: string | null;
+  dunning_manual?: boolean;
 };
 
 export type DashboardUnit = {
@@ -141,26 +145,27 @@ const AdminDashboard = () => {
     paymentMethod: null,
   });
 
+  const fetchData = async () => {
+    setLoading(true);
+    const [paymentsRes, unitsRes, profilesRes, studentsRes] = await Promise.all([
+      supabase.from("payments").select("id, status, value, final_value, due_date, paid_at, unit_id, responsible_id, installment_number, contract_id, checkout_url, invoice_url, boleto_url, pix_copy_paste, payment_method, payment_type, student_id, raw_response, in_dunning, dunning_status, dunning_manual"),
+      isMaster
+        ? supabase.from("units").select("id, name").eq("active", true)
+        : supabase.from("units").select("id, name").eq("id", userProfile?.unit_id ?? ""),
+      supabase.from("profiles").select("id, full_name, phone"),
+      supabase.from("students").select("id, active, unit_id, full_name, responsible_id, birth_date"),
+    ]);
+
+    if (paymentsRes.data) setPayments(paymentsRes.data as DashboardPayment[]);
+    if (unitsRes.data) setUnits(unitsRes.data);
+    if (profilesRes.data) setProfiles(profilesRes.data);
+    if (studentsRes.data) setStudents(studentsRes.data);
+    setLoading(false);
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      const [paymentsRes, unitsRes, profilesRes, studentsRes] = await Promise.all([
-        supabase.from("payments").select("id, status, value, final_value, due_date, paid_at, unit_id, responsible_id, installment_number, contract_id, checkout_url, invoice_url, boleto_url, pix_copy_paste, payment_method, payment_type, student_id, raw_response"),
-        isMaster
-          ? supabase.from("units").select("id, name").eq("active", true)
-          : supabase.from("units").select("id, name").eq("id", userProfile?.unit_id ?? ""),
-        supabase.from("profiles").select("id, full_name, phone"),
-        supabase.from("students").select("id, active, unit_id, full_name, responsible_id, birth_date"),
-      ]);
-
-      if (paymentsRes.data) setPayments(paymentsRes.data);
-      if (unitsRes.data) setUnits(unitsRes.data);
-      if (profilesRes.data) setProfiles(profilesRes.data);
-      if (studentsRes.data) setStudents(studentsRes.data);
-      setLoading(false);
-    };
-
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMaster, userProfile?.unit_id]);
 
   // Realtime subscription
@@ -267,12 +272,16 @@ const AdminDashboard = () => {
       .sort((a, b) => (b.final_value ?? b.value) - (a.final_value ?? a.value));
 
     // Overdue list - all, sorted by most days overdue
-    const overdueList = overdueAll
+    const overdueRaw = overdueAll
       .map((p) => ({
         ...p,
         daysOverdue: differenceInDays(today, parseLocalDate(p.due_date)),
       }))
       .sort((a, b) => b.daysOverdue - a.daysOverdue);
+
+    // Separa SPC (em negativação) das cobranças em atraso
+    const spcList = overdueRaw.filter((p) => p.in_dunning === true);
+    const overdueList = overdueRaw.filter((p) => p.in_dunning !== true);
 
     // Recent paid
     const recentPaid = paidInPeriod
@@ -306,6 +315,7 @@ const AdminDashboard = () => {
       activeStudents: filteredStudents.length,
       dueTodayList,
       overdueList,
+      spcList,
       recentPaid,
       inadimplencia,
       perUnit,
@@ -518,9 +528,8 @@ const AdminDashboard = () => {
       {/* Low stock alerts */}
       <DashboardLowStock unitFilter={unitFilter} units={units} />
 
-      {/* Main lists grid */}
+      {/* Overdue + SPC */}
       <div className="grid lg:grid-cols-2 gap-4">
-        {/* Overdue */}
         <DashboardOverdueList
           overdueList={filtered.overdueList}
           getProfileName={getProfileName}
@@ -529,9 +538,23 @@ const AdminDashboard = () => {
           formatCurrency={formatCurrency}
           showUnit={isMaster && unitFilter === "all"}
           onSendWhatsApp={openWhatsApp}
+          onChanged={fetchData}
         />
 
-        {/* Due Today */}
+        <DashboardSpcList
+          spcList={filtered.spcList}
+          getProfileName={getProfileName}
+          getStudentByResponsible={getStudentByResponsible}
+          getUnitName={getUnitName}
+          formatCurrency={formatCurrency}
+          showUnit={isMaster && unitFilter === "all"}
+          onSendWhatsApp={openWhatsApp}
+          onChanged={fetchData}
+        />
+      </div>
+
+      {/* Vencendo hoje */}
+      <div className="grid lg:grid-cols-2 gap-4">
         <DashboardDueTodayList
           dueTodayList={filtered.dueTodayList}
           getProfileName={getProfileName}
