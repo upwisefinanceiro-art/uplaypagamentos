@@ -731,68 +731,124 @@ const AdminUnits = () => {
               </div>
             </div>
 
-            {/* ASAAS */}
+            {/* PLANO DE PARCERIA UPLAY */}
             <div className="border-t border-border pt-4 mt-4">
-              <p className="text-xs font-semibold text-muted-foreground mb-3">Integração Asaas</p>
+              <p className="text-xs font-semibold text-primary mb-1">🤝 Plano de Parceria</p>
+              <p className="text-[10px] text-muted-foreground mb-3">
+                Define como o parceiro recebe os pagamentos dos clientes finais.
+              </p>
               <div className="space-y-3">
                 <div className="space-y-1">
-                  <Label className="text-xs">API Key Asaas</Label>
-                  <Input value={form.asaas_api_key} onChange={e => setField("asaas_api_key", e.target.value)} placeholder="$aact_..." type="password" />
+                  <Label className="text-xs">Plano</Label>
+                  <Select value={form.partnership_plan} onValueChange={v => setField("partnership_plan", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="PLANO_UPLAY">Plano UpPlay (intermediado · taxa por boleto)</SelectItem>
+                      <SelectItem value="PLANO_ASAAS">Plano Asaas (parceiro recebe direto)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Base URL Asaas</Label>
-                  <Input value={form.asaas_base_url} onChange={e => setField("asaas_base_url", e.target.value)} />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Webhook Token</Label>
-                  <Input value={form.asaas_webhook_token} onChange={e => setField("asaas_webhook_token", e.target.value)} placeholder="Token de validação" />
-                </div>
+
+                {form.partnership_plan === "PLANO_UPLAY" && (
+                  <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-3">
+                    <p className="text-[11px] text-foreground">
+                      Os pagamentos serão recebidos pela conta UpPlay. A UpPlay deduz uma taxa por boleto e repassa o líquido ao parceiro.
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Tipo de taxa</Label>
+                        <Select value={form.uplay_fee_type} onValueChange={v => setField("uplay_fee_type", v)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="PERCENT">Percentual (%)</SelectItem>
+                            <SelectItem value="FIXED">Valor fixo (R$)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">
+                          Valor da taxa {form.uplay_fee_type === "PERCENT" ? "(%)" : "(R$)"}
+                        </Label>
+                        <Input
+                          type="number" step="0.01" min="0"
+                          value={form.uplay_fee_value}
+                          onChange={e => setField("uplay_fee_value", e.target.value)}
+                          placeholder={form.uplay_fee_type === "PERCENT" ? "Ex: 2.5" : "Ex: 3.00"}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* CORA */}
-            <div className="border-t border-border pt-4 mt-4">
-              <p className="text-xs font-semibold text-muted-foreground mb-3">Integração Banco Cora</p>
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Banco preferido (geração de cobranças)</Label>
-                    <Select value={form.preferred_bank} onValueChange={v => setField("preferred_bank", v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="asaas">Asaas</SelectItem>
-                        <SelectItem value="cora">Banco Cora</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Ambiente Cora</Label>
-                    <Select value={form.cora_environment} onValueChange={v => setField("cora_environment", v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="stage">Stage (testes)</SelectItem>
-                        <SelectItem value="production">Produção</SelectItem>
-                      </SelectContent>
-                    </Select>
+            {/* Integrações bancárias — só no Plano Asaas */}
+            {form.partnership_plan !== "PLANO_UPLAY" && (
+              <>
+                {/* ASAAS */}
+                <div className="border-t border-border pt-4 mt-4">
+                  <p className="text-xs font-semibold text-muted-foreground mb-3">Integração Asaas</p>
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">API Key Asaas</Label>
+                      <Input value={form.asaas_api_key} onChange={e => setField("asaas_api_key", e.target.value)} placeholder="$aact_..." type="password" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Base URL Asaas</Label>
+                      <Input value={form.asaas_base_url} onChange={e => setField("asaas_base_url", e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Webhook Token</Label>
+                      <Input value={form.asaas_webhook_token} onChange={e => setField("asaas_webhook_token", e.target.value)} placeholder="Token de validação" />
+                    </div>
                   </div>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Cora Client ID</Label>
-                  <Input value={form.cora_client_id} onChange={e => setField("cora_client_id", e.target.value)} placeholder="int-app-..." />
+
+                {/* CORA */}
+                <div className="border-t border-border pt-4 mt-4">
+                  <p className="text-xs font-semibold text-muted-foreground mb-3">Integração Banco Cora</p>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Banco preferido (geração de cobranças)</Label>
+                        <Select value={form.preferred_bank} onValueChange={v => setField("preferred_bank", v)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="asaas">Asaas</SelectItem>
+                            <SelectItem value="cora">Banco Cora</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Ambiente Cora</Label>
+                        <Select value={form.cora_environment} onValueChange={v => setField("cora_environment", v)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="stage">Stage (testes)</SelectItem>
+                            <SelectItem value="production">Produção</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Cora Client ID</Label>
+                      <Input value={form.cora_client_id} onChange={e => setField("cora_client_id", e.target.value)} placeholder="int-app-..." />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Certificado Cora (PEM)</Label>
+                      <Textarea value={form.cora_certificate} onChange={e => setField("cora_certificate", e.target.value)} placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----" rows={4} className="font-mono text-[10px]" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Chave Privada Cora (PEM)</Label>
+                      <Textarea value={form.cora_private_key} onChange={e => setField("cora_private_key", e.target.value)} placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----" rows={4} className="font-mono text-[10px]" />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      Cole o conteúdo completo dos arquivos <code>.pem</code> gerados no painel Cora. Cada unidade pode ter sua própria conta Cora.
+                    </p>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Certificado Cora (PEM)</Label>
-                  <Textarea value={form.cora_certificate} onChange={e => setField("cora_certificate", e.target.value)} placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----" rows={4} className="font-mono text-[10px]" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Chave Privada Cora (PEM)</Label>
-                  <Textarea value={form.cora_private_key} onChange={e => setField("cora_private_key", e.target.value)} placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----" rows={4} className="font-mono text-[10px]" />
-                </div>
-                <p className="text-[10px] text-muted-foreground">
-                  Cole o conteúdo completo dos arquivos <code>.pem</code> gerados no painel Cora. Cada unidade pode ter sua própria conta Cora.
-                </p>
-              </div>
-            </div>
+              </>
+            )}
 
             <div className="border border-primary/30 bg-primary/5 rounded-lg p-3 mt-4">
               <p className="text-xs font-semibold text-primary mb-3">💰 Contrato SaaS da Empresa</p>
