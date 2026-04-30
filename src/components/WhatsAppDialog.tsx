@@ -24,6 +24,7 @@ interface WhatsAppDialogProps {
   paymentMethod?: string | null;
   paymentId?: string;
   responsibleId?: string;
+  messageTemplate?: "default" | "spc";
 }
 
 const formatPhone = (phone: string): string => {
