@@ -191,6 +191,7 @@ const AdminCourses = () => {
       description: formDesc.trim() || null,
       suggested_value: parseFloat(formValue.replace(",", ".")) || 0,
       suggested_installments: parseInt(formInstallments) || 1,
+      punctuality_discount: parseFloat(formDiscount.replace(",", ".")) || 0,
     };
 
     let courseId = editing?.id;
