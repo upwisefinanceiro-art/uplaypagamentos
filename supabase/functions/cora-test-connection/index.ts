@@ -73,18 +73,61 @@ Deno.serve(async (req) => {
 
     const baseUrl = getCoraBaseUrl(environment);
 
+    // ---- Diagnóstico de formato dos PEMs ----
+    // Normaliza: aceita PEMs com \n literais, \r\n ou já formatados.
+    const normalizePem = (s: string) => s.replace(/\\r\\n/g, "\n").replace(/\\n/g, "\n").replace(/\r\n/g, "\n").trim();
+    const certPem = normalizePem(certificate!);
+    const keyPem = normalizePem(privateKey!);
+
+    const certHasHeader = /-----BEGIN CERTIFICATE-----/.test(certPem);
+    const certHasFooter = /-----END CERTIFICATE-----/.test(certPem);
+    const keyHasHeader = /-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/.test(keyPem);
+    const keyHasFooter = /-----END (?:RSA |EC )?PRIVATE KEY-----/.test(keyPem);
+
+    const diagnostics = {
+      cert_length: certPem.length,
+      cert_first_40: certPem.slice(0, 40),
+      cert_last_40: certPem.slice(-40),
+      cert_has_header: certHasHeader,
+      cert_has_footer: certHasFooter,
+      cert_line_count: certPem.split("\n").length,
+      key_length: keyPem.length,
+      key_first_40: keyPem.slice(0, 40),
+      key_last_40: keyPem.slice(-40),
+      key_has_header: keyHasHeader,
+      key_has_footer: keyHasFooter,
+      key_line_count: keyPem.split("\n").length,
+    };
+    console.log("[cora-test-connection] PEM diagnostics:", JSON.stringify(diagnostics));
+
+    if (!certHasHeader || !certHasFooter) {
+      return jsonResponse({
+        success: false,
+        error: "CORA_CERTIFICATE não está em formato PEM válido. Faltam as linhas '-----BEGIN CERTIFICATE-----' e/ou '-----END CERTIFICATE-----'.",
+        diagnostics,
+      });
+    }
+    if (!keyHasHeader || !keyHasFooter) {
+      return jsonResponse({
+        success: false,
+        error: "CORA_PRIVATE_KEY não está em formato PEM válido. Faltam as linhas '-----BEGIN PRIVATE KEY-----' (ou RSA/EC) e/ou '-----END PRIVATE KEY-----'.",
+        diagnostics,
+      });
+    }
+
     // ---- Criar HTTP client com mTLS ----
     let httpClient: Deno.HttpClient;
     try {
       // @ts-ignore - Deno.createHttpClient existe no runtime do Supabase Edge
       httpClient = Deno.createHttpClient({
-        cert: certificate!,
-        key: privateKey!,
+        cert: certPem,
+        key: keyPem,
       });
     } catch (e) {
       return jsonResponse({
         success: false,
         error: `Falha ao criar cliente mTLS: ${e instanceof Error ? e.message : String(e)}. Verifique se o certificado e a chave privada estão no formato PEM correto.`,
+        diagnostics,
       });
     }
 
