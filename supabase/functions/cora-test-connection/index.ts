@@ -74,10 +74,19 @@ Deno.serve(async (req) => {
     const baseUrl = getCoraBaseUrl(environment);
 
     // ---- Diagnóstico de formato dos PEMs ----
-    // Normaliza: aceita PEMs com \n literais, \r\n ou já formatados.
-    const normalizePem = (s: string) => s.replace(/\\r\\n/g, "\n").replace(/\\n/g, "\n").replace(/\r\n/g, "\n").trim();
-    const certPem = normalizePem(certificate!);
-    const keyPem = normalizePem(privateKey!);
+    // Normaliza PEMs colados com \n literais, CRLF ou salvos em uma única linha com espaços.
+    const normalizePem = (raw: string, labelPattern: string) => {
+      const normalized = raw.replace(/\\r\\n/g, "\n").replace(/\\n/g, "\n").replace(/\r\n/g, "\n").trim();
+      const match = normalized.match(new RegExp(`-----BEGIN (${labelPattern})-----([\\s\\S]*?)-----END \\1-----`));
+      if (!match) return normalized;
+
+      const label = match[1];
+      const body = match[2].replace(/\s+/g, "");
+      const wrapped = body.match(/.{1,64}/g)?.join("\n") || body;
+      return `-----BEGIN ${label}-----\n${wrapped}\n-----END ${label}-----`;
+    };
+    const certPem = normalizePem(certificate!, "CERTIFICATE");
+    const keyPem = normalizePem(privateKey!, "(?:RSA |EC )?PRIVATE KEY");
 
     const certHasHeader = /-----BEGIN CERTIFICATE-----/.test(certPem);
     const certHasFooter = /-----END CERTIFICATE-----/.test(certPem);
