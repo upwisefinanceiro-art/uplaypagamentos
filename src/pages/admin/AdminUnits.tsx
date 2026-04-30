@@ -413,7 +413,7 @@ const AdminUnits = () => {
   const handleTestCora = async (unitId: string) => {
     setTestingCora(unitId);
     try {
-      const { data, error } = await supabase.functions.invoke("cora-test-connection", { body: {} });
+      const { data, error } = await supabase.functions.invoke("cora-test-connection", { body: { unit_id: unitId } });
       if (error) {
         toast({ title: "Erro ao testar Cora", description: error.message, variant: "destructive" });
         return;
@@ -422,7 +422,7 @@ const AdminUnits = () => {
         const env = data.environment === "production" ? "Produção" : "Stage (Sandbox)";
         toast({
           title: "✅ Cora conectado",
-          description: `${env} — Token: ${data.token_preview} — Expira em ${data.expires_in ?? "?"}s`,
+          description: `${env} — ${data.message ?? ""} Token: ${data.token_preview}`,
         });
       } else {
         toast({ title: "❌ Falha na conexão Cora", description: data?.error || "Erro desconhecido", variant: "destructive" });
@@ -431,6 +431,29 @@ const AdminUnits = () => {
       toast({ title: "Erro", description: err.message, variant: "destructive" });
     } finally {
       setTestingCora(null);
+    }
+  };
+
+  const [migratingCora, setMigratingCora] = useState<string | null>(null);
+  const handleMigrateCoraToUnit = async (unitId: string, unitName: string) => {
+    if (!confirm(`Copiar as credenciais Cora globais (CORA_CLIENT_ID/CERTIFICATE/PRIVATE_KEY) para a unidade "${unitName}"?\n\nIsto sobrescreve qualquer credencial Cora já cadastrada nessa unidade.`)) return;
+    setMigratingCora(unitId);
+    try {
+      const { data, error } = await supabase.functions.invoke("migrate-cora-secrets-to-unit", { body: { unit_id: unitId } });
+      if (error) {
+        toast({ title: "Erro", description: error.message, variant: "destructive" });
+        return;
+      }
+      if (data?.success) {
+        toast({ title: "✅ Credenciais migradas", description: `Cora vinculado à unidade ${unitName}.` });
+        fetchUnits();
+      } else {
+        toast({ title: "❌ Falha", description: data?.error || "Erro desconhecido", variant: "destructive" });
+      }
+    } catch (err: any) {
+      toast({ title: "Erro", description: err.message, variant: "destructive" });
+    } finally {
+      setMigratingCora(null);
     }
   };
 
