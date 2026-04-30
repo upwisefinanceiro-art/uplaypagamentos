@@ -6,11 +6,15 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Status do Asaas considerados "ativos" para negativação
+// Tipo "Negativação via Serasa" no Asaas
+const SERASA_TYPE = "CREDIT_BUREAU";
+
+// Status que representam negativação ATIVA (em andamento) na tela do Asaas
+// Excluímos CANCELLED, DENIED e PAID (já encerradas / pagas)
 const ACTIVE_DUNNING_STATUSES = new Set([
-  "AWAITING_APPROVAL",
   "PENDING",
-  "IN_PROGRESS",
+  "AWAITING_APPROVAL",
+  "PROCESSED",
   "PARTIALLY_PAID",
   "AWAITING_CANCELLATION",
 ]);
@@ -18,6 +22,7 @@ const ACTIVE_DUNNING_STATUSES = new Set([
 interface DunningItem {
   id: string;
   status: string;
+  type: string;
   payment: string; // asaas payment id
 }
 
@@ -28,7 +33,9 @@ async function syncUnit(unitId: string, apiKey: string, baseUrl: string, supabas
   const limit = 100;
 
   while (true) {
-    const res = await fetch(`${url}?limit=${limit}&offset=${offset}`, {
+    // Filtra direto na API: apenas Serasa (CREDIT_BUREAU)
+    const qs = `?limit=${limit}&offset=${offset}&type=${SERASA_TYPE}`;
+    const res = await fetch(`${url}${qs}`, {
       headers: { access_token: apiKey, "Content-Type": "application/json" },
     });
     if (!res.ok) {
@@ -44,6 +51,8 @@ async function syncUnit(unitId: string, apiKey: string, baseUrl: string, supabas
     if (offset > 5000) break; // safety
   }
 
+  console.log(`[unit ${unitId}] fetched ${collected.length} Serasa dunnings`);
+
   // Buscar payments locais desta unidade
   const { data: localPayments } = await supabase
     .from("payments")
@@ -58,6 +67,8 @@ async function syncUnit(unitId: string, apiKey: string, baseUrl: string, supabas
   const updates: { id: string; status: string; dunningId: string }[] = [];
 
   for (const d of collected) {
+    // Garante que é Serasa (CREDIT_BUREAU) e está em status ativo
+    if (d.type !== SERASA_TYPE) continue;
     if (!ACTIVE_DUNNING_STATUSES.has(d.status)) continue;
     activeAsaasIds.add(d.payment);
     const local = byAsaasId.get(d.payment);
@@ -100,7 +111,7 @@ async function syncUnit(unitId: string, apiKey: string, baseUrl: string, supabas
     if (!error) unmarked = idsParaLimpar.length;
   }
 
-  return { unitId, fetched: collected.length, marked, unmarked };
+  return { unitId, fetched: collected.length, marked, unmarked, notLinked: collected.length - updates.length };
 }
 
 Deno.serve(async (req) => {
