@@ -50,6 +50,7 @@ interface Course {
   description: string | null;
   suggested_value: number;
   suggested_installments: number;
+  punctuality_discount: number;
   active: boolean;
 }
 
