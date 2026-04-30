@@ -1109,19 +1109,6 @@ const AdminUnits = () => {
                   )}
                   {testingCora === unit.id ? "Testando..." : "Testar conexão Cora"}
                 </Button>
-
-                <Button
-                  size="sm" variant="secondary"
-                  onClick={() => handleMigrateCoraToUnit(unit.id, unit.name)}
-                  disabled={migratingCora === unit.id}
-                  className="text-xs"
-                  title="Copia as credenciais Cora globais (CORA_*) para esta unidade"
-                >
-                  {migratingCora === unit.id ? (
-                    <Loader2 size={12} className="mr-1.5 animate-spin" />
-                  ) : null}
-                  {migratingCora === unit.id ? "Migrando..." : "Vincular Cora global → esta unidade"}
-                </Button>
               </div>
             </div>
           );
