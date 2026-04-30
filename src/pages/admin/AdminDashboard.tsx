@@ -168,6 +168,27 @@ const AdminDashboard = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMaster, userProfile?.unit_id]);
 
+  // Sincroniza negativações Asaas (Serasa) ao abrir o Dashboard, em background
+  useEffect(() => {
+    let cancelled = false;
+    const syncDunnings = async () => {
+      try {
+        const payload: Record<string, string> = {};
+        if (!isMaster && userProfile?.unit_id) payload.unit_id = userProfile.unit_id;
+        const { error } = await supabase.functions.invoke("sync-asaas-dunnings", { body: payload });
+        if (!cancelled && !error) {
+          // Recarrega payments para refletir flags in_dunning atualizadas
+          fetchData();
+        }
+      } catch (e) {
+        console.warn("[dashboard] auto-sync dunnings falhou:", e);
+      }
+    };
+    syncDunnings();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMaster, userProfile?.unit_id]);
+
   // Realtime subscription
   useEffect(() => {
     const channel = supabase
