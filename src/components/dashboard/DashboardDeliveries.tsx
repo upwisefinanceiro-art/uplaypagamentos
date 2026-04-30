@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Package, CheckCircle2, Loader2 } from "lucide-react";
+import { Package, CheckCircle2, Loader2, Pencil, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -30,6 +30,11 @@ const DashboardDeliveries = ({ unitFilter = "all" }: Props) => {
   const [deliveries, setDeliveries] = useState<DeliveryNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const fetchDeliveries = async () => {
     setLoading(true);
@@ -84,6 +89,42 @@ const DashboardDeliveries = ({ unitFilter = "all" }: Props) => {
     setConfirmingId(null);
   };
 
+  const startEditing = (d: DeliveryNotification) => {
+    setEditingId(d.id);
+    setEditValue(d.item_name);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditValue("");
+  };
+
+  const saveEditing = async (id: string) => {
+    const newName = editValue.trim();
+    const original = deliveries.find((d) => d.id === id);
+    if (!original) return cancelEditing();
+    if (!newName || newName === original.item_name) return cancelEditing();
+
+    setSavingId(id);
+    const { error } = await supabase
+      .from("delivery_notifications")
+      .update({ item_name: newName })
+      .eq("id", id);
+    setSavingId(null);
+
+    if (error) {
+      toast({ title: "Erro ao renomear", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    setDeliveries((prev) => prev.map((d) => (d.id === id ? { ...d, item_name: newName } : d)));
+    setEditingId(null);
+    setEditValue("");
+    setSavedId(id);
+    setTimeout(() => setSavedId((curr) => (curr === id ? null : curr)), 1500);
+  };
+
   if (loading) return null;
   if (deliveries.length === 0) return null;
 
@@ -104,9 +145,45 @@ const DashboardDeliveries = ({ unitFilter = "all" }: Props) => {
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant="outline" className="text-[10px] border-primary text-primary">
-                  {d.item_name}
-                </Badge>
+                {editingId === d.id ? (
+                  <span className="inline-flex items-center gap-1 rounded-md border border-primary bg-primary px-2 py-0.5 ring-2 ring-primary/40 transition-shadow">
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onBlur={() => saveEditing(d.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") { e.preventDefault(); saveEditing(d.id); }
+                        else if (e.key === "Escape") { e.preventDefault(); cancelEditing(); }
+                      }}
+                      disabled={savingId === d.id}
+                      className="bg-transparent text-[10px] font-semibold text-primary-foreground placeholder:text-primary-foreground/60 outline-none border-0 p-0 m-0 min-w-[80px] w-[160px]"
+                    />
+                    {savingId === d.id && <Loader2 size={10} className="animate-spin text-primary-foreground" />}
+                  </span>
+                ) : (
+                  <span
+                    className="inline-flex items-center gap-1 group cursor-text"
+                    onDoubleClick={() => startEditing(d)}
+                    title="Clique duas vezes ou no lápis para editar"
+                  >
+                    <Badge variant="outline" className="text-[10px] border-primary text-primary">
+                      {d.item_name}
+                    </Badge>
+                    <button
+                      type="button"
+                      onClick={() => startEditing(d)}
+                      className="text-muted-foreground hover:text-primary transition-colors opacity-60 group-hover:opacity-100"
+                      aria-label="Editar nome"
+                    >
+                      <Pencil size={11} />
+                    </button>
+                    {savedId === d.id && (
+                      <Check size={12} className="text-success animate-in fade-in zoom-in duration-300" />
+                    )}
+                  </span>
+                )}
                 <span className="text-[10px] text-muted-foreground">
                   Qtd: {d.quantity}
                 </span>
