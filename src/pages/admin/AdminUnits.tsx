@@ -3,6 +3,7 @@ import { Plus, Pencil, Loader2, MessageCircle, Wifi, WifiOff, Building2, MapPin,
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -41,6 +42,11 @@ interface UnitRow {
   whatsapp: string | null;
   email_empresa: string | null;
   email_acesso: string | null;
+  cora_client_id: string | null;
+  cora_certificate: string | null;
+  cora_private_key: string | null;
+  cora_environment: string | null;
+  preferred_bank: string | null;
 }
 
 const ESTADOS = [
@@ -85,6 +91,8 @@ const AdminUnits = () => {
     phone: "", whatsapp: "", email_empresa: "", email_acesso: "",
     asaas_api_key: "", asaas_base_url: "https://api.asaas.com/v3", asaas_webhook_token: "",
     whatsapp_financeiro: "", usar_whatsapp_padrao: true,
+    cora_client_id: "", cora_certificate: "", cora_private_key: "", cora_environment: "stage",
+    preferred_bank: "asaas",
     // SaaS contract fields
     saas_valor_mensalidade: "", saas_desconto_pontualidade: "", saas_parcelas: "12",
     saas_primeiro_vencimento: "", saas_dia_vencimento: "10", saas_forma_pagamento: "UNDEFINED",
@@ -128,6 +136,8 @@ const AdminUnits = () => {
       phone: "", whatsapp: "", email_empresa: "", email_acesso: "",
       asaas_api_key: "", asaas_base_url: "https://api.asaas.com/v3", asaas_webhook_token: "",
       whatsapp_financeiro: "", usar_whatsapp_padrao: true,
+      cora_client_id: "", cora_certificate: "", cora_private_key: "", cora_environment: "stage",
+      preferred_bank: "asaas",
       saas_valor_mensalidade: "", saas_desconto_pontualidade: "", saas_parcelas: "12",
       saas_primeiro_vencimento: "", saas_dia_vencimento: "10", saas_forma_pagamento: "UNDEFINED",
       saas_plan_id: "", saas_trial_days: "0",
@@ -159,6 +169,11 @@ const AdminUnits = () => {
       asaas_webhook_token: unit.asaas_webhook_token || "",
       whatsapp_financeiro: unit.whatsapp_financeiro || "",
       usar_whatsapp_padrao: unit.usar_whatsapp_padrao,
+      cora_client_id: unit.cora_client_id || "",
+      cora_certificate: unit.cora_certificate || "",
+      cora_private_key: unit.cora_private_key || "",
+      cora_environment: unit.cora_environment || "stage",
+      preferred_bank: unit.preferred_bank || "asaas",
       saas_valor_mensalidade: "", saas_desconto_pontualidade: "", saas_parcelas: "12",
       saas_primeiro_vencimento: "", saas_dia_vencimento: "10", saas_forma_pagamento: "UNDEFINED",
       saas_plan_id: "", saas_trial_days: "0",
@@ -238,6 +253,11 @@ const AdminUnits = () => {
       asaas_webhook_token: form.asaas_webhook_token.trim() || null,
       whatsapp_financeiro: form.whatsapp_financeiro.trim() || null,
       usar_whatsapp_padrao: form.usar_whatsapp_padrao,
+      cora_client_id: form.cora_client_id.trim() || null,
+      cora_certificate: form.cora_certificate.trim() || null,
+      cora_private_key: form.cora_private_key.trim() || null,
+      cora_environment: form.cora_environment || "stage",
+      preferred_bank: form.preferred_bank || "asaas",
     };
 
     let error;
@@ -714,7 +734,50 @@ const AdminUnits = () => {
               </div>
             </div>
 
-            {/* CONTRATO SAAS */}
+            {/* CORA */}
+            <div className="border-t border-border pt-4 mt-4">
+              <p className="text-xs font-semibold text-muted-foreground mb-3">Integração Banco Cora</p>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Banco preferido (geração de cobranças)</Label>
+                    <Select value={form.preferred_bank} onValueChange={v => setField("preferred_bank", v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="asaas">Asaas</SelectItem>
+                        <SelectItem value="cora">Banco Cora</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Ambiente Cora</Label>
+                    <Select value={form.cora_environment} onValueChange={v => setField("cora_environment", v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="stage">Stage (testes)</SelectItem>
+                        <SelectItem value="production">Produção</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Cora Client ID</Label>
+                  <Input value={form.cora_client_id} onChange={e => setField("cora_client_id", e.target.value)} placeholder="int-app-..." />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Certificado Cora (PEM)</Label>
+                  <Textarea value={form.cora_certificate} onChange={e => setField("cora_certificate", e.target.value)} placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----" rows={4} className="font-mono text-[10px]" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Chave Privada Cora (PEM)</Label>
+                  <Textarea value={form.cora_private_key} onChange={e => setField("cora_private_key", e.target.value)} placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----" rows={4} className="font-mono text-[10px]" />
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Cole o conteúdo completo dos arquivos <code>.pem</code> gerados no painel Cora. Cada unidade pode ter sua própria conta Cora.
+                </p>
+              </div>
+            </div>
+
             <div className="border border-primary/30 bg-primary/5 rounded-lg p-3 mt-4">
               <p className="text-xs font-semibold text-primary mb-3">💰 Contrato SaaS da Empresa</p>
 
