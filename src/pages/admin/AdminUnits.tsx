@@ -135,6 +135,8 @@ const AdminUnits = () => {
       phone: "", whatsapp: "", email_empresa: "", email_acesso: "",
       asaas_api_key: "", asaas_base_url: "https://api.asaas.com/v3", asaas_webhook_token: "",
       whatsapp_financeiro: "", usar_whatsapp_padrao: true,
+      cora_client_id: "", cora_certificate: "", cora_private_key: "", cora_environment: "stage",
+      preferred_bank: "asaas",
       saas_valor_mensalidade: "", saas_desconto_pontualidade: "", saas_parcelas: "12",
       saas_primeiro_vencimento: "", saas_dia_vencimento: "10", saas_forma_pagamento: "UNDEFINED",
       saas_plan_id: "", saas_trial_days: "0",
