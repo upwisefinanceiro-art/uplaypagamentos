@@ -145,6 +145,7 @@ const AdminCourses = () => {
     setFormDesc(course.description || "");
     setFormValue(String(course.suggested_value || ""));
     setFormInstallments(String(course.suggested_installments || 12));
+    setFormDiscount(String(course.punctuality_discount || 0));
     setFormUnitId(course.unit_id);
     const linked = courseApostilas.filter((ca) => ca.course_id === course.id);
     setSelectedApostilas(
