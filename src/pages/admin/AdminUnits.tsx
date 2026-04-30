@@ -409,6 +409,31 @@ const AdminUnits = () => {
     }
   };
 
+  const [testingCora, setTestingCora] = useState<string | null>(null);
+  const handleTestCora = async (unitId: string) => {
+    setTestingCora(unitId);
+    try {
+      const { data, error } = await supabase.functions.invoke("cora-test-connection", { body: {} });
+      if (error) {
+        toast({ title: "Erro ao testar Cora", description: error.message, variant: "destructive" });
+        return;
+      }
+      if (data?.success) {
+        const env = data.environment === "production" ? "Produção" : "Stage (Sandbox)";
+        toast({
+          title: "✅ Cora conectado",
+          description: `${env} — Token: ${data.token_preview} — Expira em ${data.expires_in ?? "?"}s`,
+        });
+      } else {
+        toast({ title: "❌ Falha na conexão Cora", description: data?.error || "Erro desconhecido", variant: "destructive" });
+      }
+    } catch (err: any) {
+      toast({ title: "Erro", description: err.message, variant: "destructive" });
+    } finally {
+      setTestingCora(null);
+    }
+  };
+
   const handleDeleteUnit = async () => {
     const unit = deleteConfirm.unit;
     if (!unit) return;
@@ -965,7 +990,7 @@ const AdminUnits = () => {
                 </div>
               </details>
 
-              <div className="mt-3 pt-3 border-t border-border">
+              <div className="mt-3 pt-3 border-t border-border flex flex-wrap items-center gap-2">
                 <Button
                   size="sm" variant="outline"
                   onClick={() => handleTestConnection(unit.id)}
@@ -982,8 +1007,22 @@ const AdminUnits = () => {
                   {testingUnit === unit.id ? "Testando..." : "Testar conexão Asaas"}
                 </Button>
                 {!unit.asaas_api_key && (
-                  <span className="text-[10px] text-destructive ml-2">API Key não configurada</span>
+                  <span className="text-[10px] text-destructive">API Asaas não configurada</span>
                 )}
+
+                <Button
+                  size="sm" variant="outline"
+                  onClick={() => handleTestCora(unit.id)}
+                  disabled={testingCora === unit.id}
+                  className="text-xs"
+                >
+                  {testingCora === unit.id ? (
+                    <Loader2 size={12} className="mr-1.5 animate-spin" />
+                  ) : (
+                    <Wifi size={12} className="mr-1.5" />
+                  )}
+                  {testingCora === unit.id ? "Testando..." : "Testar conexão Cora"}
+                </Button>
               </div>
             </div>
           );
