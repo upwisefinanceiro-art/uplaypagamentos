@@ -129,6 +129,7 @@ const AdminDashboard = () => {
     boletoUrl: string | null;
     pixCopyPaste: string | null;
     paymentMethod: string | null;
+    messageTemplate: "default" | "spc";
   }>({
     open: false,
     phone: null,
@@ -143,6 +144,7 @@ const AdminDashboard = () => {
     boletoUrl: null,
     pixCopyPaste: null,
     paymentMethod: null,
+    messageTemplate: "default",
   });
 
   const fetchData = async () => {
@@ -398,7 +400,7 @@ const AdminDashboard = () => {
     }
   };
 
-  const openWhatsApp = async (payment: DashboardPayment) => {
+  const openWhatsApp = async (payment: DashboardPayment, template: "default" | "spc" = "default") => {
     try {
       toast({ title: "Sincronizando cobrança no Asaas antes do envio..." });
       const resolved = await resolveWhatsAppChargeData(payment.id);
@@ -417,6 +419,7 @@ const AdminDashboard = () => {
         boletoUrl: resolved.payment.boleto_url,
         pixCopyPaste: resolved.payment.pix_copy_paste,
         paymentMethod: resolved.payment.payment_method,
+        messageTemplate: template,
       });
     } catch (err) {
       toast({
@@ -426,6 +429,8 @@ const AdminDashboard = () => {
       });
     }
   };
+
+  const openWhatsAppSpc = (payment: DashboardPayment) => openWhatsApp(payment, "spc");
 
   const handleCleanupPreview = async () => {
     setCleanupLoading(true);
@@ -569,7 +574,7 @@ const AdminDashboard = () => {
           getUnitName={getUnitName}
           formatCurrency={formatCurrency}
           showUnit={isMaster && unitFilter === "all"}
-          onSendWhatsApp={openWhatsApp}
+          onSendWhatsApp={openWhatsAppSpc}
           onChanged={fetchData}
         />
       </div>
@@ -619,6 +624,7 @@ const AdminDashboard = () => {
         paymentMethod={waDialog.paymentMethod}
         paymentId={waDialog.paymentId}
         responsibleId={waDialog.responsibleId}
+        messageTemplate={waDialog.messageTemplate}
       />
 
       {/* Cleanup Test Data - ADMIN_MASTER only */}

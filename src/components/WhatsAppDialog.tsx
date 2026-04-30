@@ -24,6 +24,7 @@ interface WhatsAppDialogProps {
   paymentMethod?: string | null;
   paymentId?: string;
   responsibleId?: string;
+  messageTemplate?: "default" | "spc";
 }
 
 const formatPhone = (phone: string): string => {
@@ -87,6 +88,43 @@ const buildDefaultMessage = ({
   return msg;
 };
 
+const buildSpcMessage = ({
+  responsibleName,
+  studentName,
+  description,
+  value,
+  dueDate,
+  invoiceUrl,
+  boletoUrl,
+  pixCopyPaste,
+}: Omit<WhatsAppDialogProps, "open" | "onOpenChange" | "phone">): string => {
+  const formatCurrency = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
+  const formatDate = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("pt-BR");
+  const paymentLink = invoiceUrl || boletoUrl || null;
+
+  let msg = `*AVISO DE REGULARIZAÇÃO DE CPF* ⚠️\n\n`;
+  msg += `Olá, ${responsibleName}! Tudo bem?\n\n`;
+  msg += `Constatamos em nosso sistema que o seu débito referente à *${description}*`;
+  if (studentName) msg += ` (aluno: ${studentName})`;
+  msg += ` (Vencimento: ${formatDate(dueDate)}) resultou na inclusão do seu nome nos órgãos de proteção ao crédito (*SPC/Serasa*).\n\n`;
+  msg += `Queremos te ajudar a resolver isso! Esta é uma oportunidade para você acertar seus débitos e *limpar seu nome imediatamente*. ✅\n\n`;
+  msg += `💰 *Valor:* ${formatCurrency(value)}\n`;
+
+  if (paymentLink) {
+    msg += `👉 *Regularize aqui:* ${paymentLink}\n`;
+  } else {
+    msg += `👉 *Regularize aqui:* https://uplaypagamento.com.br\n`;
+  }
+  if (pixCopyPaste) {
+    msg += `\n*PIX (copia e cola):*\n${pixCopyPaste}\n`;
+  }
+
+  msg += `\nApós o pagamento, a *baixa na negativação ocorre automaticamente*. Vamos resolver isso hoje? 💪\n\n`;
+  msg += `Atenciosamente,\n*Equipe UPLAY Pagamentos* 🚀`;
+
+  return msg;
+};
+
 const WhatsAppDialog = ({
   open,
   onOpenChange,
@@ -102,6 +140,7 @@ const WhatsAppDialog = ({
   paymentMethod,
   paymentId,
   responsibleId,
+  messageTemplate = "default",
 }: WhatsAppDialogProps) => {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -115,19 +154,21 @@ const WhatsAppDialog = ({
   useEffect(() => {
     if (open) {
       setManualPhone(phone && isValidPhone(phone) ? "" : "");
-      const nextMessage = buildDefaultMessage({ responsibleName, studentName, description, value, dueDate, invoiceUrl, boletoUrl, pixCopyPaste, paymentMethod, paymentId, responsibleId });
+      const builder = messageTemplate === "spc" ? buildSpcMessage : buildDefaultMessage;
+      const nextMessage = builder({ responsibleName, studentName, description, value, dueDate, invoiceUrl, boletoUrl, pixCopyPaste, paymentMethod, paymentId, responsibleId });
       setMessage(nextMessage);
       console.info("[whatsapp-sync] mensagem pronta para envio", {
         paymentId,
         responsibleId,
         paymentMethod,
+        template: messageTemplate,
         hasInvoiceUrl: Boolean(invoiceUrl),
         hasBoletoUrl: Boolean(boletoUrl),
         hasPixCopyPaste: Boolean(pixCopyPaste),
         messageLength: nextMessage.length,
       });
     }
-  }, [open, responsibleName, studentName, description, value, dueDate, invoiceUrl, boletoUrl, pixCopyPaste, paymentMethod, phone]);
+  }, [open, responsibleName, studentName, description, value, dueDate, invoiceUrl, boletoUrl, pixCopyPaste, paymentMethod, phone, messageTemplate]);
 
   const [copied, setCopied] = useState(false);
 
