@@ -89,6 +89,42 @@ const DashboardDeliveries = ({ unitFilter = "all" }: Props) => {
     setConfirmingId(null);
   };
 
+  const startEditing = (d: DeliveryNotification) => {
+    setEditingId(d.id);
+    setEditValue(d.item_name);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditValue("");
+  };
+
+  const saveEditing = async (id: string) => {
+    const newName = editValue.trim();
+    const original = deliveries.find((d) => d.id === id);
+    if (!original) return cancelEditing();
+    if (!newName || newName === original.item_name) return cancelEditing();
+
+    setSavingId(id);
+    const { error } = await supabase
+      .from("delivery_notifications")
+      .update({ item_name: newName })
+      .eq("id", id);
+    setSavingId(null);
+
+    if (error) {
+      toast({ title: "Erro ao renomear", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    setDeliveries((prev) => prev.map((d) => (d.id === id ? { ...d, item_name: newName } : d)));
+    setEditingId(null);
+    setEditValue("");
+    setSavedId(id);
+    setTimeout(() => setSavedId((curr) => (curr === id ? null : curr)), 1500);
+  };
+
   if (loading) return null;
   if (deliveries.length === 0) return null;
 
