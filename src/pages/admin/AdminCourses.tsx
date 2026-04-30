@@ -100,6 +100,7 @@ const AdminCourses = () => {
   const [formDesc, setFormDesc] = useState("");
   const [formValue, setFormValue] = useState("");
   const [formInstallments, setFormInstallments] = useState("12");
+  const [formDiscount, setFormDiscount] = useState("0");
   const [formUnitId, setFormUnitId] = useState("");
   const [selectedApostilas, setSelectedApostilas] = useState<
     { stock_item_id: string; unit_value: string }[]
