@@ -91,6 +91,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
+      currentUserIdRef.current = nextSession?.user?.id ?? null;
 
       if (!nextSession?.user) {
         clearUserData();
