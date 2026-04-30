@@ -133,6 +133,7 @@ const AdminCourses = () => {
     setFormDesc("");
     setFormValue("");
     setFormInstallments("12");
+    setFormDiscount("0");
     setFormUnitId(units.length === 1 ? units[0].id : "");
     setSelectedApostilas([]);
     setDialogOpen(true);
