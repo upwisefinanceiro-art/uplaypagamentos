@@ -41,6 +41,11 @@ interface UnitRow {
   whatsapp: string | null;
   email_empresa: string | null;
   email_acesso: string | null;
+  cora_client_id: string | null;
+  cora_certificate: string | null;
+  cora_private_key: string | null;
+  cora_environment: string | null;
+  preferred_bank: string | null;
 }
 
 const ESTADOS = [
