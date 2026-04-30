@@ -140,6 +140,7 @@ const WhatsAppDialog = ({
   paymentMethod,
   paymentId,
   responsibleId,
+  messageTemplate = "default",
 }: WhatsAppDialogProps) => {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -153,19 +154,21 @@ const WhatsAppDialog = ({
   useEffect(() => {
     if (open) {
       setManualPhone(phone && isValidPhone(phone) ? "" : "");
-      const nextMessage = buildDefaultMessage({ responsibleName, studentName, description, value, dueDate, invoiceUrl, boletoUrl, pixCopyPaste, paymentMethod, paymentId, responsibleId });
+      const builder = messageTemplate === "spc" ? buildSpcMessage : buildDefaultMessage;
+      const nextMessage = builder({ responsibleName, studentName, description, value, dueDate, invoiceUrl, boletoUrl, pixCopyPaste, paymentMethod, paymentId, responsibleId });
       setMessage(nextMessage);
       console.info("[whatsapp-sync] mensagem pronta para envio", {
         paymentId,
         responsibleId,
         paymentMethod,
+        template: messageTemplate,
         hasInvoiceUrl: Boolean(invoiceUrl),
         hasBoletoUrl: Boolean(boletoUrl),
         hasPixCopyPaste: Boolean(pixCopyPaste),
         messageLength: nextMessage.length,
       });
     }
-  }, [open, responsibleName, studentName, description, value, dueDate, invoiceUrl, boletoUrl, pixCopyPaste, paymentMethod, phone]);
+  }, [open, responsibleName, studentName, description, value, dueDate, invoiceUrl, boletoUrl, pixCopyPaste, paymentMethod, phone, messageTemplate]);
 
   const [copied, setCopied] = useState(false);
 
