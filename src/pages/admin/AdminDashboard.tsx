@@ -574,7 +574,7 @@ const AdminDashboard = () => {
           getUnitName={getUnitName}
           formatCurrency={formatCurrency}
           showUnit={isMaster && unitFilter === "all"}
-          onSendWhatsApp={openWhatsApp}
+          onSendWhatsApp={openWhatsAppSpc}
           onChanged={fetchData}
         />
       </div>
