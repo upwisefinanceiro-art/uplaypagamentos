@@ -47,6 +47,10 @@ interface UnitRow {
   cora_private_key: string | null;
   cora_environment: string | null;
   preferred_bank: string | null;
+  partnership_plan: string | null;
+  uplay_fee_type: string | null;
+  uplay_fee_value: number | null;
+  uplay_balance: number | null;
 }
 
 const ESTADOS = [
@@ -93,6 +97,9 @@ const AdminUnits = () => {
     whatsapp_financeiro: "", usar_whatsapp_padrao: true,
     cora_client_id: "", cora_certificate: "", cora_private_key: "", cora_environment: "stage",
     preferred_bank: "asaas",
+    partnership_plan: "PLANO_ASAAS",
+    uplay_fee_type: "PERCENT",
+    uplay_fee_value: "0",
     // SaaS contract fields
     saas_valor_mensalidade: "", saas_desconto_pontualidade: "", saas_parcelas: "12",
     saas_primeiro_vencimento: "", saas_dia_vencimento: "10", saas_forma_pagamento: "UNDEFINED",
@@ -138,6 +145,9 @@ const AdminUnits = () => {
       whatsapp_financeiro: "", usar_whatsapp_padrao: true,
       cora_client_id: "", cora_certificate: "", cora_private_key: "", cora_environment: "stage",
       preferred_bank: "asaas",
+      partnership_plan: "PLANO_ASAAS",
+      uplay_fee_type: "PERCENT",
+      uplay_fee_value: "0",
       saas_valor_mensalidade: "", saas_desconto_pontualidade: "", saas_parcelas: "12",
       saas_primeiro_vencimento: "", saas_dia_vencimento: "10", saas_forma_pagamento: "UNDEFINED",
       saas_plan_id: "", saas_trial_days: "0",
@@ -174,6 +184,9 @@ const AdminUnits = () => {
       cora_private_key: unit.cora_private_key || "",
       cora_environment: unit.cora_environment || "stage",
       preferred_bank: unit.preferred_bank || "asaas",
+      partnership_plan: (unit as any).partnership_plan || "PLANO_ASAAS",
+      uplay_fee_type: (unit as any).uplay_fee_type || "PERCENT",
+      uplay_fee_value: String((unit as any).uplay_fee_value ?? "0"),
       saas_valor_mensalidade: "", saas_desconto_pontualidade: "", saas_parcelas: "12",
       saas_primeiro_vencimento: "", saas_dia_vencimento: "10", saas_forma_pagamento: "UNDEFINED",
       saas_plan_id: "", saas_trial_days: "0",
@@ -258,6 +271,9 @@ const AdminUnits = () => {
       cora_private_key: form.cora_private_key.trim() || null,
       cora_environment: form.cora_environment || "stage",
       preferred_bank: form.preferred_bank || "asaas",
+      partnership_plan: form.partnership_plan || "PLANO_ASAAS",
+      uplay_fee_type: form.uplay_fee_type || "PERCENT",
+      uplay_fee_value: parseFloat(form.uplay_fee_value) || 0,
     };
 
     let error;
