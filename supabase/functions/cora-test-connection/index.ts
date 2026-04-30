@@ -1,6 +1,6 @@
 // Edge Function: cora-test-connection
-// Valida as credenciais mTLS do Banco Cora autenticando via OAuth client_credentials.
-// Usa as secrets globais: CORA_CLIENT_ID, CORA_CERTIFICATE, CORA_PRIVATE_KEY, CORA_ENVIRONMENT
+// Valida credenciais mTLS Cora autenticando via OAuth client_credentials.
+// Lê credenciais por unit_id (units.cora_*) com fallback para secrets globais.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.98.0";
 
 const corsHeaders = {
@@ -17,19 +17,15 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 function getCoraBaseUrl(environment: string) {
-  // Integração Direta usa subdomínio matls-clients
   return environment === "production"
     ? "https://matls-clients.api.cora.com.br"
     : "https://matls-clients.api.stage.cora.com.br";
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    // ---- Autenticação do usuário chamador ----
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return jsonResponse({ error: "Não autorizado" }, 401);
 
@@ -54,32 +50,62 @@ Deno.serve(async (req) => {
     );
     if (!allowed) return jsonResponse({ error: "Sem permissão" }, 403);
 
-    // ---- Carregar credenciais Cora das secrets ----
-    const clientId = Deno.env.get("CORA_CLIENT_ID");
-    const certificate = Deno.env.get("CORA_CERTIFICATE");
-    const privateKey = Deno.env.get("CORA_PRIVATE_KEY");
-    const environment = (Deno.env.get("CORA_ENVIRONMENT") || "stage").toLowerCase();
+    // ---- Origem das credenciais: unidade (preferido) ou globais (fallback) ----
+    let unit_id: string | null = null;
+    try {
+      const body = await req.json();
+      unit_id = body?.unit_id ?? null;
+    } catch { /* sem body */ }
 
-    const missing: string[] = [];
-    if (!clientId) missing.push("CORA_CLIENT_ID");
-    if (!certificate) missing.push("CORA_CERTIFICATE");
-    if (!privateKey) missing.push("CORA_PRIVATE_KEY");
-    if (missing.length > 0) {
-      return jsonResponse({
-        success: false,
-        error: `Secrets faltando: ${missing.join(", ")}`,
-      });
+    let clientId: string | undefined;
+    let certificate: string | undefined;
+    let privateKey: string | undefined;
+    let environment: string;
+    let source: "unit" | "global" = "global";
+
+    if (unit_id) {
+      const { data: unit, error: unitErr } = await supabaseAdmin
+        .from("units")
+        .select("cora_client_id, cora_certificate, cora_private_key, cora_environment")
+        .eq("id", unit_id)
+        .maybeSingle();
+      if (unitErr) return jsonResponse({ success: false, error: `Erro ao buscar unidade: ${unitErr.message}` });
+      if (!unit) return jsonResponse({ success: false, error: "Unidade não encontrada" });
+
+      clientId = unit.cora_client_id ?? undefined;
+      certificate = unit.cora_certificate ?? undefined;
+      privateKey = unit.cora_private_key ?? undefined;
+      environment = (unit.cora_environment || "stage").toLowerCase();
+      source = "unit";
+
+      if (!clientId || !certificate || !privateKey) {
+        return jsonResponse({
+          success: false,
+          error: "Esta unidade ainda não possui credenciais Cora configuradas. Cadastre na aba 'Banco Cora' do perfil da unidade.",
+        });
+      }
+    } else {
+      clientId = Deno.env.get("CORA_CLIENT_ID");
+      certificate = Deno.env.get("CORA_CERTIFICATE");
+      privateKey = Deno.env.get("CORA_PRIVATE_KEY");
+      environment = (Deno.env.get("CORA_ENVIRONMENT") || "stage").toLowerCase();
+
+      const missing: string[] = [];
+      if (!clientId) missing.push("CORA_CLIENT_ID");
+      if (!certificate) missing.push("CORA_CERTIFICATE");
+      if (!privateKey) missing.push("CORA_PRIVATE_KEY");
+      if (missing.length > 0) {
+        return jsonResponse({ success: false, error: `Secrets faltando: ${missing.join(", ")}` });
+      }
     }
 
     const baseUrl = getCoraBaseUrl(environment);
 
-    // ---- Diagnóstico de formato dos PEMs ----
-    // Normaliza PEMs colados com \n literais, CRLF ou salvos em uma única linha com espaços.
+    // ---- Normalização e diagnóstico de PEMs ----
     const normalizePem = (raw: string, labelPattern: string) => {
       const normalized = raw.replace(/\\r\\n/g, "\n").replace(/\\n/g, "\n").replace(/\r\n/g, "\n").trim();
       const match = normalized.match(new RegExp(`-----BEGIN (${labelPattern})-----([\\s\\S]*?)-----END \\1-----`));
       if (!match) return normalized;
-
       const label = match[1];
       const body = match[2].replace(/\s+/g, "");
       const wrapped = body.match(/.{1,64}/g)?.join("\n") || body;
@@ -93,54 +119,34 @@ Deno.serve(async (req) => {
     const keyHasHeader = /-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/.test(keyPem);
     const keyHasFooter = /-----END (?:RSA |EC )?PRIVATE KEY-----/.test(keyPem);
 
-    const diagnostics = {
-      cert_length: certPem.length,
-      cert_first_40: certPem.slice(0, 40),
-      cert_last_40: certPem.slice(-40),
-      cert_has_header: certHasHeader,
-      cert_has_footer: certHasFooter,
-      cert_line_count: certPem.split("\n").length,
-      key_length: keyPem.length,
-      key_first_40: keyPem.slice(0, 40),
-      key_last_40: keyPem.slice(-40),
-      key_has_header: keyHasHeader,
-      key_has_footer: keyHasFooter,
-      key_line_count: keyPem.split("\n").length,
-    };
-    console.log("[cora-test-connection] PEM diagnostics:", JSON.stringify(diagnostics));
-
     if (!certHasHeader || !certHasFooter) {
       return jsonResponse({
         success: false,
-        error: "CORA_CERTIFICATE não está em formato PEM válido. Faltam as linhas '-----BEGIN CERTIFICATE-----' e/ou '-----END CERTIFICATE-----'.",
-        diagnostics,
+        source,
+        error: "CORA_CERTIFICATE não está em formato PEM válido (-----BEGIN/END CERTIFICATE-----).",
       });
     }
     if (!keyHasHeader || !keyHasFooter) {
       return jsonResponse({
         success: false,
-        error: "CORA_PRIVATE_KEY não está em formato PEM válido. Faltam as linhas '-----BEGIN PRIVATE KEY-----' (ou RSA/EC) e/ou '-----END PRIVATE KEY-----'.",
-        diagnostics,
+        source,
+        error: "CORA_PRIVATE_KEY não está em formato PEM válido (-----BEGIN/END PRIVATE KEY-----).",
       });
     }
 
-    // ---- Criar HTTP client com mTLS ----
+    // ---- mTLS client ----
     let httpClient: Deno.HttpClient;
     try {
-      // @ts-ignore - Deno.createHttpClient existe no runtime do Supabase Edge
-      httpClient = Deno.createHttpClient({
-        cert: certPem,
-        key: keyPem,
-      });
+      // @ts-ignore
+      httpClient = Deno.createHttpClient({ cert: certPem, key: keyPem });
     } catch (e) {
       return jsonResponse({
         success: false,
-        error: `Falha ao criar cliente mTLS: ${e instanceof Error ? e.message : String(e)}. Verifique se o certificado e a chave privada estão no formato PEM correto.`,
-        diagnostics,
+        source,
+        error: `Falha ao criar cliente mTLS: ${e instanceof Error ? e.message : String(e)}`,
       });
     }
 
-    // ---- Chamar endpoint de OAuth do Cora ----
     const tokenUrl = `${baseUrl}/token`;
     const formBody = new URLSearchParams({
       grant_type: "client_credentials",
@@ -151,7 +157,7 @@ Deno.serve(async (req) => {
     try {
       tokenRes = await fetch(tokenUrl, {
         method: "POST",
-        // @ts-ignore - client é suportado no runtime
+        // @ts-ignore
         client: httpClient,
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
@@ -163,6 +169,7 @@ Deno.serve(async (req) => {
       try { httpClient.close(); } catch { /* noop */ }
       return jsonResponse({
         success: false,
+        source,
         error: `Falha de rede ao chamar Cora: ${e instanceof Error ? e.message : String(e)}`,
       });
     }
@@ -177,6 +184,7 @@ Deno.serve(async (req) => {
       const detail = (parsed && (parsed.error_description || parsed.message || parsed.error)) || rawText.slice(0, 300);
       return jsonResponse({
         success: false,
+        source,
         environment,
         status_code: tokenRes.status,
         error: `Cora retornou ${tokenRes.status}: ${detail}`,
@@ -189,19 +197,21 @@ Deno.serve(async (req) => {
     if (!accessToken) {
       return jsonResponse({
         success: false,
+        source,
         environment,
-        error: "Cora respondeu 200, mas sem access_token na resposta.",
+        error: "Cora respondeu 200, mas sem access_token.",
       });
     }
 
     return jsonResponse({
       success: true,
+      source,
       environment,
       base_url: baseUrl,
       client_id: clientId,
       token_preview: `${accessToken.slice(0, 12)}...`,
       expires_in: expiresIn ?? null,
-      message: "Conexão com o Banco Cora estabelecida com sucesso via mTLS.",
+      message: `Conexão Cora OK (origem: ${source === "unit" ? "credenciais da unidade" : "secrets globais"}).`,
     });
   } catch (err) {
     return jsonResponse({
