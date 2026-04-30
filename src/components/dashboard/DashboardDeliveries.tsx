@@ -30,6 +30,11 @@ const DashboardDeliveries = ({ unitFilter = "all" }: Props) => {
   const [deliveries, setDeliveries] = useState<DeliveryNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const fetchDeliveries = async () => {
     setLoading(true);
