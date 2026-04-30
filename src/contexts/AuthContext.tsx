@@ -40,6 +40,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const mountedRef = useRef(false);
   const loadingRef = useRef(true);
   const syncRequestRef = useRef(0);
+  const currentUserIdRef = useRef<string | null>(null);
 
   const clearUserData = () => {
     setProfile(null);
