@@ -1,0 +1,1 @@
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS punctuality_discount numeric NOT NULL DEFAULT 0;

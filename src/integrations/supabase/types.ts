@@ -442,6 +442,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          punctuality_discount: number
           suggested_installments: number
           suggested_value: number
           unit_id: string
@@ -453,6 +454,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          punctuality_discount?: number
           suggested_installments?: number
           suggested_value?: number
           unit_id: string
@@ -464,6 +466,7 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          punctuality_discount?: number
           suggested_installments?: number
           suggested_value?: number
           unit_id?: string
