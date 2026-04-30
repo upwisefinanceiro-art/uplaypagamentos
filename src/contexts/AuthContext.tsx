@@ -132,7 +132,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // dispara SIGNED_IN apenas porque a aba voltou ao foco e a sessão
         // continua sendo a mesma. Isso preserva o estado de formulários
         // e a rota atual ao alternar abas.
-        if (_event === "SIGNED_IN" && nextSession?.user?.id && nextSession.user.id === user?.id) {
+        if (_event === "SIGNED_IN" && nextSession?.user?.id && nextSession.user.id === currentUserIdRef.current) {
           setSession(nextSession);
           return;
         }
