@@ -2,3 +2,6 @@ project_id = "kfhjoffsqfnwiiwgelhl"
 
 [functions.sync-asaas-dunnings]
 verify_jwt = false
+
+[functions.cora-webhook]
+verify_jwt = false
