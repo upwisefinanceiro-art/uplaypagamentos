@@ -145,6 +145,14 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
 
   const handleSubmit = async () => {
     if (!contract) return;
+    if ((contract as any).status === "CANCELLED") {
+      toast({
+        title: "Contrato cancelado",
+        description: "Não é possível adicionar parcelas a um contrato cancelado.",
+        variant: "destructive",
+      });
+      return;
+    }
     const err = validate();
     if (err) {
       toast({ title: "Atenção", description: err, variant: "destructive" });
