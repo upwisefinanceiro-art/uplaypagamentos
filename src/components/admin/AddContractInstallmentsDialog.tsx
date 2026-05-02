@@ -69,6 +69,7 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
   const [generateAsaas, setGenerateAsaas] = useState(true);
 
   const [paymentMethod, setPaymentMethod] = useState<"PIX" | "BOLETO" | "CARD">("BOLETO");
+  const [gateway, setGateway] = useState<"ASAAS" | "CORA">("ASAAS");
   const [firstDueDate, setFirstDueDate] = useState("");
   const [installments, setInstallments] = useState("1");
   const [realValue, setRealValue] = useState("");
@@ -90,6 +91,7 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
     if (!open) {
       setSubmitting(false);
       setPaymentMethod("BOLETO");
+      setGateway("ASAAS");
       setFirstDueDate("");
       setInstallments("1");
       setRealValue("");
@@ -176,6 +178,7 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
           final_value: finalParc,
           status: "PENDING",
           payment_method: paymentMethod,
+          gateway: paymentMethod === "BOLETO" ? gateway : null,
           payment_type: "MENSALIDADE",
           description: contract.description + (notes ? ` — ${notes}` : ""),
         });
@@ -205,6 +208,7 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
             final_value: parc,
             status: "PENDING",
             payment_method: paymentMethod,
+            gateway: paymentMethod === "BOLETO" ? gateway : null,
             payment_type: "APOSTILA",
             description: `Apostila ${i + 1}/${apostilasCount}`,
           });
@@ -225,6 +229,7 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
           final_value: matricula,
           status: "PENDING",
           payment_method: paymentMethod,
+          gateway: paymentMethod === "BOLETO" ? gateway : null,
           payment_type: "MATRICULA",
           description: matriculaDescription || "Matrícula",
         });
@@ -248,12 +253,18 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
         description: `${inserted?.length ?? 0} cobrança(s) criada(s) no contrato.`,
       });
 
-      // Geração no Asaas em background (best effort)
+      // Geração automática no gateway escolhido (best effort)
       if (generateAsaas && inserted && inserted.length > 0) {
-        toast({ title: "Gerando cobranças no Asaas...", description: "Pode levar alguns segundos." });
-        let ok = 0;
-        let fail = 0;
-        for (const p of inserted) {
+        if (paymentMethod === "BOLETO" && gateway === "CORA") {
+          toast({
+            title: "Boletos Cora salvos localmente",
+            description: "A geração automática via API Cora ainda não está disponível. Os boletos foram salvos como pendentes.",
+          });
+        } else {
+          toast({ title: "Gerando cobranças no Asaas...", description: "Pode levar alguns segundos." });
+          let ok = 0;
+          let fail = 0;
+          for (const p of inserted) {
           try {
             const { error: chErr } = await supabase.functions.invoke("create-asaas-charge", {
               body: {
@@ -281,10 +292,11 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
             fail++;
           }
         }
-        toast({
-          title: "Sincronização Asaas concluída",
-          description: `${ok} gerada(s) no Asaas${fail ? `, ${fail} falha(s) — mantidas como locais` : ""}.`,
-        });
+          toast({
+            title: "Sincronização Asaas concluída",
+            description: `${ok} gerada(s) no Asaas${fail ? `, ${fail} falha(s) — mantidas como locais` : ""}.`,
+          });
+        }
       }
 
       onSuccess?.();
@@ -329,6 +341,21 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
               </SelectContent>
             </Select>
           </div>
+
+          {paymentMethod === "BOLETO" && (
+            <div className="space-y-2">
+              <Label className="text-foreground text-sm font-semibold">Gateway de Pagamento</Label>
+              <Select value={gateway} onValueChange={(v) => setGateway(v as any)}>
+                <SelectTrigger className="bg-input border-border text-foreground">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ASAAS">Asaas</SelectItem>
+                  <SelectItem value="CORA">Banco Cora</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <Separator className="bg-border" />
 
@@ -483,7 +510,7 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
           <div className="flex items-center gap-2">
             <Checkbox id="gen-asaas" checked={generateAsaas} onCheckedChange={(v) => setGenerateAsaas(!!v)} />
             <Label htmlFor="gen-asaas" className="text-xs text-foreground cursor-pointer">
-              Gerar cobranças no Asaas automaticamente após salvar
+              Gerar cobranças no {paymentMethod === "BOLETO" && gateway === "CORA" ? "Cora" : "Asaas"} automaticamente após salvar
             </Label>
           </div>
 

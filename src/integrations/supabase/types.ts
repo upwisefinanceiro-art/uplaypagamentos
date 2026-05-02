@@ -726,6 +726,7 @@ export type Database = {
           dunning_status: string | null
           dunning_synced_at: string | null
           final_value: number | null
+          gateway: string | null
           id: string
           in_dunning: boolean
           installment_number: number
@@ -761,6 +762,7 @@ export type Database = {
           dunning_status?: string | null
           dunning_synced_at?: string | null
           final_value?: number | null
+          gateway?: string | null
           id?: string
           in_dunning?: boolean
           installment_number?: number
@@ -796,6 +798,7 @@ export type Database = {
           dunning_status?: string | null
           dunning_synced_at?: string | null
           final_value?: number | null
+          gateway?: string | null
           id?: string
           in_dunning?: boolean
           installment_number?: number
