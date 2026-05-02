@@ -321,7 +321,15 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
       onSuccess?.();
       onOpenChange(false);
     } catch (e: any) {
-      toast({ title: "Erro ao adicionar parcelas", description: e?.message ?? String(e), variant: "destructive" });
+      const msg = e?.message ?? String(e);
+      const isRls = /row-level security|violates.*policy/i.test(msg);
+      toast({
+        title: isRls ? "Sem permissão para este contrato" : "Erro ao adicionar parcelas",
+        description: isRls
+          ? "Você não tem acesso à unidade deste contrato. Peça a um administrador master para revisar a unidade vinculada ao contrato ou faça login com a conta correta."
+          : msg,
+        variant: "destructive",
+      });
     } finally {
       setSubmitting(false);
     }
