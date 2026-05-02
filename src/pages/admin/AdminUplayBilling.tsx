@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Banknote, TrendingUp, Wallet, CheckCircle2, Building2, Filter } from "lucide-react";
+import { Banknote, TrendingUp, Wallet, CheckCircle2, Building2, Filter, Send } from "lucide-react";
 
 interface UplayUnit {
   id: string;
@@ -51,6 +51,22 @@ const AdminUplayBilling = () => {
   const [transferDialog, setTransferDialog] = useState<{ open: boolean; unit: UplayUnit | null }>({ open: false, unit: null });
   const [transferNotes, setTransferNotes] = useState("");
   const [transferring, setTransferring] = useState(false);
+  const [emitting, setEmitting] = useState(false);
+
+  const handleEmitPending = async () => {
+    setEmitting(true);
+    const { data, error } = await supabase.functions.invoke("emit-pending-cora-boletos", { body: {} });
+    setEmitting(false);
+    if (error || (data as any)?.error) {
+      toast({ title: "Erro", description: error?.message || (data as any)?.error, variant: "destructive" });
+      return;
+    }
+    toast({
+      title: "Emissão iniciada",
+      description: `${(data as any)?.queued ?? 0} boleto(s) na fila. A página atualiza automaticamente em alguns segundos.`,
+    });
+    setTimeout(fetchData, 8000);
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -135,12 +151,18 @@ const AdminUplayBilling = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center gap-2">
-        <Banknote size={20} className="text-primary" />
-        <div>
-          <h1 className="text-xl font-bold text-foreground">Boletos UpPlay</h1>
-          <p className="text-xs text-muted-foreground">Gestão de boletos intermediados — Plano UpPlay</p>
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Banknote size={20} className="text-primary" />
+          <div>
+            <h1 className="text-xl font-bold text-foreground">Boletos UpPlay</h1>
+            <p className="text-xs text-muted-foreground">Gestão de boletos intermediados — Plano UpPlay (Cora)</p>
+          </div>
         </div>
+        <Button size="sm" variant="outline" onClick={handleEmitPending} disabled={emitting} className="gap-2">
+          <Send size={14} />
+          {emitting ? "Enviando..." : "Emitir boletos pendentes"}
+        </Button>
       </div>
 
       {/* KPIs */}
