@@ -292,10 +292,11 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
             fail++;
           }
         }
-        toast({
-          title: "Sincronização Asaas concluída",
-          description: `${ok} gerada(s) no Asaas${fail ? `, ${fail} falha(s) — mantidas como locais` : ""}.`,
-        });
+          toast({
+            title: "Sincronização Asaas concluída",
+            description: `${ok} gerada(s) no Asaas${fail ? `, ${fail} falha(s) — mantidas como locais` : ""}.`,
+          });
+        }
       }
 
       onSuccess?.();
