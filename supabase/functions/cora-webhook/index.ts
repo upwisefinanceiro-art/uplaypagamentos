@@ -26,12 +26,12 @@ Deno.serve(async (req) => {
   if (expectedSecret) {
     const got = req.headers.get("x-webhook-secret") || req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
     if (got !== expectedSecret) {
-      await admin.from("webhook_logs").insert({ provider: "cora", event_type: "unauthorized", payload: body }).catch(() => null);
+      await admin.from("webhook_logs").insert({ event: "cora:" + "unauthorized", payload: body }).catch(() => null);
       return json({ error: "unauthorized" }, 401);
     }
   }
 
-  await admin.from("webhook_logs").insert({ provider: "cora", event_type: body?.event || body?.type || "unknown", payload: body }).catch(() => null);
+  await admin.from("webhook_logs").insert({ event: body?.event || body?.type || "unknown", payload: body }).catch(() => null);
 
   // Cora payload variants: { event, invoice: { id, status } } or top-level { id, status }
   const event = (body?.event || body?.type || "").toString().toLowerCase();
