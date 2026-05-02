@@ -69,6 +69,7 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
   const [generateAsaas, setGenerateAsaas] = useState(true);
 
   const [paymentMethod, setPaymentMethod] = useState<"PIX" | "BOLETO" | "CARD">("BOLETO");
+  const [gateway, setGateway] = useState<"ASAAS" | "CORA">("ASAAS");
   const [firstDueDate, setFirstDueDate] = useState("");
   const [installments, setInstallments] = useState("1");
   const [realValue, setRealValue] = useState("");
