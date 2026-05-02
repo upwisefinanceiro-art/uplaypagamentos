@@ -241,12 +241,23 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
         return;
       }
 
+      console.info("[AddContractInstallments] Inserindo parcelas", {
+        count: toInsert.length,
+        unit_id: contract.unit_id,
+        contract_id: contract.id,
+        responsible_id: contract.responsible_id,
+        sample: toInsert[0],
+      });
+
       const { data: inserted, error: insErr } = await supabase
         .from("payments")
         .insert(toInsert)
         .select("id, value, due_date, description, payment_type, stock_item_id, stock_quantity");
 
-      if (insErr) throw insErr;
+      if (insErr) {
+        console.error("[AddContractInstallments] Erro ao inserir payments:", insErr);
+        throw insErr;
+      }
 
       toast({
         title: "Parcelas adicionadas",
