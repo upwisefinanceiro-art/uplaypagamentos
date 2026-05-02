@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Loader2, UserPlus, UserCheck, Save, Trash2, ExternalLink, Search, CalendarIcon, Pencil, Ban, AlertTriangle, Bell, PlusCircle } from "lucide-react";
+import { Plus, Loader2, UserPlus, UserCheck, Save, Trash2, ExternalLink, Search, CalendarIcon, Pencil, Ban, AlertTriangle, Bell, PlusCircle, RotateCcw } from "lucide-react";
 import { format, addMonths, lastDayOfMonth, setDate as setDateFns, startOfDay, isBefore, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
@@ -143,6 +143,8 @@ const AdminContracts = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [editResponsible, setEditResponsible] = useState<{ id: string; full_name: string; cpf: string; phone: string | null; unit_id: string | null; email?: string | null; address?: string | null } | null>(null);
   const [cancelTarget, setCancelTarget] = useState<ContractRow | null>(null);
+  const [reopenTarget, setReopenTarget] = useState<ContractRow | null>(null);
+  const [reopening, setReopening] = useState(false);
   const [notifyTarget, setNotifyTarget] = useState<{ id: string; name: string; unit_id: string } | null>(null);
   const [addInstallmentsTarget, setAddInstallmentsTarget] = useState<ContractRow | null>(null);
   const [contractPayments, setContractPayments] = useState<{ id: string; contract_id: string | null; status: string; due_date: string }[]>([]);
@@ -1542,6 +1544,16 @@ const AdminContracts = () => {
                       <Ban size={12} className="mr-1" /> Cancelar Curso
                     </Button>
                   )}
+                  {c.status === "CANCELLED" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs text-emerald-500 hover:text-emerald-400"
+                      onClick={() => setReopenTarget(c)}
+                    >
+                      <RotateCcw size={12} className="mr-1" /> Reabrir Contrato
+                    </Button>
+                  )}
                   {hasRole("ADMIN_MASTER") && (
                     <Button
                       variant="ghost"
@@ -1626,6 +1638,52 @@ const AdminContracts = () => {
         } : null}
         onSuccess={fetchData}
       />
+
+      <AlertDialog open={!!reopenTarget} onOpenChange={(open) => !open && !reopening && setReopenTarget(null)}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-foreground">Reabrir contrato</AlertDialogTitle>
+            <AlertDialogDescription>
+              O contrato <strong>{reopenTarget?.contract_number || ""}</strong> voltará para o status <strong>ATIVO</strong> e poderá receber novas parcelas. As parcelas canceladas anteriormente <strong>não</strong> serão restauradas automaticamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-border" disabled={reopening}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={reopening}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground"
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!reopenTarget) return;
+                setReopening(true);
+                const { error } = await supabase
+                  .from("contracts")
+                  .update({
+                    status: "ACTIVE",
+                    cancelled_at: null,
+                    cancellation_date: null,
+                    cancellation_penalty_value: 0,
+                    cancellation_base_value: 0,
+                    cancellation_installments_count: 0,
+                    cancellation_penalty_percent: 0,
+                  })
+                  .eq("id", reopenTarget.id);
+                setReopening(false);
+                if (error) {
+                  toast({ title: "Erro ao reabrir", description: error.message, variant: "destructive" });
+                  return;
+                }
+                toast({ title: "Contrato reaberto com sucesso" });
+                setReopenTarget(null);
+                fetchData();
+              }}
+            >
+              {reopening ? <Loader2 size={14} className="animate-spin mr-2" /> : <RotateCcw size={14} className="mr-2" />}
+              Reabrir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
