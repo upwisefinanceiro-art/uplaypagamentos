@@ -718,6 +718,9 @@ export type Database = {
           boleto_url: string | null
           checkout_url: string | null
           contract_id: string | null
+          cora_invoice_id: string | null
+          cora_status: string | null
+          cora_synced_at: string | null
           created_at: string
           description: string
           due_date: string
@@ -754,6 +757,9 @@ export type Database = {
           boleto_url?: string | null
           checkout_url?: string | null
           contract_id?: string | null
+          cora_invoice_id?: string | null
+          cora_status?: string | null
+          cora_synced_at?: string | null
           created_at?: string
           description?: string
           due_date: string
@@ -790,6 +796,9 @@ export type Database = {
           boleto_url?: string | null
           checkout_url?: string | null
           contract_id?: string | null
+          cora_invoice_id?: string | null
+          cora_status?: string | null
+          cora_synced_at?: string | null
           created_at?: string
           description?: string
           due_date?: string
