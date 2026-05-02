@@ -1638,6 +1638,52 @@ const AdminContracts = () => {
         } : null}
         onSuccess={fetchData}
       />
+
+      <AlertDialog open={!!reopenTarget} onOpenChange={(open) => !open && !reopening && setReopenTarget(null)}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-foreground">Reabrir contrato</AlertDialogTitle>
+            <AlertDialogDescription>
+              O contrato <strong>{reopenTarget?.contract_number || ""}</strong> voltará para o status <strong>ATIVO</strong> e poderá receber novas parcelas. As parcelas canceladas anteriormente <strong>não</strong> serão restauradas automaticamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-border" disabled={reopening}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={reopening}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground"
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!reopenTarget) return;
+                setReopening(true);
+                const { error } = await supabase
+                  .from("contracts")
+                  .update({
+                    status: "ACTIVE",
+                    cancelled_at: null,
+                    cancellation_date: null,
+                    cancellation_penalty_value: 0,
+                    cancellation_base_value: 0,
+                    cancellation_installments_count: 0,
+                    cancellation_penalty_percent: 0,
+                  })
+                  .eq("id", reopenTarget.id);
+                setReopening(false);
+                if (error) {
+                  toast({ title: "Erro ao reabrir", description: error.message, variant: "destructive" });
+                  return;
+                }
+                toast({ title: "Contrato reaberto com sucesso" });
+                setReopenTarget(null);
+                fetchData();
+              }}
+            >
+              {reopening ? <Loader2 size={14} className="animate-spin mr-2" /> : <RotateCcw size={14} className="mr-2" />}
+              Reabrir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
