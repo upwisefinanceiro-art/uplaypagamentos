@@ -91,6 +91,7 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
     if (!open) {
       setSubmitting(false);
       setPaymentMethod("BOLETO");
+      setGateway("ASAAS");
       setFirstDueDate("");
       setInstallments("1");
       setRealValue("");
