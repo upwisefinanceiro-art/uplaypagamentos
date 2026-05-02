@@ -145,6 +145,14 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
 
   const handleSubmit = async () => {
     if (!contract) return;
+    if ((contract as any).status === "CANCELLED") {
+      toast({
+        title: "Contrato cancelado",
+        description: "Não é possível adicionar parcelas a um contrato cancelado.",
+        variant: "destructive",
+      });
+      return;
+    }
     const err = validate();
     if (err) {
       toast({ title: "Atenção", description: err, variant: "destructive" });
@@ -313,7 +321,15 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
       onSuccess?.();
       onOpenChange(false);
     } catch (e: any) {
-      toast({ title: "Erro ao adicionar parcelas", description: e?.message ?? String(e), variant: "destructive" });
+      const msg = e?.message ?? String(e);
+      const isRls = /row-level security|violates.*policy/i.test(msg);
+      toast({
+        title: isRls ? "Sem permissão para este contrato" : "Erro ao adicionar parcelas",
+        description: isRls
+          ? "Você não tem acesso à unidade deste contrato. Peça a um administrador master para revisar a unidade vinculada ao contrato ou faça login com a conta correta."
+          : msg,
+        variant: "destructive",
+      });
     } finally {
       setSubmitting(false);
     }
