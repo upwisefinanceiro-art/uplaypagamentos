@@ -342,6 +342,21 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
             </Select>
           </div>
 
+          {paymentMethod === "BOLETO" && (
+            <div className="space-y-2">
+              <Label className="text-foreground text-sm font-semibold">Gateway de Pagamento</Label>
+              <Select value={gateway} onValueChange={(v) => setGateway(v as any)}>
+                <SelectTrigger className="bg-input border-border text-foreground">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ASAAS">Asaas</SelectItem>
+                  <SelectItem value="CORA">Banco Cora</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <Separator className="bg-border" />
 
           {/* Parcelamento */}
