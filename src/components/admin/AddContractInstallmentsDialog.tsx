@@ -253,12 +253,18 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
         description: `${inserted?.length ?? 0} cobrança(s) criada(s) no contrato.`,
       });
 
-      // Geração no Asaas em background (best effort)
+      // Geração automática no gateway escolhido (best effort)
       if (generateAsaas && inserted && inserted.length > 0) {
-        toast({ title: "Gerando cobranças no Asaas...", description: "Pode levar alguns segundos." });
-        let ok = 0;
-        let fail = 0;
-        for (const p of inserted) {
+        if (paymentMethod === "BOLETO" && gateway === "CORA") {
+          toast({
+            title: "Boletos Cora salvos localmente",
+            description: "A geração automática via API Cora ainda não está disponível. Os boletos foram salvos como pendentes.",
+          });
+        } else {
+          toast({ title: "Gerando cobranças no Asaas...", description: "Pode levar alguns segundos." });
+          let ok = 0;
+          let fail = 0;
+          for (const p of inserted) {
           try {
             const { error: chErr } = await supabase.functions.invoke("create-asaas-charge", {
               body: {
