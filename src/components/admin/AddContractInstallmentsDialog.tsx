@@ -510,7 +510,7 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
           <div className="flex items-center gap-2">
             <Checkbox id="gen-asaas" checked={generateAsaas} onCheckedChange={(v) => setGenerateAsaas(!!v)} />
             <Label htmlFor="gen-asaas" className="text-xs text-foreground cursor-pointer">
-              Gerar cobranças no Asaas automaticamente após salvar
+              Gerar cobranças no {paymentMethod === "BOLETO" && gateway === "CORA" ? "Cora" : "Asaas"} automaticamente após salvar
             </Label>
           </div>
 
