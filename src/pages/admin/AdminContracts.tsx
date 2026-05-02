@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Loader2, UserPlus, UserCheck, Save, Trash2, ExternalLink, Search, CalendarIcon, Pencil, Ban, AlertTriangle, Bell, PlusCircle } from "lucide-react";
+import { Plus, Loader2, UserPlus, UserCheck, Save, Trash2, ExternalLink, Search, CalendarIcon, Pencil, Ban, AlertTriangle, Bell, PlusCircle, RotateCcw } from "lucide-react";
 import { format, addMonths, lastDayOfMonth, setDate as setDateFns, startOfDay, isBefore, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
