@@ -1544,6 +1544,16 @@ const AdminContracts = () => {
                       <Ban size={12} className="mr-1" /> Cancelar Curso
                     </Button>
                   )}
+                  {c.status === "CANCELLED" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs text-emerald-500 hover:text-emerald-400"
+                      onClick={() => setReopenTarget(c)}
+                    >
+                      <RotateCcw size={12} className="mr-1" /> Reabrir Contrato
+                    </Button>
+                  )}
                   {hasRole("ADMIN_MASTER") && (
                     <Button
                       variant="ghost"
