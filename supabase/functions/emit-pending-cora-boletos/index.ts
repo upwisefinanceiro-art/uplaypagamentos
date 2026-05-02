@@ -66,9 +66,9 @@ Deno.serve(async (req) => {
         }
       }
       await admin.from("webhook_logs").insert({
-        provider: "cora",
-        event_type: "batch_emit_done",
-        payload: { unit_id: unit_id ?? null, ok, fail, total: ids.length },
+        event: "cora:batch_emit_done",
+        unit_id: unit_id ?? null,
+        payload: { ok, fail, total: ids.length },
       }).catch(() => null);
     })();
 
