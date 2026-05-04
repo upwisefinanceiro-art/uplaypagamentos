@@ -223,7 +223,7 @@ const AdminCharges = () => {
       fetchAllPaginated<PaymentRow>((from, to) =>
         supabase
           .from("payments")
-          .select("id, value, final_value, due_date, status, payment_method, pix_copy_paste, invoice_url, checkout_url, boleto_url, pix_qr_code, asaas_payment_id, responsible_id, unit_id, installment_number, contract_id, student_id, description, payment_type")
+          .select("id, value, final_value, due_date, status, payment_method, pix_copy_paste, invoice_url, checkout_url, boleto_url, pix_qr_code, asaas_payment_id, responsible_id, unit_id, installment_number, contract_id, student_id, description, payment_type, cora_invoice_id")
           .order("due_date", { ascending: false })
           .range(from, to),
       ),
