@@ -113,13 +113,24 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: authError.message });
     }
 
-    const updateData = {
+    const norm = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+    const cleanZip = typeof zip_code === "string" ? zip_code.replace(/\D/g, "") : "";
+
+    const updateData: Record<string, unknown> = {
       full_name: normalizedName,
       cpf: cleanCpf,
       phone: normalizedPhone,
       email: normalizedEmail,
       address: normalizedAddress,
       unit_id: nextUnitId,
+      birth_date: birth_date && String(birth_date).trim() ? birth_date : null,
+      rg: norm(rg),
+      address_number: norm(address_number),
+      complement: norm(complement),
+      neighborhood: norm(neighborhood),
+      city: norm(city),
+      state: norm(state),
+      zip_code: cleanZip || null,
     };
 
     const { error: updateError } = await supabaseAdmin
