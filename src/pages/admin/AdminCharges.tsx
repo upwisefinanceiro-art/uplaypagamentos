@@ -1221,23 +1221,52 @@ const AdminCharges = () => {
                       </button>
                     </div>
 
-                    {/* Sync with Asaas */}
-                    {!payment.asaas_payment_id && payment.payment_method !== "DINHEIRO" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5 text-xs h-7 border-warning/40 text-warning hover:bg-warning/10"
-                        disabled={syncingPaymentId === payment.id}
-                        onClick={() => handleSyncPayment(payment.id)}
-                      >
-                        {syncingPaymentId === payment.id ? (
-                          <Loader2 size={12} className="animate-spin" />
-                        ) : (
-                          <RefreshCw size={12} />
-                        )}
-                        Enviar ao Asaas
-                      </Button>
-                    )}
+                    {/* Emissão dinâmica conforme plano da unidade */}
+                    {(() => {
+                      const unit = units.find((u) => u.id === payment.unit_id);
+                      const isUplay = unit?.partnership_plan === "PLANO_UPLAY";
+                      if (payment.payment_method === "DINHEIRO") return null;
+
+                      if (isUplay) {
+                        if (payment.cora_invoice_id) return null;
+                        return (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 text-xs h-7 border-primary/40 text-primary hover:bg-primary/10"
+                            disabled={syncingPaymentId === payment.id}
+                            onClick={() => handleEmitCora(payment.id)}
+                          >
+                            {syncingPaymentId === payment.id ? (
+                              <Loader2 size={12} className="animate-spin" />
+                            ) : (
+                              <RefreshCw size={12} />
+                            )}
+                            Emitir boleto Cora
+                          </Button>
+                        );
+                      }
+
+                      if (!payment.asaas_payment_id) {
+                        return (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 text-xs h-7 border-warning/40 text-warning hover:bg-warning/10"
+                            disabled={syncingPaymentId === payment.id}
+                            onClick={() => handleSyncPayment(payment.id)}
+                          >
+                            {syncingPaymentId === payment.id ? (
+                              <Loader2 size={12} className="animate-spin" />
+                            ) : (
+                              <RefreshCw size={12} />
+                            )}
+                            Enviar ao Asaas
+                          </Button>
+                        );
+                      }
+                      return null;
+                    })()}
 
                     {payment.asaas_payment_id && !(payment.invoice_url || payment.boleto_url) && (
                       <Button
