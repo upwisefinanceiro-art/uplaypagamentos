@@ -615,6 +615,8 @@ const AdminCharges = () => {
       setSyncingPaymentId(null);
     }
   };
+
+  const handleOpenWhatsApp = async (payment: PaymentRow) => {
     try {
       toast({ title: "Sincronizando cobrança no Asaas antes do envio..." });
       const resolved = await resolveWhatsAppChargeData(payment.id);
