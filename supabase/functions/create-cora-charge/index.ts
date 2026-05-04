@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
 
     const { data: payment, error: pErr } = await admin
       .from("payments")
-      .select("id, unit_id, responsible_id, value, final_value, due_date, description, status, gateway, payment_method, cora_invoice_id")
+      .select("id, unit_id, responsible_id, contract_id, value, final_value, due_date, description, status, gateway, payment_method, cora_invoice_id")
       .eq("id", payment_id)
       .single();
     if (pErr || !payment) return json({ error: "Parcela não encontrada" }, 404);
@@ -78,6 +78,53 @@ Deno.serve(async (req) => {
       return json({ error: "CPF/CNPJ do responsável inválido" }, 400);
     }
 
+    // Endereço — busca do contrato (mais completo) e cai no profile como fallback
+    let addrStreet = resp.address || "";
+    let addrNumber = "S/N";
+    let addrDistrict = "Centro";
+    let addrCity = "";
+    let addrState = "";
+    let addrZip = "";
+    let addrComplement = "";
+
+    if (payment.contract_id) {
+      const { data: ct } = await admin
+        .from("contracts")
+        .select("address, address_number, neighborhood, city, state, zip_code, complement")
+        .eq("id", payment.contract_id)
+        .maybeSingle();
+      if (ct) {
+        addrStreet = ct.address || addrStreet;
+        addrNumber = ct.address_number || addrNumber;
+        addrDistrict = ct.neighborhood || addrDistrict;
+        addrCity = ct.city || addrCity;
+        addrState = (ct.state || addrState).toUpperCase().slice(0, 2);
+        addrZip = onlyDigits(ct.zip_code || "");
+        addrComplement = ct.complement || "";
+      }
+    }
+
+    // Validações de endereço (Cora exige CEP de 8 dígitos, cidade e UF)
+    const missing: string[] = [];
+    if (!addrStreet || addrStreet.trim().length < 3) missing.push("logradouro");
+    if (!addrZip || addrZip.length !== 8) missing.push("CEP (8 dígitos)");
+    if (!addrCity) missing.push("cidade");
+    if (!addrState || addrState.length !== 2) missing.push("UF");
+    if (missing.length) {
+      return json({
+        error: `Endereço do responsável incompleto: ${missing.join(", ")}. Edite o cadastro do contrato/cliente.`,
+      }, 400);
+    }
+
+    // Sanitiza nome — remove acentos e caracteres não permitidos
+    const sanitizeName = (s: string) =>
+      s.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^A-Za-z0-9 .'-]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 100);
+    const customerName = sanitizeName(resp.full_name);
+
     // Credenciais globais
     const credsOrErr = getGlobalCoraCredentials();
     if ("error" in credsOrErr) return json({ error: credsOrErr.error }, 500);
@@ -94,52 +141,69 @@ Deno.serve(async (req) => {
 
       // Payload Cora — boleto + PIX (BANK_SLIP)
       const payload = {
-        code: payment.id, // referência interna (idempotência local)
+        code: payment.id,
         customer: {
-          name: resp.full_name,
+          name: customerName,
           email: resp.email || undefined,
           document: { identity: cpfDigits, type: cpfDigits.length === 11 ? "CPF" : "CNPJ" },
           address: {
-            street: resp.address || "Não informado",
-            number: "S/N",
-            district: "Centro",
-            city: "Belo Horizonte",
-            state: "MG",
-            complement: "",
-            zip_code: "30000000",
+            street: addrStreet.slice(0, 100),
+            number: String(addrNumber).slice(0, 10),
+            district: (addrDistrict || "Centro").slice(0, 60),
+            city: addrCity.slice(0, 60),
+            state: addrState,
+            complement: (addrComplement || "").slice(0, 60),
+            zip_code: addrZip,
           },
         },
         services: [
           {
-            name: payment.description || "Cobrança UPLAY",
-            description: payment.description || "Cobrança UPLAY",
+            name: (payment.description || "Cobrança UPLAY").slice(0, 100),
+            description: (payment.description || "Cobrança UPLAY").slice(0, 200),
             amount: valueCents,
           },
         ],
-        payment_terms: {
-          due_date: payment.due_date,
-        },
+        payment_terms: { due_date: payment.due_date },
         payment_forms: ["BANK_SLIP", "PIX"],
         notification: {
-          name: resp.full_name,
+          name: customerName,
           channels: resp.email
             ? [{ channel: "EMAIL", contact: resp.email, rules: ["NOTIFY_THREE_DAYS_BEFORE_DUE_DATE", "NOTIFY_ON_DUE_DATE"] }]
             : [],
         },
       };
 
+      console.info("[create-cora-charge] enviando payload Cora", {
+        payment_id: payment.id,
+        amount: valueCents,
+        zip: addrZip,
+        state: addrState,
+      });
+
       const result = await coraRequest(session, "/v2/invoices", "POST", payload);
 
       if (!result.ok) {
-        const detail = result.data?.message || result.data?.errors?.[0]?.description || result.raw.slice(0, 300);
+        const errors = result.data?.errors;
+        const errList = Array.isArray(errors)
+          ? errors.map((e: any) => `${e.field || e.code || ""}: ${e.description || e.message || JSON.stringify(e)}`).join(" | ")
+          : null;
+        const detail = errList || result.data?.message || result.data?.error || result.raw.slice(0, 500);
+        console.error("[create-cora-charge] Cora retornou erro", {
+          status: result.status,
+          response: result.data || result.raw,
+          payload_sent: payload,
+        });
         try {
           await admin.from("webhook_logs").insert({
             event: "cora:create_charge_error",
             local_payment_id: payment_id,
-            payload: { status: result.status, response: result.data || result.raw },
+            payload: { status: result.status, response: result.data || result.raw, sent: payload },
           });
         } catch (_) { /* ignore log failure */ }
-        return json({ error: `Cora retornou ${result.status}: ${detail}` }, 502);
+        return json({
+          error: `Cora retornou ${result.status}: ${detail}`,
+          cora_response: result.data || result.raw,
+        }, 502);
       }
 
       const invoice = result.data;
