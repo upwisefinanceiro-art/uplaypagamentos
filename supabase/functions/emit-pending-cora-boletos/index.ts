@@ -65,11 +65,13 @@ Deno.serve(async (req) => {
           fail++;
         }
       }
-      await admin.from("webhook_logs").insert({
-        event: "cora:batch_emit_done",
-        unit_id: unit_id ?? null,
-        payload: { ok, fail, total: ids.length },
-      }).catch(() => null);
+      try {
+        await admin.from("webhook_logs").insert({
+          event: "cora:batch_emit_done",
+          unit_id: unit_id ?? null,
+          payload: { ok, fail, total: ids.length },
+        });
+      } catch (_) { /* ignore */ }
     })();
 
     return json({ success: true, queued: ids.length });
