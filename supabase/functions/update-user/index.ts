@@ -54,7 +54,10 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Sem permissão" });
     }
 
-    const { user_id, full_name, cpf, phone, unit_id, email, address } = await req.json();
+    const {
+      user_id, full_name, cpf, phone, unit_id, email, address,
+      birth_date, rg, address_number, complement, neighborhood, city, state, zip_code,
+    } = await req.json();
 
     if (!user_id || !full_name?.trim() || !cpf?.trim()) {
       return jsonResponse({ error: "user_id, nome e CPF são obrigatórios" });
@@ -62,7 +65,7 @@ Deno.serve(async (req) => {
 
     const { data: targetProfile, error: targetError } = await supabaseAdmin
       .from("profiles")
-      .select("id, unit_id, full_name, cpf, phone, email, address, active")
+      .select("id, unit_id, full_name, cpf, phone, email, address, active, birth_date, rg, address_number, complement, neighborhood, city, state, zip_code")
       .eq("id", user_id)
       .single();
 
