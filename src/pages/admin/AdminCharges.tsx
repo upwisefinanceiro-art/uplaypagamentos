@@ -84,6 +84,7 @@ interface PaymentRow {
   student_id: string | null;
   description: string;
   payment_type: string;
+  cora_invoice_id?: string | null;
 }
 
 interface ContractRow {
@@ -113,6 +114,7 @@ interface StudentRow {
 interface UnitRow {
   id: string;
   name: string;
+  partnership_plan?: string | null;
 }
 
 interface ChargeResult {
@@ -221,12 +223,12 @@ const AdminCharges = () => {
       fetchAllPaginated<PaymentRow>((from, to) =>
         supabase
           .from("payments")
-          .select("id, value, final_value, due_date, status, payment_method, pix_copy_paste, invoice_url, checkout_url, boleto_url, pix_qr_code, asaas_payment_id, responsible_id, unit_id, installment_number, contract_id, student_id, description, payment_type")
+          .select("id, value, final_value, due_date, status, payment_method, pix_copy_paste, invoice_url, checkout_url, boleto_url, pix_qr_code, asaas_payment_id, responsible_id, unit_id, installment_number, contract_id, student_id, description, payment_type, cora_invoice_id")
           .order("due_date", { ascending: false })
           .range(from, to),
       ),
       supabase.from("students").select("id, full_name, responsible_id").order("full_name"),
-      supabase.from("units").select("id, name").order("name"),
+      supabase.from("units").select("id, name, partnership_plan").order("name"),
       supabase.from("profiles").select("id, full_name, unit_id, active, phone").order("full_name"),
       supabase.from("user_roles").select("user_id").eq("role", "RESPONSAVEL"),
       fetchAllPaginated<ContractRow>((from, to) =>
@@ -586,6 +588,32 @@ const AdminCharges = () => {
     } catch (err: unknown) {
       setSyncingPaymentId(null);
       toast({ title: "Erro inesperado", description: err instanceof Error ? err.message : "Erro desconhecido", variant: "destructive" });
+    }
+  };
+
+  const handleEmitCora = async (paymentId: string) => {
+    setSyncingPaymentId(paymentId);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-cora-charge", {
+        body: { payment_id: paymentId },
+      });
+      if (error || data?.error) {
+        let msg = error?.message || data?.error || "Falha ao emitir boleto Cora";
+        try {
+          if ((error as any)?.context?.json) {
+            const body = await (error as any).context.json();
+            msg = body?.error || msg;
+          }
+        } catch { /* */ }
+        toast({ title: "Erro ao emitir na Cora", description: msg, variant: "destructive" });
+        return;
+      }
+      toast({ title: data?.already_emitted ? "Boleto já emitido" : "Boleto emitido na Cora!" });
+      fetchData();
+    } catch (err) {
+      toast({ title: "Erro inesperado", description: err instanceof Error ? err.message : "", variant: "destructive" });
+    } finally {
+      setSyncingPaymentId(null);
     }
   };
 
@@ -1194,23 +1222,52 @@ const AdminCharges = () => {
                       </button>
                     </div>
 
-                    {/* Sync with Asaas */}
-                    {!payment.asaas_payment_id && payment.payment_method !== "DINHEIRO" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5 text-xs h-7 border-warning/40 text-warning hover:bg-warning/10"
-                        disabled={syncingPaymentId === payment.id}
-                        onClick={() => handleSyncPayment(payment.id)}
-                      >
-                        {syncingPaymentId === payment.id ? (
-                          <Loader2 size={12} className="animate-spin" />
-                        ) : (
-                          <RefreshCw size={12} />
-                        )}
-                        Enviar ao Asaas
-                      </Button>
-                    )}
+                    {/* Emissão dinâmica conforme plano da unidade */}
+                    {(() => {
+                      const unit = units.find((u) => u.id === payment.unit_id);
+                      const isUplay = unit?.partnership_plan === "PLANO_UPLAY";
+                      if (payment.payment_method === "DINHEIRO") return null;
+
+                      if (isUplay) {
+                        if (payment.cora_invoice_id) return null;
+                        return (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 text-xs h-7 border-primary/40 text-primary hover:bg-primary/10"
+                            disabled={syncingPaymentId === payment.id}
+                            onClick={() => handleEmitCora(payment.id)}
+                          >
+                            {syncingPaymentId === payment.id ? (
+                              <Loader2 size={12} className="animate-spin" />
+                            ) : (
+                              <RefreshCw size={12} />
+                            )}
+                            Emitir boleto Cora
+                          </Button>
+                        );
+                      }
+
+                      if (!payment.asaas_payment_id) {
+                        return (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 text-xs h-7 border-warning/40 text-warning hover:bg-warning/10"
+                            disabled={syncingPaymentId === payment.id}
+                            onClick={() => handleSyncPayment(payment.id)}
+                          >
+                            {syncingPaymentId === payment.id ? (
+                              <Loader2 size={12} className="animate-spin" />
+                            ) : (
+                              <RefreshCw size={12} />
+                            )}
+                            Enviar ao Asaas
+                          </Button>
+                        );
+                      }
+                      return null;
+                    })()}
 
                     {payment.asaas_payment_id && !(payment.invoice_url || payment.boleto_url) && (
                       <Button
