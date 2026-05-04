@@ -113,6 +113,7 @@ interface StudentRow {
 interface UnitRow {
   id: string;
   name: string;
+  partnership_plan?: string | null;
 }
 
 interface ChargeResult {
