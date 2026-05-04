@@ -165,11 +165,13 @@ Deno.serve(async (req) => {
         })
         .eq("id", payment.id);
 
-      await admin.from("webhook_logs").insert({
-        event: "cora:create_charge_success",
-        local_payment_id: payment.id,
-        payload: { cora_invoice_id: coraInvoiceId },
-      }).catch(() => null);
+      try {
+        await admin.from("webhook_logs").insert({
+          event: "cora:create_charge_success",
+          local_payment_id: payment.id,
+          payload: { cora_invoice_id: coraInvoiceId },
+        });
+      } catch (_) { /* ignore log failure */ }
 
       return json({ success: true, cora_invoice_id: coraInvoiceId, boleto_url: boletoUrl, pix_copy_paste: pixCopia });
     } finally {
