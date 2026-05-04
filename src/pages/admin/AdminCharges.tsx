@@ -590,7 +590,31 @@ const AdminCharges = () => {
     }
   };
 
-  const handleOpenWhatsApp = async (payment: PaymentRow) => {
+  const handleEmitCora = async (paymentId: string) => {
+    setSyncingPaymentId(paymentId);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-cora-charge", {
+        body: { payment_id: paymentId },
+      });
+      if (error || data?.error) {
+        let msg = error?.message || data?.error || "Falha ao emitir boleto Cora";
+        try {
+          if ((error as any)?.context?.json) {
+            const body = await (error as any).context.json();
+            msg = body?.error || msg;
+          }
+        } catch { /* */ }
+        toast({ title: "Erro ao emitir na Cora", description: msg, variant: "destructive" });
+        return;
+      }
+      toast({ title: data?.already_emitted ? "Boleto já emitido" : "Boleto emitido na Cora!" });
+      fetchData();
+    } catch (err) {
+      toast({ title: "Erro inesperado", description: err instanceof Error ? err.message : "", variant: "destructive" });
+    } finally {
+      setSyncingPaymentId(null);
+    }
+  };
     try {
       toast({ title: "Sincronizando cobrança no Asaas antes do envio..." });
       const resolved = await resolveWhatsAppChargeData(payment.id);
