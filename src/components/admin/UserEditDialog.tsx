@@ -59,10 +59,11 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
   const loadProfileExtras = async (userId: string) => {
     const { data } = await supabase
       .from("profiles")
-      .select("birth_date, rg, address_number, complement, neighborhood, city, state, zip_code")
+      .select("address, birth_date, rg, address_number, complement, neighborhood, city, state, zip_code")
       .eq("id", userId)
       .maybeSingle();
     if (data) {
+      setAddress((prev) => prev || (data as any).address || "");
       setBirthDate((data as any).birth_date || "");
       setRg((data as any).rg || "");
       setAddressNumber((data as any).address_number || "");
