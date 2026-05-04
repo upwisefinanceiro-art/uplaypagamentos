@@ -84,6 +84,7 @@ interface PaymentRow {
   student_id: string | null;
   description: string;
   payment_type: string;
+  cora_invoice_id?: string | null;
 }
 
 interface ContractRow {
