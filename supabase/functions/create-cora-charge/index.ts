@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
     // Pagador
     const { data: resp } = await admin
       .from("profiles")
-      .select("full_name, cpf, email, phone, address")
+      .select("full_name, cpf, email, phone, address, address_number, complement, neighborhood, city, state, zip_code")
       .eq("id", payment.responsible_id)
       .single();
     if (!resp || !resp.full_name || !resp.cpf) {
@@ -78,31 +78,30 @@ Deno.serve(async (req) => {
       return json({ error: "CPF/CNPJ do responsável inválido" }, 400);
     }
 
-    // Endereço — busca do contrato (mais completo) e cai no profile como fallback
-    let addrStreet = resp.address || "";
-    let addrNumber = "S/N";
-    let addrDistrict = "Centro";
-    let addrCity = "";
-    let addrState = "";
-    let addrZip = "";
-    let addrComplement = "";
-
+    // Endereço — combina contrato + profile (fallback). Contrato tem precedência quando preenchido.
+    let ct: any = null;
     if (payment.contract_id) {
-      const { data: ct } = await admin
+      const { data: contractData } = await admin
         .from("contracts")
         .select("address, address_number, neighborhood, city, state, zip_code, complement")
         .eq("id", payment.contract_id)
         .maybeSingle();
-      if (ct) {
-        addrStreet = ct.address || addrStreet;
-        addrNumber = ct.address_number || addrNumber;
-        addrDistrict = ct.neighborhood || addrDistrict;
-        addrCity = ct.city || addrCity;
-        addrState = (ct.state || addrState).toUpperCase().slice(0, 2);
-        addrZip = onlyDigits(ct.zip_code || "");
-        addrComplement = ct.complement || "";
-      }
+      ct = contractData;
     }
+
+    const pick = (a: any, b: any) => {
+      const va = typeof a === "string" ? a.trim() : a;
+      const vb = typeof b === "string" ? b.trim() : b;
+      return va || vb || "";
+    };
+
+    const addrStreet = pick(ct?.address, resp.address);
+    const addrNumber = pick(ct?.address_number, resp.address_number) || "S/N";
+    const addrDistrict = pick(ct?.neighborhood, resp.neighborhood) || "Centro";
+    const addrCity = pick(ct?.city, resp.city);
+    const addrState = String(pick(ct?.state, resp.state) || "").toUpperCase().slice(0, 2);
+    const addrZip = onlyDigits(pick(ct?.zip_code, resp.zip_code));
+    const addrComplement = pick(ct?.complement, resp.complement);
 
     // Validações de endereço (Cora exige CEP de 8 dígitos, cidade e UF)
     const missing: string[] = [];
