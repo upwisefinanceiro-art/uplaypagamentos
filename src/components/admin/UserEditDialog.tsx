@@ -76,7 +76,7 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
     if (!data || (!(data as any).city && !(data as any).zip_code)) {
       const { data: contract } = await supabase
         .from("contracts")
-        .select("birth_date, rg, address_number, complement, neighborhood, city, state, zip_code")
+        .select("birth_date, rg, address, address_number, complement, neighborhood, city, state, zip_code")
         .eq("responsible_id", userId)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -84,6 +84,7 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
       if (contract) {
         setBirthDate((prev) => prev || (contract as any).birth_date || "");
         setRg((prev) => prev || (contract as any).rg || "");
+        setAddress((prev) => prev || (contract as any).address || "");
         setAddressNumber((prev) => prev || (contract as any).address_number || "");
         setComplement((prev) => prev || (contract as any).complement || "");
         setNeighborhood((prev) => prev || (contract as any).neighborhood || "");
