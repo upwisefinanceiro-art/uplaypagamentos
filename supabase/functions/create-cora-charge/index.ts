@@ -132,11 +132,13 @@ Deno.serve(async (req) => {
 
       if (!result.ok) {
         const detail = result.data?.message || result.data?.errors?.[0]?.description || result.raw.slice(0, 300);
-        await admin.from("webhook_logs").insert({
-          event: "cora:create_charge_error",
-          local_payment_id: payment_id,
-          payload: { status: result.status, response: result.data || result.raw },
-        }).catch(() => null);
+        try {
+          await admin.from("webhook_logs").insert({
+            event: "cora:create_charge_error",
+            local_payment_id: payment_id,
+            payload: { status: result.status, response: result.data || result.raw },
+          });
+        } catch (_) { /* ignore log failure */ }
         return json({ error: `Cora retornou ${result.status}: ${detail}` }, 502);
       }
 
@@ -163,11 +165,13 @@ Deno.serve(async (req) => {
         })
         .eq("id", payment.id);
 
-      await admin.from("webhook_logs").insert({
-        event: "cora:create_charge_success",
-        local_payment_id: payment.id,
-        payload: { cora_invoice_id: coraInvoiceId },
-      }).catch(() => null);
+      try {
+        await admin.from("webhook_logs").insert({
+          event: "cora:create_charge_success",
+          local_payment_id: payment.id,
+          payload: { cora_invoice_id: coraInvoiceId },
+        });
+      } catch (_) { /* ignore log failure */ }
 
       return json({ success: true, cora_invoice_id: coraInvoiceId, boleto_url: boletoUrl, pix_copy_paste: pixCopia });
     } finally {
