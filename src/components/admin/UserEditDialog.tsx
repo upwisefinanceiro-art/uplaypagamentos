@@ -59,10 +59,11 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
   const loadProfileExtras = async (userId: string) => {
     const { data } = await supabase
       .from("profiles")
-      .select("birth_date, rg, address_number, complement, neighborhood, city, state, zip_code")
+      .select("address, birth_date, rg, address_number, complement, neighborhood, city, state, zip_code")
       .eq("id", userId)
       .maybeSingle();
     if (data) {
+      setAddress((prev) => prev || (data as any).address || "");
       setBirthDate((data as any).birth_date || "");
       setRg((data as any).rg || "");
       setAddressNumber((data as any).address_number || "");
@@ -76,7 +77,7 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
     if (!data || (!(data as any).city && !(data as any).zip_code)) {
       const { data: contract } = await supabase
         .from("contracts")
-        .select("birth_date, rg, address_number, complement, neighborhood, city, state, zip_code")
+        .select("birth_date, rg, address, address_number, complement, neighborhood, city, state, zip_code")
         .eq("responsible_id", userId)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -84,6 +85,7 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
       if (contract) {
         setBirthDate((prev) => prev || (contract as any).birth_date || "");
         setRg((prev) => prev || (contract as any).rg || "");
+        setAddress((prev) => prev || (contract as any).address || "");
         setAddressNumber((prev) => prev || (contract as any).address_number || "");
         setComplement((prev) => prev || (contract as any).complement || "");
         setNeighborhood((prev) => prev || (contract as any).neighborhood || "");
@@ -172,6 +174,10 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
     e.preventDefault();
     if (!user || !name.trim() || !cpf.trim()) {
       toast({ title: "Nome e CPF são obrigatórios", variant: "destructive" });
+      return;
+    }
+    if (!address.trim()) {
+      toast({ title: "Logradouro é obrigatório", description: "Preencha o endereço (rua/avenida) antes de salvar.", variant: "destructive" });
       return;
     }
     setSaving(true);
