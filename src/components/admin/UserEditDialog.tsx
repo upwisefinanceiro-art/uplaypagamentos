@@ -176,6 +176,10 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
       toast({ title: "Nome e CPF são obrigatórios", variant: "destructive" });
       return;
     }
+    if (!address.trim()) {
+      toast({ title: "Logradouro é obrigatório", description: "Preencha o endereço (rua/avenida) antes de salvar.", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     try {
       const { data, error } = await supabase.functions.invoke("update-user", {
