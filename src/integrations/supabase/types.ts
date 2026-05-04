@@ -871,41 +871,65 @@ export type Database = {
         Row: {
           active: boolean
           address: string | null
+          address_number: string | null
           asaas_customer_id: string | null
+          birth_date: string | null
+          city: string | null
+          complement: string | null
           cpf: string
           created_at: string
           email: string | null
           full_name: string
           id: string
+          neighborhood: string | null
           phone: string | null
+          rg: string | null
+          state: string | null
           unit_id: string | null
           updated_at: string
+          zip_code: string | null
         }
         Insert: {
           active?: boolean
           address?: string | null
+          address_number?: string | null
           asaas_customer_id?: string | null
+          birth_date?: string | null
+          city?: string | null
+          complement?: string | null
           cpf: string
           created_at?: string
           email?: string | null
           full_name: string
           id: string
+          neighborhood?: string | null
           phone?: string | null
+          rg?: string | null
+          state?: string | null
           unit_id?: string | null
           updated_at?: string
+          zip_code?: string | null
         }
         Update: {
           active?: boolean
           address?: string | null
+          address_number?: string | null
           asaas_customer_id?: string | null
+          birth_date?: string | null
+          city?: string | null
+          complement?: string | null
           cpf?: string
           created_at?: string
           email?: string | null
           full_name?: string
           id?: string
+          neighborhood?: string | null
           phone?: string | null
+          rg?: string | null
+          state?: string | null
           unit_id?: string | null
           updated_at?: string
+          zip_code?: string | null
         }
         Relationships: [
           {
