@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
 
     const { data: payment, error: pErr } = await admin
       .from("payments")
-      .select("id, unit_id, responsible_id, value, final_value, due_date, description, status, gateway, payment_method, cora_invoice_id")
+      .select("id, unit_id, responsible_id, contract_id, value, final_value, due_date, description, status, gateway, payment_method, cora_invoice_id")
       .eq("id", payment_id)
       .single();
     if (pErr || !payment) return json({ error: "Parcela não encontrada" }, 404);
