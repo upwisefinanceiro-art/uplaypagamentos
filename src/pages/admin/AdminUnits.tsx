@@ -172,6 +172,16 @@ const AdminUnits = () => {
 
   const openEdit = async (unit: UnitRow) => {
     setEditingUnit(unit);
+
+    // Load secret credentials via secure RPC (admins only).
+    let secrets: any = {};
+    try {
+      const { data: sec } = await supabase.rpc("get_unit_secrets", { _unit_id: unit.id });
+      secrets = (sec as any) || {};
+    } catch {
+      secrets = {};
+    }
+
     setForm({
       name: unit.name || "",
       razao_social: unit.razao_social || "",
@@ -188,14 +198,14 @@ const AdminUnits = () => {
       whatsapp: unit.whatsapp || "",
       email_empresa: unit.email_empresa || "",
       email_acesso: unit.email_acesso || "",
-      asaas_api_key: unit.asaas_api_key || "",
+      asaas_api_key: secrets.asaas_api_key || "",
       asaas_base_url: unit.asaas_base_url || "https://api.asaas.com/v3",
-      asaas_webhook_token: unit.asaas_webhook_token || "",
+      asaas_webhook_token: secrets.asaas_webhook_token || "",
       whatsapp_financeiro: unit.whatsapp_financeiro || "",
       usar_whatsapp_padrao: unit.usar_whatsapp_padrao,
-      cora_client_id: unit.cora_client_id || "",
-      cora_certificate: unit.cora_certificate || "",
-      cora_private_key: unit.cora_private_key || "",
+      cora_client_id: secrets.cora_client_id || "",
+      cora_certificate: secrets.cora_certificate || "",
+      cora_private_key: secrets.cora_private_key || "",
       cora_environment: unit.cora_environment || "stage",
       preferred_bank: unit.preferred_bank || "asaas",
       partnership_plan: (unit as any).partnership_plan || "PLANO_ASAAS",
