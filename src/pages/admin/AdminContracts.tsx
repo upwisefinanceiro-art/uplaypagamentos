@@ -150,6 +150,9 @@ const AdminContracts = () => {
   const [contractPayments, setContractPayments] = useState<{ id: string; contract_id: string | null; status: string; due_date: string }[]>([]);
   const [accessModalOpen, setAccessModalOpen] = useState(false);
   const [accessModalData, setAccessModalData] = useState<{ responsibleName: string; studentName: string; cpf: string; email?: string | null; phone?: string | null; unitId?: string | null } | null>(null);
+  const [deleteClientTarget, setDeleteClientTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deleteClientConfirm, setDeleteClientConfirm] = useState("");
+  const [deletingClient, setDeletingClient] = useState(false);
   const { toast } = useToast();
   const { profile, hasRole } = useAuth();
 
