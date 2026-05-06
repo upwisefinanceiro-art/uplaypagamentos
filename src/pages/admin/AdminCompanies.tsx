@@ -211,14 +211,28 @@ const AdminCompanies = () => {
         cidade: form.cidade?.trim() || null,
         estado: form.estado || null,
         cep: form.cep?.trim() || null,
-        asaas_api_key_master: form.asaas_api_key_master?.trim() || null,
         asaas_base_url_master: form.asaas_base_url_master?.trim() || "https://api.asaas.com/v3",
-        asaas_webhook_token_master: form.asaas_webhook_token_master?.trim() || null,
         valor_mensalidade: form.valor_mensalidade ?? 97,
         dias_bloqueio: form.dias_bloqueio ?? 10,
         whatsapp_master: form.whatsapp_master?.trim() || null,
       })
       .eq("id", company.id);
+
+    // Save sensitive master credentials via secure RPC.
+    if (!error) {
+      const secretsPayload: Record<string, string> = {};
+      if (form.asaas_api_key_master?.trim()) secretsPayload.asaas_api_key_master = form.asaas_api_key_master.trim();
+      if (form.asaas_webhook_token_master?.trim()) secretsPayload.asaas_webhook_token_master = form.asaas_webhook_token_master.trim();
+      if (Object.keys(secretsPayload).length > 0) {
+        const { error: secErr } = await supabase.rpc("update_company_secrets", {
+          _company_id: company.id,
+          _secrets: secretsPayload,
+        });
+        if (secErr) {
+          toast({ title: "Aviso: dados salvos, mas falha nas credenciais Asaas Master", description: secErr.message, variant: "destructive" });
+        }
+      }
+    }
 
     setSaving(false);
 
