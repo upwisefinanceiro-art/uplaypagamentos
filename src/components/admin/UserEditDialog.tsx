@@ -202,10 +202,12 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
         },
       });
       if (error || data?.error) {
-        const rawMsg = error?.message || data?.error || "";
-        const friendly = /profiles_cpf_unique|duplicate key.*cpf/i.test(rawMsg)
-          ? "Já existe outro cadastro com este CPF. Verifique se a pessoa não foi cadastrada em duplicidade — neste caso, você precisa mesclar os registros antes de alterar o CPF."
-          : rawMsg;
+        const rawMsg = data?.error || error?.message || "";
+        const friendly = data?.duplicate_cpf
+          ? `Já existe um cliente cadastrado com este CPF${data?.existing_name ? ` (${data.existing_name})` : ""}. Verifique o cadastro existente antes de continuar.`
+          : /profiles_cpf_unique|duplicate key.*cpf/i.test(rawMsg)
+            ? "Já existe um cliente cadastrado com este CPF. Verifique o cadastro existente antes de continuar."
+            : rawMsg;
         toast({ title: "Erro ao salvar", description: friendly, variant: "destructive" });
         return;
       }
