@@ -164,12 +164,51 @@ Deno.serve(async (req) => {
     });
     const existingProfile = Array.isArray(dupRows) && dupRows.length > 0 ? dupRows[0] : null;
 
+    // Se já existe um cadastro com este CPF, REUTILIZA em vez de bloquear.
+    // Garante que nunca haverá dois perfis com o mesmo CPF e desbloqueia a criação de novos contratos.
     if (existingProfile) {
+      const existingUserId = existingProfile.id;
+
+      // Atualiza dados básicos + reativa + reseta senha padrão
+      const { error: authUpdateError } = await supabaseAdmin.auth.admin.updateUserById(existingUserId, {
+        password: finalPassword,
+        email_confirm: true,
+        ban_duration: "none",
+        user_metadata: { cpf: cleanCpf, full_name: normalizedName },
+      });
+      if (authUpdateError) {
+        return jsonResponse({ error: authUpdateError.message || "Erro ao reutilizar cadastro existente" });
+      }
+
+      const { error: existingProfileError } = await supabaseAdmin.from("profiles").update({
+        cpf: cleanCpf,
+        full_name: normalizedName,
+        phone: normalizedPhone,
+        unit_id: nextUnitId,
+        active: true,
+      }).eq("id", existingUserId);
+      if (existingProfileError) {
+        return jsonResponse({ error: existingProfileError.message || "Erro ao sincronizar perfil existente" });
+      }
+
+      await supabaseAdmin.from("user_roles").upsert(
+        { user_id: existingUserId, role: normalizedRole },
+        { onConflict: "user_id,role" },
+      );
+
+      await supabaseAdmin.from("audit_logs").insert({
+        action: "REUSE_BY_CPF",
+        target_table: "profiles",
+        target_id: existingUserId,
+        performed_by: callerId,
+        details: { cpf: cleanCpf, role: normalizedRole, unit_id: nextUnitId },
+      });
+
       return jsonResponse({
-        error: "Já existe um cliente cadastrado com este CPF. Verifique o cadastro existente antes de continuar.",
-        duplicate_cpf: true,
-        existing_id: existingProfile.id,
+        success: true,
+        user_id: existingUserId,
         existing_name: existingProfile.full_name,
+        reused: true,
       });
     }
 
