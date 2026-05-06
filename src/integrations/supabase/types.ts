@@ -1723,6 +1723,13 @@ export type Database = {
       }
     }
     Functions: {
+      find_duplicate_cpf: {
+        Args: { _cpf: string; _exclude_id?: string }
+        Returns: {
+          full_name: string
+          id: string
+        }[]
+      }
       get_company_secrets: { Args: { _company_id: string }; Returns: Json }
       get_email_by_cpf: { Args: { _cpf: string }; Returns: string }
       get_unit_secrets: { Args: { _unit_id: string }; Returns: Json }
