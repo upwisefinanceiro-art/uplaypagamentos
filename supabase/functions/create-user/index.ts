@@ -158,14 +158,19 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: true, user_id: existingUserId, email: normalizedEmail, updated: true });
     }
 
-    const { data: existingProfile } = await supabaseAdmin
-      .from("profiles")
-      .select("id")
-      .eq("cpf", cleanCpf)
-      .maybeSingle();
+    const { data: dupRows } = await supabaseAdmin.rpc("find_duplicate_cpf", {
+      _cpf: cleanCpf,
+      _exclude_id: null,
+    });
+    const existingProfile = Array.isArray(dupRows) && dupRows.length > 0 ? dupRows[0] : null;
 
     if (existingProfile) {
-      return jsonResponse({ error: "Já existe um cadastro com este CPF" });
+      return jsonResponse({
+        error: "Já existe um cliente cadastrado com este CPF. Verifique o cadastro existente antes de continuar.",
+        duplicate_cpf: true,
+        existing_id: existingProfile.id,
+        existing_name: existingProfile.full_name,
+      });
     }
 
     const { data: createdUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
