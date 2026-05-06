@@ -1723,7 +1723,9 @@ export type Database = {
       }
     }
     Functions: {
+      get_company_secrets: { Args: { _company_id: string }; Returns: Json }
       get_email_by_cpf: { Args: { _cpf: string }; Returns: string }
+      get_unit_secrets: { Args: { _unit_id: string }; Returns: Json }
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
       get_user_unit_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
@@ -1732,6 +1734,14 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      update_company_secrets: {
+        Args: { _company_id: string; _secrets: Json }
+        Returns: undefined
+      }
+      update_unit_secrets: {
+        Args: { _secrets: Json; _unit_id: string }
+        Returns: undefined
       }
     }
     Enums: {

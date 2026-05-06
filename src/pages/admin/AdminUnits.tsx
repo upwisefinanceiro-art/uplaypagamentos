@@ -110,8 +110,22 @@ const AdminUnits = () => {
 
   const fetchUnits = async () => {
     setLoading(true);
-    const { data } = await supabase.from("units").select("*").order("name");
-    if (data) setUnits(data as unknown as UnitRow[]);
+    // NOTE: secret columns (asaas_api_key, asaas_webhook_token, cora_*) are NOT
+    // selectable directly — they must be loaded via the get_unit_secrets RPC.
+    const NON_SECRET_COLS = "id, name, active, status, cnpj, address, phone, asaas_base_url, whatsapp_financeiro, usar_whatsapp_padrao, razao_social, tipo_cadastro, cpf, rg_ie, cidade, estado, bairro, cep, whatsapp, email_empresa, email_acesso, cora_environment, preferred_bank, partnership_plan, uplay_fee_type, uplay_fee_value, uplay_balance, company_id";
+    const { data } = await supabase.from("units").select(NON_SECRET_COLS).order("name");
+    if (data) {
+      // Mark secret fields as null on the row — they will be loaded on demand.
+      const rows = (data as any[]).map(r => ({
+        ...r,
+        asaas_api_key: null,
+        asaas_webhook_token: null,
+        cora_client_id: null,
+        cora_certificate: null,
+        cora_private_key: null,
+      }));
+      setUnits(rows as unknown as UnitRow[]);
+    }
     setLoading(false);
   };
 
@@ -158,6 +172,16 @@ const AdminUnits = () => {
 
   const openEdit = async (unit: UnitRow) => {
     setEditingUnit(unit);
+
+    // Load secret credentials via secure RPC (admins only).
+    let secrets: any = {};
+    try {
+      const { data: sec } = await supabase.rpc("get_unit_secrets", { _unit_id: unit.id });
+      secrets = (sec as any) || {};
+    } catch {
+      secrets = {};
+    }
+
     setForm({
       name: unit.name || "",
       razao_social: unit.razao_social || "",
@@ -174,14 +198,14 @@ const AdminUnits = () => {
       whatsapp: unit.whatsapp || "",
       email_empresa: unit.email_empresa || "",
       email_acesso: unit.email_acesso || "",
-      asaas_api_key: unit.asaas_api_key || "",
+      asaas_api_key: secrets.asaas_api_key || "",
       asaas_base_url: unit.asaas_base_url || "https://api.asaas.com/v3",
-      asaas_webhook_token: unit.asaas_webhook_token || "",
+      asaas_webhook_token: secrets.asaas_webhook_token || "",
       whatsapp_financeiro: unit.whatsapp_financeiro || "",
       usar_whatsapp_padrao: unit.usar_whatsapp_padrao,
-      cora_client_id: unit.cora_client_id || "",
-      cora_certificate: unit.cora_certificate || "",
-      cora_private_key: unit.cora_private_key || "",
+      cora_client_id: secrets.cora_client_id || "",
+      cora_certificate: secrets.cora_certificate || "",
+      cora_private_key: secrets.cora_private_key || "",
       cora_environment: unit.cora_environment || "stage",
       preferred_bank: unit.preferred_bank || "asaas",
       partnership_plan: (unit as any).partnership_plan || "PLANO_ASAAS",
@@ -245,6 +269,8 @@ const AdminUnits = () => {
 
     setSaving(true);
 
+    // Note: secret fields (asaas_api_key, asaas_webhook_token, cora_*) are
+    // saved separately through the update_unit_secrets RPC (server-side only).
     const payload: Record<string, unknown> = {
       name: form.name.trim(),
       razao_social: form.razao_social.trim() || null,
@@ -261,14 +287,9 @@ const AdminUnits = () => {
       whatsapp: form.whatsapp.trim() || null,
       email_empresa: form.email_empresa.trim() || null,
       email_acesso: form.email_empresa.trim() || null,
-      asaas_api_key: form.asaas_api_key.trim() || null,
       asaas_base_url: form.asaas_base_url.trim() || "https://api.asaas.com/v3",
-      asaas_webhook_token: form.asaas_webhook_token.trim() || null,
       whatsapp_financeiro: form.whatsapp_financeiro.trim() || null,
       usar_whatsapp_padrao: form.usar_whatsapp_padrao,
-      cora_client_id: form.cora_client_id.trim() || null,
-      cora_certificate: form.cora_certificate.trim() || null,
-      cora_private_key: form.cora_private_key.trim() || null,
       cora_environment: form.cora_environment || "stage",
       preferred_bank: form.preferred_bank || "asaas",
       partnership_plan: form.partnership_plan || "PLANO_ASAAS",
@@ -280,11 +301,31 @@ const AdminUnits = () => {
     let newUnitId: string | null = null;
     if (editingUnit) {
       ({ error } = await supabase.from("units").update(payload as any).eq("id", editingUnit.id));
+      newUnitId = editingUnit.id;
     } else {
       if (companyId) payload.company_id = companyId;
       const res = await supabase.from("units").insert(payload as any).select("id").single();
       error = res.error;
       newUnitId = res.data?.id ?? null;
+    }
+
+    // Persist secrets via RPC (only when at least one secret was filled).
+    if (!error && newUnitId) {
+      const secretsPayload: Record<string, string> = {};
+      if (form.asaas_api_key.trim()) secretsPayload.asaas_api_key = form.asaas_api_key.trim();
+      if (form.asaas_webhook_token.trim()) secretsPayload.asaas_webhook_token = form.asaas_webhook_token.trim();
+      if (form.cora_client_id.trim()) secretsPayload.cora_client_id = form.cora_client_id.trim();
+      if (form.cora_certificate.trim()) secretsPayload.cora_certificate = form.cora_certificate.trim();
+      if (form.cora_private_key.trim()) secretsPayload.cora_private_key = form.cora_private_key.trim();
+      if (Object.keys(secretsPayload).length > 0) {
+        const { error: secErr } = await supabase.rpc("update_unit_secrets", {
+          _unit_id: newUnitId,
+          _secrets: secretsPayload,
+        });
+        if (secErr) {
+          toast({ title: "Aviso: dados salvos, mas falha ao gravar credenciais", description: secErr.message, variant: "destructive" });
+        }
+      }
     }
 
     if (error) {
@@ -1133,7 +1174,27 @@ const AdminUnits = () => {
                     <code className="text-foreground flex-1 truncate">
                       {showKeys[unit.id] ? (unit.asaas_api_key || "—") : "••••••••••••"}
                     </code>
-                    <button onClick={() => toggleKey(unit.id)} className="text-muted-foreground hover:text-foreground">
+                    <button
+                      onClick={async () => {
+                        if (!showKeys[unit.id] && !unit.asaas_api_key) {
+                          // Lazy-load secrets via secure RPC.
+                          const { data } = await supabase.rpc("get_unit_secrets", { _unit_id: unit.id });
+                          if (data) {
+                            const s: any = data;
+                            setUnits(prev => prev.map(u => u.id === unit.id ? {
+                              ...u,
+                              asaas_api_key: s.asaas_api_key,
+                              asaas_webhook_token: s.asaas_webhook_token,
+                              cora_client_id: s.cora_client_id,
+                              cora_certificate: s.cora_certificate,
+                              cora_private_key: s.cora_private_key,
+                            } : u));
+                          }
+                        }
+                        toggleKey(unit.id);
+                      }}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
                       {showKeys[unit.id] ? <ShieldOff size={14} /> : <Shield size={14} />}
                     </button>
                   </div>
@@ -1143,7 +1204,7 @@ const AdminUnits = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground w-20">Webhook:</span>
-                    <code className="text-foreground truncate">{unit.asaas_webhook_token || "—"}</code>
+                    <code className="text-foreground truncate">{showKeys[unit.id] ? (unit.asaas_webhook_token || "—") : "••••••••"}</code>
                   </div>
                 </div>
               </details>
@@ -1152,21 +1213,16 @@ const AdminUnits = () => {
                 <Button
                   size="sm" variant="outline"
                   onClick={() => handleTestConnection(unit.id)}
-                  disabled={testingUnit === unit.id || !unit.asaas_api_key}
+                  disabled={testingUnit === unit.id}
                   className="text-xs"
                 >
                   {testingUnit === unit.id ? (
                     <Loader2 size={12} className="mr-1.5 animate-spin" />
-                  ) : unit.asaas_api_key ? (
-                    <Wifi size={12} className="mr-1.5" />
                   ) : (
-                    <WifiOff size={12} className="mr-1.5" />
+                    <Wifi size={12} className="mr-1.5" />
                   )}
                   {testingUnit === unit.id ? "Testando..." : "Testar conexão Asaas"}
                 </Button>
-                {!unit.asaas_api_key && (
-                  <span className="text-[10px] text-destructive">API Asaas não configurada</span>
-                )}
 
                 <Button
                   size="sm" variant="outline"

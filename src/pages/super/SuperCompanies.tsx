@@ -65,8 +65,9 @@ const SuperCompanies = () => {
 
   const fetchData = async () => {
     setLoading(true);
+    const COMPANY_COLS = "id, name, system_name, logo_url, primary_color, secondary_color, whatsapp_financeiro, cnpj, email, phone, plan, status, max_units, max_users, endereco, numero, bairro, cidade, estado, cep, asaas_base_url_master, valor_mensalidade, dias_bloqueio, whatsapp_master, created_at, updated_at";
     const [companiesRes, subsRes, invoicesRes] = await Promise.all([
-      supabase.from("companies").select("*").order("created_at", { ascending: false }),
+      supabase.from("companies").select(COMPANY_COLS).order("created_at", { ascending: false }),
       supabase.from("saas_subscriptions").select("*"),
       supabase.from("saas_invoices").select("*").order("due_date", { ascending: false }),
     ]);

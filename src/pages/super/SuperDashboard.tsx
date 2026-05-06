@@ -48,7 +48,7 @@ const SuperDashboard = () => {
       setLoading(true);
 
       const [companiesRes, unitsRes, profilesRes, paymentsRes, subsRes, saasInvoicesRes] = await Promise.all([
-        supabase.from("companies").select("*"),
+        supabase.from("companies").select("id, name, system_name, logo_url, primary_color, secondary_color, whatsapp_financeiro, cnpj, email, phone, plan, status, max_units, max_users, endereco, numero, bairro, cidade, estado, cep, asaas_base_url_master, valor_mensalidade, dias_bloqueio, whatsapp_master, created_at, updated_at"),
         supabase.from("units").select("id, company_id"),
         supabase.from("profiles").select("id"),
         supabase.from("payments").select("id, status, value, final_value, paid_at"),
