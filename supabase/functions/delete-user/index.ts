@@ -95,12 +95,12 @@ Deno.serve(async (req) => {
     if (action === "permanent_delete") {
       await logAction("DELETE_ATTEMPT", { requested_action: "permanent_delete" });
 
-      if (!isAdminMaster) {
+      if (!isAdminMaster && !isAdminUnidade) {
         await logAction("DELETE_ATTEMPT", {
           requested_action: "permanent_delete",
-          blocked_reason: "not_admin_master",
+          blocked_reason: "not_admin",
         });
-        return jsonResponse({ error: "Apenas ADMIN_MASTER pode excluir permanentemente" });
+        return jsonResponse({ error: "Apenas administradores podem excluir permanentemente" });
       }
 
       const [contractsRes, paymentsRes] = await Promise.all([
