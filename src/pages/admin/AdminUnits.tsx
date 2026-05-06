@@ -110,8 +110,22 @@ const AdminUnits = () => {
 
   const fetchUnits = async () => {
     setLoading(true);
-    const { data } = await supabase.from("units").select("*").order("name");
-    if (data) setUnits(data as unknown as UnitRow[]);
+    // NOTE: secret columns (asaas_api_key, asaas_webhook_token, cora_*) are NOT
+    // selectable directly — they must be loaded via the get_unit_secrets RPC.
+    const NON_SECRET_COLS = "id, name, active, status, cnpj, address, phone, asaas_base_url, whatsapp_financeiro, usar_whatsapp_padrao, razao_social, tipo_cadastro, cpf, rg_ie, cidade, estado, bairro, cep, whatsapp, email_empresa, email_acesso, cora_environment, preferred_bank, partnership_plan, uplay_fee_type, uplay_fee_value, uplay_balance, company_id";
+    const { data } = await supabase.from("units").select(NON_SECRET_COLS).order("name");
+    if (data) {
+      // Mark secret fields as null on the row — they will be loaded on demand.
+      const rows = (data as any[]).map(r => ({
+        ...r,
+        asaas_api_key: null,
+        asaas_webhook_token: null,
+        cora_client_id: null,
+        cora_certificate: null,
+        cora_private_key: null,
+      }));
+      setUnits(rows as unknown as UnitRow[]);
+    }
     setLoading(false);
   };
 
