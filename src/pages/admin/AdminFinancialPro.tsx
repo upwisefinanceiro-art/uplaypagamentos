@@ -1,20 +1,22 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { fetchAllPaginated } from "@/lib/fetchAllPaginated";
+import { FINANCE_CATEGORIES, findCategoryGroup } from "@/lib/finance-categories";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
   TrendingUp, DollarSign, Wallet, Target, Plus, Edit2, Trash2,
-  CalendarClock, ArrowDownCircle, ArrowUpCircle, Activity, Layers,
+  CalendarClock, ArrowDownCircle, ArrowUpCircle, Activity, Layers, Download, Filter,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, Legend, CartesianGrid,
@@ -32,7 +34,9 @@ interface FinanceEntry {
   id: string; unit_id: string; entry_type: "FIXO" | "VARIAVEL" | "CONSUMO";
   direction: "DESPESA" | "RECEITA"; category: string | null; description: string;
   amount: number; competence_date: string; due_date: string; paid_date: string | null;
-  reconciliation_status: "PENDENTE" | "PAGO" | "ATRASADO"; recurrence: "UNICO" | "MENSAL"; notes: string | null;
+  reconciliation_status: "PENDENTE" | "PAGO" | "ATRASADO" | "PARCIAL" | "CANCELADO";
+  recurrence: "UNICO" | "SEMANAL" | "QUINZENAL" | "MENSAL" | "ANUAL";
+  notes: string | null;
 }
 
 const PAID = ["PAID", "RECEIVED", "CONFIRMED"];
@@ -41,12 +45,21 @@ const fmtPct = (v: number) => `${v.toFixed(1)}%`;
 const toDate = (s: string | null) => (s ? new Date(s.length <= 10 ? s + "T00:00:00" : s) : null);
 const startOfDay = (d = new Date()) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
 const addDays = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const addMonths = (d: Date, n: number) => { const x = new Date(d); x.setMonth(x.getMonth() + n); return x; };
+const isoDate = (d: Date) => d.toISOString().slice(0, 10);
+
+const PERIOD_OPTIONS: Record<string, number | null> = {
+  "30D": 30, "90D": 90, "6M": 180, "12M": 365, "ALL": null,
+};
+const PERIOD_LABEL: Record<string, string> = {
+  "30D": "30 dias", "90D": "90 dias", "6M": "6 meses", "12M": "12 meses", "ALL": "Todo período",
+};
 
 const emptyEntry = (unitId: string): Partial<FinanceEntry> => ({
   unit_id: unitId, entry_type: "FIXO", direction: "DESPESA",
   category: "", description: "", amount: 0,
-  competence_date: new Date().toISOString().slice(0, 10),
-  due_date: new Date().toISOString().slice(0, 10),
+  competence_date: isoDate(new Date()),
+  due_date: isoDate(new Date()),
   paid_date: null, reconciliation_status: "PENDENTE", recurrence: "UNICO", notes: "",
 });
 
@@ -54,6 +67,8 @@ const STATUS_COLOR: Record<string, string> = {
   PENDENTE: "bg-warning/10 text-warning border-warning/20",
   PAGO: "bg-success/10 text-success border-success/20",
   ATRASADO: "bg-destructive/10 text-destructive border-destructive/20",
+  PARCIAL: "bg-primary/10 text-primary border-primary/20",
+  CANCELADO: "bg-muted text-muted-foreground border-border",
 };
 
 const TYPE_LABEL: Record<string, string> = {
@@ -69,35 +84,64 @@ const AdminFinancialPro = () => {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [stock, setStock] = useState<Record<string, number>>({});
   const [entries, setEntries] = useState<FinanceEntry[]>([]);
+
+  // ===== Filtros =====
   const [unitFilter, setUnitFilter] = useState<string>("ALL");
+  const [periodFilter, setPeriodFilter] = useState<string>("90D");
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [groupFilter, setGroupFilter] = useState<string>("ALL");
+  const [directionFilter, setDirectionFilter] = useState<string>("ALL");
+  const [search, setSearch] = useState("");
 
   // dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Partial<FinanceEntry> | null>(null);
 
+  const periodCutoff = useMemo(() => {
+    const days = PERIOD_OPTIONS[periodFilter];
+    if (days == null) return null;
+    return isoDate(addDays(startOfDay(), -days));
+  }, [periodFilter]);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [{ data: us }, { data: ps }, { data: si }, { data: fe }] = await Promise.all([
+      const [usRes, siRes, paymentsAll, entriesAll] = await Promise.all([
         supabase.from("units").select("id,name").eq("active", true).order("name"),
-        supabase.from("payments").select("id,unit_id,due_date,paid_at,value,final_value,status,raw_response,stock_item_id,stock_quantity"),
         supabase.from("stock_items").select("id,cost_price"),
-        supabase.from("finance_entries").select("*").order("due_date", { ascending: false }),
+        fetchAllPaginated<Payment>((from, to) => {
+          let q = supabase
+            .from("payments")
+            .select("id,unit_id,due_date,paid_at,value,final_value,status,raw_response,stock_item_id,stock_quantity")
+            .order("due_date", { ascending: false })
+            .range(from, to);
+          if (periodCutoff) q = q.gte("due_date", periodCutoff);
+          return q as any;
+        }),
+        fetchAllPaginated<FinanceEntry>((from, to) => {
+          let q = supabase
+            .from("finance_entries")
+            .select("*")
+            .order("due_date", { ascending: false })
+            .range(from, to);
+          if (periodCutoff) q = q.gte("due_date", periodCutoff);
+          return q as any;
+        }),
       ]);
-      setUnits(us || []);
-      setPayments((ps as Payment[]) || []);
+      setUnits(usRes.data || []);
+      setPayments(paymentsAll || []);
       const sm: Record<string, number> = {};
-      (si || []).forEach((s: StockItem) => { sm[s.id] = Number(s.cost_price || 0); });
+      (siRes.data || []).forEach((s: StockItem) => { sm[s.id] = Number(s.cost_price || 0); });
       setStock(sm);
-      setEntries((fe as FinanceEntry[]) || []);
-      if (!isMaster && us && us.length === 1) setUnitFilter(us[0].id);
+      setEntries(entriesAll || []);
+      if (!isMaster && usRes.data && usRes.data.length === 1) setUnitFilter(usRes.data[0].id);
     } catch (e: any) {
       console.error(e);
       toast.error("Erro ao carregar dados financeiros");
     } finally {
       setLoading(false);
     }
-  }, [isMaster]);
+  }, [isMaster, periodCutoff]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -105,19 +149,32 @@ const AdminFinancialPro = () => {
     () => unitFilter === "ALL" ? payments : payments.filter(p => p.unit_id === unitFilter),
     [payments, unitFilter]
   );
-  const filteredEntries = useMemo(
-    () => unitFilter === "ALL" ? entries : entries.filter(e => e.unit_id === unitFilter),
-    [entries, unitFilter]
-  );
+  const filteredEntries = useMemo(() => {
+    let arr = unitFilter === "ALL" ? entries : entries.filter(e => e.unit_id === unitFilter);
+    if (statusFilter !== "ALL") arr = arr.filter(e => e.reconciliation_status === statusFilter);
+    if (directionFilter !== "ALL") arr = arr.filter(e => e.direction === directionFilter);
+    if (groupFilter !== "ALL") {
+      const grp = FINANCE_CATEGORIES.find(g => g.group === groupFilter);
+      const cats = new Set(grp?.items || []);
+      arr = arr.filter(e => e.category && cats.has(e.category));
+    }
+    if (search.trim()) {
+      const s = search.trim().toLowerCase();
+      arr = arr.filter(e =>
+        e.description?.toLowerCase().includes(s) ||
+        e.category?.toLowerCase().includes(s) ||
+        e.notes?.toLowerCase().includes(s)
+      );
+    }
+    return arr;
+  }, [entries, unitFilter, statusFilter, directionFilter, groupFilter, search]);
 
   // ==== KPIs ====
   const kpis = useMemo(() => {
-    // Receita Total: pagamentos PAID (valor BRUTO = final_value já corrigido)
     const receita = filteredPayments
       .filter(p => PAID.includes(p.status))
       .reduce((s, p) => s + Number(p.final_value || p.value || 0), 0);
 
-    // Custo Variável automático: Taxas Asaas (value - netValue) + custo de estoque entregue
     let taxasAsaas = 0;
     let custoEstoque = 0;
     filteredPayments.filter(p => PAID.includes(p.status)).forEach(p => {
@@ -131,7 +188,6 @@ const AdminFinancialPro = () => {
       }
     });
 
-    // Lançamentos manuais (apenas PAGOS contam para resultado realizado)
     let custoFixo = 0, custoVariavelManual = 0, consumo = 0, receitaExtra = 0;
     let aPagar = 0, aReceber = 0, atrasados = 0;
     filteredEntries.forEach(e => {
@@ -139,13 +195,13 @@ const AdminFinancialPro = () => {
       const isPaid = e.reconciliation_status === "PAGO";
       if (e.direction === "RECEITA") {
         if (isPaid) receitaExtra += amt;
-        else aReceber += amt;
+        else if (e.reconciliation_status !== "CANCELADO") aReceber += amt;
       } else {
         if (isPaid) {
           if (e.entry_type === "FIXO") custoFixo += amt;
           else if (e.entry_type === "VARIAVEL") custoVariavelManual += amt;
           else consumo += amt;
-        } else {
+        } else if (e.reconciliation_status !== "CANCELADO") {
           aPagar += amt;
         }
       }
@@ -167,42 +223,46 @@ const AdminFinancialPro = () => {
     };
   }, [filteredPayments, filteredEntries, stock]);
 
+  // ==== Despesas por Grupo ====
+  const expensesByGroup = useMemo(() => {
+    const map: Record<string, number> = {};
+    FINANCE_CATEGORIES.filter(g => g.direction === "DESPESA").forEach(g => { map[g.group] = 0; });
+    filteredEntries
+      .filter(e => e.direction === "DESPESA" && e.reconciliation_status === "PAGO")
+      .forEach(e => {
+        const g = findCategoryGroup(e.category);
+        const groupName = g?.group || "Outros";
+        map[groupName] = (map[groupName] || 0) + Number(e.amount || 0);
+      });
+    return Object.entries(map)
+      .filter(([, v]) => v > 0)
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [filteredEntries]);
+
   // ==== Fluxo de Caixa 30 / 60 / 90 ====
   const flow = useMemo(() => {
     const t = startOfDay();
-    const horizons = [30, 60, 90];
-    return horizons.map(days => {
+    return [30, 60, 90].map(days => {
       const limit = addDays(t, days);
-      // Entradas: payments PENDING/OVERDUE com due_date <= limit
       const entradas = filteredPayments
         .filter(p => !PAID.includes(p.status))
-        .filter(p => {
-          const d = toDate(p.due_date);
-          return d && d >= t && d <= limit;
-        })
+        .filter(p => { const d = toDate(p.due_date); return d && d >= t && d <= limit; })
         .reduce((s, p) => s + Number(p.final_value || p.value || 0), 0);
-      // Entradas extras (finance_entries RECEITA pendente)
       const entradasExtras = filteredEntries
-        .filter(e => e.direction === "RECEITA" && e.reconciliation_status !== "PAGO")
-        .filter(e => {
-          const d = toDate(e.due_date);
-          return d && d >= t && d <= limit;
-        })
+        .filter(e => e.direction === "RECEITA" && e.reconciliation_status !== "PAGO" && e.reconciliation_status !== "CANCELADO")
+        .filter(e => { const d = toDate(e.due_date); return d && d >= t && d <= limit; })
         .reduce((s, e) => s + Number(e.amount || 0), 0);
-      // Saídas: finance_entries DESPESA pendente
       const saidas = filteredEntries
-        .filter(e => e.direction === "DESPESA" && e.reconciliation_status !== "PAGO")
-        .filter(e => {
-          const d = toDate(e.due_date);
-          return d && d >= t && d <= limit;
-        })
+        .filter(e => e.direction === "DESPESA" && e.reconciliation_status !== "PAGO" && e.reconciliation_status !== "CANCELADO")
+        .filter(e => { const d = toDate(e.due_date); return d && d >= t && d <= limit; })
         .reduce((s, e) => s + Number(e.amount || 0), 0);
       const totalEntradas = entradas + entradasExtras;
       return { days, entradas: totalEntradas, saidas, saldo: totalEntradas - saidas };
     });
   }, [filteredPayments, filteredEntries]);
 
-  // ==== Gráfico Despesas vs Receitas (últimos 6 meses) ====
+  // ==== Gráfico mensal ====
   const monthlyChart = useMemo(() => {
     const now = startOfDay();
     const months: { key: string; label: string; receita: number; despesa: number }[] = [];
@@ -220,6 +280,13 @@ const AdminFinancialPro = () => {
     filteredPayments.filter(p => PAID.includes(p.status)).forEach(p => {
       const m = findM(p.paid_at || p.due_date);
       if (m) m.receita += Number(p.final_value || p.value || 0);
+      const r = p.raw_response || {};
+      const v = Number(r.value ?? p.final_value ?? p.value ?? 0);
+      const nv = Number(r.netValue ?? v);
+      if (m) m.despesa += Math.max(0, v - nv);
+      if (m && p.stock_item_id && stock[p.stock_item_id]) {
+        m.despesa += stock[p.stock_item_id] * (p.stock_quantity || 1);
+      }
     });
     filteredEntries.forEach(e => {
       const m = findM(e.paid_date || e.competence_date);
@@ -227,28 +294,34 @@ const AdminFinancialPro = () => {
       if (e.direction === "DESPESA" && e.reconciliation_status === "PAGO") m.despesa += Number(e.amount || 0);
       if (e.direction === "RECEITA" && e.reconciliation_status === "PAGO") m.receita += Number(e.amount || 0);
     });
-    // adiciona taxas + custo estoque por mês
-    filteredPayments.filter(p => PAID.includes(p.status)).forEach(p => {
-      const m = findM(p.paid_at || p.due_date);
-      if (!m) return;
-      const r = p.raw_response || {};
-      const v = Number(r.value ?? p.final_value ?? p.value ?? 0);
-      const nv = Number(r.netValue ?? v);
-      m.despesa += Math.max(0, v - nv);
-      if (p.stock_item_id && stock[p.stock_item_id]) {
-        m.despesa += stock[p.stock_item_id] * (p.stock_quantity || 1);
-      }
-    });
     return months;
   }, [filteredPayments, filteredEntries, stock]);
 
-  // ==== Gauge break-even (% atingido) ====
+  // ==== Gauge break-even ====
   const breakEvenGauge = useMemo(() => {
     if (kpis.breakEven <= 0) return [{ name: "atingido", value: 0, fill: "hsl(var(--muted))" }];
     const pct = Math.min(100, (kpis.receitaTotal / kpis.breakEven) * 100);
     const color = pct >= 100 ? "hsl(var(--success))" : pct >= 70 ? "hsl(var(--warning))" : "hsl(var(--destructive))";
     return [{ name: "atingido", value: pct, fill: color }];
   }, [kpis]);
+
+  // ==== Alertas ====
+  const alerts = useMemo(() => {
+    const today = startOfDay();
+    const in7 = addDays(today, 7);
+    const venceEm7 = filteredEntries.filter(e => {
+      if (e.reconciliation_status === "PAGO" || e.reconciliation_status === "CANCELADO") return false;
+      const d = toDate(e.due_date);
+      return d && d >= today && d <= in7;
+    });
+    const overdue = filteredEntries.filter(e => {
+      if (e.reconciliation_status === "PAGO" || e.reconciliation_status === "CANCELADO") return false;
+      const d = toDate(e.due_date);
+      return d && d < today;
+    });
+    const fluxoNegativo = flow.find(f => f.saldo < 0);
+    return { venceEm7, overdue, fluxoNegativo };
+  }, [filteredEntries, flow]);
 
   // ==== CRUD ====
   const openNew = () => {
@@ -259,12 +332,23 @@ const AdminFinancialPro = () => {
   };
   const openEdit = (e: FinanceEntry) => { setEditing({ ...e }); setDialogOpen(true); };
 
+  const onCategoryChange = (cat: string) => {
+    if (!editing) return;
+    const grp = findCategoryGroup(cat);
+    setEditing({
+      ...editing,
+      category: cat,
+      direction: grp?.direction || editing.direction,
+      entry_type: grp?.entryType || editing.entry_type,
+    });
+  };
+
   const save = async () => {
     if (!editing || !editing.unit_id || !editing.description || !editing.amount) {
       toast.error("Preencha unidade, descrição e valor");
       return;
     }
-    const payload = {
+    const payload: any = {
       unit_id: editing.unit_id,
       entry_type: editing.entry_type,
       direction: editing.direction,
@@ -287,7 +371,34 @@ const AdminFinancialPro = () => {
       } else {
         const { error } = await supabase.from("finance_entries").insert(payload);
         if (error) throw error;
-        toast.success("Lançamento criado");
+
+        // Recorrência: gerar 11 ocorrências futuras (totalizando 12 meses)
+        const rec = editing.recurrence;
+        if (rec && rec !== "UNICO") {
+          const stepDays: Record<string, { type: "d" | "m"; n: number; count: number }> = {
+            SEMANAL: { type: "d", n: 7, count: 51 },
+            QUINZENAL: { type: "d", n: 15, count: 23 },
+            MENSAL: { type: "m", n: 1, count: 11 },
+            ANUAL: { type: "m", n: 12, count: 4 },
+          };
+          const cfg = stepDays[rec];
+          if (cfg) {
+            const base = new Date(editing.due_date + "T00:00:00");
+            const baseComp = new Date(editing.competence_date + "T00:00:00");
+            const future: any[] = [];
+            for (let i = 1; i <= cfg.count; i++) {
+              const due = cfg.type === "d" ? addDays(base, cfg.n * i) : addMonths(base, cfg.n * i);
+              const comp = cfg.type === "d" ? addDays(baseComp, cfg.n * i) : addMonths(baseComp, cfg.n * i);
+              future.push({ ...payload, due_date: isoDate(due), competence_date: isoDate(comp), paid_date: null, reconciliation_status: "PENDENTE" });
+            }
+            await supabase.from("finance_entries").insert(future);
+            toast.success(`Lançamento criado + ${cfg.count} recorrências`);
+          } else {
+            toast.success("Lançamento criado");
+          }
+        } else {
+          toast.success("Lançamento criado");
+        }
       }
       setDialogOpen(false);
       setEditing(null);
@@ -311,11 +422,37 @@ const AdminFinancialPro = () => {
       .from("finance_entries")
       .update({
         reconciliation_status: isPaid ? "PENDENTE" : "PAGO",
-        paid_date: isPaid ? null : new Date().toISOString().slice(0, 10),
+        paid_date: isPaid ? null : isoDate(new Date()),
       })
       .eq("id", e.id);
     if (error) { toast.error(error.message); return; }
     load();
+  };
+
+  // ==== Exportar CSV ====
+  const exportCSV = () => {
+    const header = ["Tipo","Direção","Categoria","Descrição","Unidade","Valor","Competência","Vencimento","Pagamento","Status","Recorrência","Observações"];
+    const rows = filteredEntries.map(e => [
+      TYPE_LABEL[e.entry_type] || e.entry_type,
+      e.direction,
+      e.category || "",
+      (e.description || "").replace(/"/g, '""'),
+      units.find(u => u.id === e.unit_id)?.name || "",
+      String(e.amount).replace(".", ","),
+      e.competence_date,
+      e.due_date,
+      e.paid_date || "",
+      e.reconciliation_status,
+      e.recurrence,
+      (e.notes || "").replace(/"/g, '""'),
+    ]);
+    const csv = [header, ...rows].map(r => r.map(c => `"${c}"`).join(";")).join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `financeiro-pro-${isoDate(new Date())}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   if (loading) {
@@ -335,21 +472,63 @@ const AdminFinancialPro = () => {
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <Activity className="text-primary" size={24} /> Financeiro Pro
           </h1>
-          <p className="text-sm text-muted-foreground">Inteligência financeira: margem, break-even e fluxo de caixa.</p>
+          <p className="text-sm text-muted-foreground">Inteligência financeira: margem, break-even, fluxo de caixa e alertas.</p>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2 items-center flex-wrap">
+          <Select value={periodFilter} onValueChange={setPeriodFilter}>
+            <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {Object.keys(PERIOD_OPTIONS).map(k => <SelectItem key={k} value={k}>{PERIOD_LABEL[k]}</SelectItem>)}
+            </SelectContent>
+          </Select>
           {isMaster && (
             <Select value={unitFilter} onValueChange={setUnitFilter}>
-              <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="ALL">Todas as unidades</SelectItem>
                 {units.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
               </SelectContent>
             </Select>
           )}
+          <Button variant="outline" size="sm" onClick={exportCSV}>
+            <Download size={14} className="mr-1" /> CSV
+          </Button>
           <Button onClick={openNew}><Plus size={16} className="mr-1" /> Novo lançamento</Button>
         </div>
       </div>
+
+      {/* Alertas */}
+      {(alerts.overdue.length > 0 || alerts.venceEm7.length > 0 || alerts.fluxoNegativo) && (
+        <div className="grid md:grid-cols-3 gap-3">
+          {alerts.overdue.length > 0 && (
+            <Card className="border-destructive/40 bg-destructive/5">
+              <CardContent className="pt-4">
+                <p className="text-xs text-destructive font-semibold">⚠ Contas em atraso</p>
+                <p className="text-2xl font-bold text-destructive">{alerts.overdue.length}</p>
+                <p className="text-xs text-muted-foreground">{fmt(alerts.overdue.reduce((s, e) => s + Number(e.amount || 0), 0))}</p>
+              </CardContent>
+            </Card>
+          )}
+          {alerts.venceEm7.length > 0 && (
+            <Card className="border-warning/40 bg-warning/5">
+              <CardContent className="pt-4">
+                <p className="text-xs text-warning font-semibold">⏰ Vencem em 7 dias</p>
+                <p className="text-2xl font-bold text-warning">{alerts.venceEm7.length}</p>
+                <p className="text-xs text-muted-foreground">{fmt(alerts.venceEm7.reduce((s, e) => s + Number(e.amount || 0), 0))}</p>
+              </CardContent>
+            </Card>
+          )}
+          {alerts.fluxoNegativo && (
+            <Card className="border-destructive/40 bg-destructive/5">
+              <CardContent className="pt-4">
+                <p className="text-xs text-destructive font-semibold">📉 Fluxo negativo</p>
+                <p className="text-2xl font-bold text-destructive">{fmt(alerts.fluxoNegativo.saldo)}</p>
+                <p className="text-xs text-muted-foreground">Em {alerts.fluxoNegativo.days} dias</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       <Tabs defaultValue="dashboard" className="w-full">
         <TabsList>
@@ -360,7 +539,6 @@ const AdminFinancialPro = () => {
 
         {/* ============ DASHBOARD ============ */}
         <TabsContent value="dashboard" className="space-y-6 mt-4">
-          {/* KPIs principais */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <KpiCard icon={DollarSign} label="Receita Total" value={fmt(kpis.receitaTotal)} tone="success" />
             <KpiCard icon={ArrowDownCircle} label="Custos Variáveis" value={fmt(kpis.custoVariavel)} tone="warning"
@@ -369,7 +547,6 @@ const AdminFinancialPro = () => {
             <KpiCard icon={Wallet} label="Lucro" value={fmt(kpis.lucro)} tone={kpis.lucro >= 0 ? "success" : "destructive"} />
           </div>
 
-          {/* Margem + Break-even */}
           <div className="grid lg:grid-cols-3 gap-4">
             <Card className="lg:col-span-1">
               <CardHeader className="pb-2">
@@ -431,34 +608,95 @@ const AdminFinancialPro = () => {
             </Card>
           </div>
 
-          {/* Gráfico despesas x receitas */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Despesas vs Receitas — últimos 6 meses</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-72">
-                <ResponsiveContainer>
-                  <BarChart data={monthlyChart}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="label" className="text-xs" />
-                    <YAxis className="text-xs" tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
-                    <RTooltip formatter={(v: number) => fmt(v)} />
-                    <Legend />
-                    <Bar dataKey="receita" name="Receita" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="despesa" name="Despesa" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Grid: mensal + por categoria */}
+          <div className="grid lg:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Despesas vs Receitas — últimos 6 meses</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-72">
+                  <ResponsiveContainer>
+                    <BarChart data={monthlyChart}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="label" className="text-xs" />
+                      <YAxis className="text-xs" tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
+                      <RTooltip formatter={(v: number) => fmt(v)} />
+                      <Legend />
+                      <Bar dataKey="receita" name="Receita" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="despesa" name="Despesa" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Despesas por Categoria</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {expensesByGroup.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-8 text-center">Sem despesas pagas no período.</p>
+                ) : (
+                  <div className="h-72">
+                    <ResponsiveContainer>
+                      <BarChart data={expensesByGroup} layout="vertical" margin={{ left: 80 }}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                        <XAxis type="number" className="text-xs" tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
+                        <YAxis dataKey="label" type="category" className="text-xs" width={120} />
+                        <RTooltip formatter={(v: number) => fmt(v)} />
+                        <Bar dataKey="value" name="Total" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* ============ ENTRIES ============ */}
-        <TabsContent value="entries" className="mt-4">
+        <TabsContent value="entries" className="mt-4 space-y-3">
+          <Card>
+            <CardContent className="pt-4 grid grid-cols-2 md:grid-cols-5 gap-2">
+              <div className="md:col-span-2">
+                <Input placeholder="Buscar descrição, categoria, observação..." value={search} onChange={(e) => setSearch(e.target.value)} />
+              </div>
+              <Select value={directionFilter} onValueChange={setDirectionFilter}>
+                <SelectTrigger><SelectValue placeholder="Tipo" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Todos os tipos</SelectItem>
+                  <SelectItem value="RECEITA">Receitas</SelectItem>
+                  <SelectItem value="DESPESA">Despesas</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Todos os status</SelectItem>
+                  <SelectItem value="PAGO">Pago</SelectItem>
+                  <SelectItem value="PENDENTE">Pendente</SelectItem>
+                  <SelectItem value="ATRASADO">Atrasado</SelectItem>
+                  <SelectItem value="PARCIAL">Parcial</SelectItem>
+                  <SelectItem value="CANCELADO">Cancelado</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={groupFilter} onValueChange={setGroupFilter}>
+                <SelectTrigger><SelectValue placeholder="Grupo" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Todos os grupos</SelectItem>
+                  {FINANCE_CATEGORIES.map(g => <SelectItem key={g.group} value={g.group}>{g.group}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Lançamentos ({filteredEntries.length})</CardTitle>
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Filter size={14} /> Lançamentos ({filteredEntries.length})
+              </CardTitle>
             </CardHeader>
             <CardContent className="overflow-x-auto">
               {filteredEntries.length === 0 ? (
@@ -480,7 +718,7 @@ const AdminFinancialPro = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredEntries.map(e => (
+                    {filteredEntries.slice(0, 500).map(e => (
                       <tr key={e.id} className="border-b hover:bg-muted/30">
                         <td className="py-2 px-2">
                           <Badge variant="outline" className="text-[10px]">
@@ -522,6 +760,11 @@ const AdminFinancialPro = () => {
                     ))}
                   </tbody>
                 </table>
+              )}
+              {filteredEntries.length > 500 && (
+                <p className="text-xs text-muted-foreground text-center mt-3">
+                  Exibindo 500 de {filteredEntries.length} — refine os filtros para ver mais.
+                </p>
               )}
             </CardContent>
           </Card>
@@ -576,11 +819,11 @@ const AdminFinancialPro = () => {
 
       {/* ============ DIALOG ============ */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing?.id ? "Editar Lançamento" : "Novo Lançamento"}</DialogTitle>
             <DialogDescription>
-              Custos Fixos, Variáveis ou Consumo. Defina datas e status de conciliação.
+              Escolha a categoria — direção e tipo serão definidos automaticamente.
             </DialogDescription>
           </DialogHeader>
           {editing && (
@@ -618,19 +861,41 @@ const AdminFinancialPro = () => {
                 </div>
               </div>
               <div className="col-span-2">
+                <Label>Categoria</Label>
+                <Select value={editing.category || ""} onValueChange={onCategoryChange}>
+                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                  <SelectContent>
+                    {FINANCE_CATEGORIES.map(g => (
+                      <SelectGroup key={g.group}>
+                        <SelectLabel>{g.group}</SelectLabel>
+                        {g.items.map(it => <SelectItem key={it} value={it}>{it}</SelectItem>)}
+                      </SelectGroup>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2">
                 <Label>Descrição *</Label>
                 <Input value={editing.description || ""} onChange={(e) => setEditing({ ...editing, description: e.target.value })}
-                  placeholder="Ex: Aluguel, Energia, Material consumido" />
-              </div>
-              <div>
-                <Label>Categoria</Label>
-                <Input value={editing.category || ""} onChange={(e) => setEditing({ ...editing, category: e.target.value })}
-                  placeholder="Ex: Infraestrutura" />
+                  placeholder="Ex: Aluguel sede, Energia maio, Salário João..." />
               </div>
               <div>
                 <Label>Valor (R$) *</Label>
                 <Input type="number" step="0.01" min="0" value={editing.amount || 0}
                   onChange={(e) => setEditing({ ...editing, amount: parseFloat(e.target.value) || 0 })} />
+              </div>
+              <div>
+                <Label>Recorrência</Label>
+                <Select value={editing.recurrence} onValueChange={(v) => setEditing({ ...editing, recurrence: v as any })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="UNICO">Único</SelectItem>
+                    <SelectItem value="SEMANAL">Semanal (gera 51 ocorrências)</SelectItem>
+                    <SelectItem value="QUINZENAL">Quinzenal (gera 23 ocorrências)</SelectItem>
+                    <SelectItem value="MENSAL">Mensal (gera 11 ocorrências)</SelectItem>
+                    <SelectItem value="ANUAL">Anual (gera 4 ocorrências)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label>Data competência</Label>
@@ -648,23 +913,15 @@ const AdminFinancialPro = () => {
                   onChange={(e) => setEditing({ ...editing, paid_date: e.target.value || null })} />
               </div>
               <div>
-                <Label>Conciliação</Label>
+                <Label>Status</Label>
                 <Select value={editing.reconciliation_status} onValueChange={(v) => setEditing({ ...editing, reconciliation_status: v as any })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="PENDENTE">Pendente</SelectItem>
                     <SelectItem value="PAGO">Pago</SelectItem>
                     <SelectItem value="ATRASADO">Atrasado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="col-span-2">
-                <Label>Recorrência</Label>
-                <Select value={editing.recurrence} onValueChange={(v) => setEditing({ ...editing, recurrence: v as any })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="UNICO">Único</SelectItem>
-                    <SelectItem value="MENSAL">Mensal (informativo)</SelectItem>
+                    <SelectItem value="PARCIAL">Parcial</SelectItem>
+                    <SelectItem value="CANCELADO">Cancelado</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
