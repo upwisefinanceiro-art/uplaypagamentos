@@ -69,33 +69,30 @@ const Login = () => {
 
     const typedCredential = credential.trim();
     const loginMethod = typedCredential.includes("@") ? "email" : "cpf";
-    let email = typedCredential;
+    let email = loginMethod === "email" ? typedCredential.toLowerCase() : typedCredential;
 
-    if (loginMethod === "cpf") {
-      const cpfDigits = typedCredential.replace(/\D/g, "");
+    if (loginMethod === "cpf" && !isCpf(typedCredential)) {
+      console.warn("[auth] CPF inválido no login", { credential: typedCredential });
+      toast({ title: "CPF inválido", description: "Digite um CPF válido com 11 números ou use seu e-mail.", variant: "destructive" });
+      setLoading(false);
+      return;
+    }
 
-      if (!isCpf(typedCredential)) {
-        console.warn("[auth] CPF inválido no login", { credential: typedCredential });
-        toast({ title: "CPF inválido", description: "Digite um CPF válido com 11 números ou use seu e-mail.", variant: "destructive" });
-        setLoading(false);
-        return;
-      }
+    // Resolve o e-mail real de autenticação (cobre divergência entre profile.email e auth.users.email)
+    console.info("[auth] Resolvendo e-mail de autenticação", { loginMethod });
+    const { data: resolved, error: rpcError } = await supabase.rpc("resolve_auth_email", { _login: typedCredential });
 
-      console.info("[auth] Tentando login por CPF", { cpf: cpfDigits });
-      const { data, error: rpcError } = await supabase.rpc("get_email_by_cpf", { _cpf: cpfDigits });
+    if (rpcError) {
+      console.warn("[auth] Erro ao resolver e-mail", { rpcError });
+    }
 
-      if (rpcError || !data) {
-        console.warn("[auth] CPF não encontrado", { cpf: cpfDigits, rpcError });
-        toast({ title: "Usuário ou senha inválidos", description: "Verifique seus dados e tente novamente.", variant: "destructive" });
-        setLoading(false);
-        return;
-      }
-
-      console.info("[auth] CPF localizado com sucesso", { cpf: cpfDigits });
-      email = data as string;
-    } else {
-      console.info("[auth] Tentando login por e-mail", { email: typedCredential.toLowerCase() });
-      email = typedCredential.toLowerCase();
+    if (resolved && typeof resolved === "string") {
+      email = resolved;
+    } else if (loginMethod === "cpf") {
+      console.warn("[auth] CPF não encontrado", { credential: typedCredential });
+      toast({ title: "Usuário ou senha inválidos", description: "Verifique seus dados e tente novamente.", variant: "destructive" });
+      setLoading(false);
+      return;
     }
 
     try {
@@ -113,8 +110,11 @@ const Login = () => {
         return;
       }
 
-      // Check if profile is active
-      const { data: profileData } = await supabase.from("profiles").select("active, unit_id").eq("email", email).maybeSingle();
+      // Check if profile is active (lookup by user id since profile.email may diverge from auth email)
+      const { data: { user: authedUser } } = await supabase.auth.getUser();
+      const { data: profileData } = authedUser
+        ? await supabase.from("profiles").select("active, unit_id").eq("id", authedUser.id).maybeSingle()
+        : { data: null };
 
       if (profileData && !profileData.active) {
         console.warn("[auth] Usuário inativo", { email });
