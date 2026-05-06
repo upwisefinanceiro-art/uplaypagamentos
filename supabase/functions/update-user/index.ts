@@ -75,6 +75,24 @@ Deno.serve(async (req) => {
 
     const cleanCpf = String(cpf).replace(/\D/g, "");
     const normalizedName = String(full_name).trim();
+
+    // Verifica duplicidade de CPF ignorando o próprio registro
+    if (cleanCpf) {
+      const { data: cpfDup } = await supabaseAdmin
+        .from("profiles")
+        .select("id, full_name")
+        .eq("cpf", cleanCpf)
+        .neq("id", user_id)
+        .maybeSingle();
+      if (cpfDup) {
+        return jsonResponse({
+          error: "Já existe um cliente cadastrado com este CPF. Verifique o cadastro existente antes de continuar.",
+          duplicate_cpf: true,
+          existing_id: cpfDup.id,
+          existing_name: cpfDup.full_name,
+        });
+      }
+    }
     const normalizedPhone = typeof phone === "string" && phone.trim() ? phone.trim() : null;
     const normalizedAddress = typeof address === "string" && address.trim() ? address.trim() : null;
     const normalizedEmail = typeof email === "string" && email.trim()
