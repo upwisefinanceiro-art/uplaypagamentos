@@ -63,6 +63,7 @@ export const FINANCE_CATEGORIES: FinanceCategoryGroup[] = [
       "Freelancer",
       "Horas extras",
       "Professores",
+      "Pró-labore",
     ],
   },
   {
