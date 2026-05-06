@@ -1735,6 +1735,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      resolve_auth_email: { Args: { _login: string }; Returns: string }
       update_company_secrets: {
         Args: { _company_id: string; _secrets: Json }
         Returns: undefined
