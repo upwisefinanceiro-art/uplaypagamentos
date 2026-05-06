@@ -1,0 +1,2 @@
+ALTER TABLE public.finance_entries DROP CONSTRAINT IF EXISTS finance_entries_recurrence_check;
+ALTER TABLE public.finance_entries ADD CONSTRAINT finance_entries_recurrence_check CHECK (recurrence = ANY (ARRAY['UNICO','SEMANAL','QUINZENAL','MENSAL','ANUAL']));
