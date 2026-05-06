@@ -82,16 +82,29 @@ const AdminCompanies = () => {
       return;
     }
 
+    const COMPANY_COLS = "id, name, system_name, logo_url, primary_color, secondary_color, whatsapp_financeiro, cnpj, email, phone, plan, status, max_units, max_users, endereco, numero, bairro, cidade, estado, cep, asaas_base_url_master, valor_mensalidade, dias_bloqueio, whatsapp_master";
     const { data, error } = await supabase
       .from("companies")
-      .select("*")
+      .select(COMPANY_COLS)
       .eq("id", unit.company_id)
       .maybeSingle();
 
     if (error) {
       toast({ title: "Erro ao carregar empresa", variant: "destructive" });
+    } else if (data) {
+      // Load master secrets via secure RPC.
+      let secrets: any = {};
+      try {
+        const { data: sec } = await supabase.rpc("get_company_secrets", { _company_id: unit.company_id });
+        secrets = (sec as any) || {};
+      } catch { /* ignore */ }
+      setCompany({
+        ...(data as any),
+        asaas_api_key_master: secrets.asaas_api_key_master ?? null,
+        asaas_webhook_token_master: secrets.asaas_webhook_token_master ?? null,
+      } as Company);
     } else {
-      setCompany(data as Company | null);
+      setCompany(null);
     }
     setLoading(false);
   };
