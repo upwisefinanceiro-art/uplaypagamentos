@@ -1174,7 +1174,27 @@ const AdminUnits = () => {
                     <code className="text-foreground flex-1 truncate">
                       {showKeys[unit.id] ? (unit.asaas_api_key || "—") : "••••••••••••"}
                     </code>
-                    <button onClick={() => toggleKey(unit.id)} className="text-muted-foreground hover:text-foreground">
+                    <button
+                      onClick={async () => {
+                        if (!showKeys[unit.id] && !unit.asaas_api_key) {
+                          // Lazy-load secrets via secure RPC.
+                          const { data } = await supabase.rpc("get_unit_secrets", { _unit_id: unit.id });
+                          if (data) {
+                            const s: any = data;
+                            setUnits(prev => prev.map(u => u.id === unit.id ? {
+                              ...u,
+                              asaas_api_key: s.asaas_api_key,
+                              asaas_webhook_token: s.asaas_webhook_token,
+                              cora_client_id: s.cora_client_id,
+                              cora_certificate: s.cora_certificate,
+                              cora_private_key: s.cora_private_key,
+                            } : u));
+                          }
+                        }
+                        toggleKey(unit.id);
+                      }}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
                       {showKeys[unit.id] ? <ShieldOff size={14} /> : <Shield size={14} />}
                     </button>
                   </div>
@@ -1184,7 +1204,7 @@ const AdminUnits = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground w-20">Webhook:</span>
-                    <code className="text-foreground truncate">{unit.asaas_webhook_token || "—"}</code>
+                    <code className="text-foreground truncate">{showKeys[unit.id] ? (unit.asaas_webhook_token || "—") : "••••••••"}</code>
                   </div>
                 </div>
               </details>
