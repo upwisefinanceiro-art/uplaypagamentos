@@ -269,6 +269,8 @@ const AdminUnits = () => {
 
     setSaving(true);
 
+    // Note: secret fields (asaas_api_key, asaas_webhook_token, cora_*) are
+    // saved separately through the update_unit_secrets RPC (server-side only).
     const payload: Record<string, unknown> = {
       name: form.name.trim(),
       razao_social: form.razao_social.trim() || null,
@@ -285,14 +287,9 @@ const AdminUnits = () => {
       whatsapp: form.whatsapp.trim() || null,
       email_empresa: form.email_empresa.trim() || null,
       email_acesso: form.email_empresa.trim() || null,
-      asaas_api_key: form.asaas_api_key.trim() || null,
       asaas_base_url: form.asaas_base_url.trim() || "https://api.asaas.com/v3",
-      asaas_webhook_token: form.asaas_webhook_token.trim() || null,
       whatsapp_financeiro: form.whatsapp_financeiro.trim() || null,
       usar_whatsapp_padrao: form.usar_whatsapp_padrao,
-      cora_client_id: form.cora_client_id.trim() || null,
-      cora_certificate: form.cora_certificate.trim() || null,
-      cora_private_key: form.cora_private_key.trim() || null,
       cora_environment: form.cora_environment || "stage",
       preferred_bank: form.preferred_bank || "asaas",
       partnership_plan: form.partnership_plan || "PLANO_ASAAS",
@@ -304,11 +301,31 @@ const AdminUnits = () => {
     let newUnitId: string | null = null;
     if (editingUnit) {
       ({ error } = await supabase.from("units").update(payload as any).eq("id", editingUnit.id));
+      newUnitId = editingUnit.id;
     } else {
       if (companyId) payload.company_id = companyId;
       const res = await supabase.from("units").insert(payload as any).select("id").single();
       error = res.error;
       newUnitId = res.data?.id ?? null;
+    }
+
+    // Persist secrets via RPC (only when at least one secret was filled).
+    if (!error && newUnitId) {
+      const secretsPayload: Record<string, string> = {};
+      if (form.asaas_api_key.trim()) secretsPayload.asaas_api_key = form.asaas_api_key.trim();
+      if (form.asaas_webhook_token.trim()) secretsPayload.asaas_webhook_token = form.asaas_webhook_token.trim();
+      if (form.cora_client_id.trim()) secretsPayload.cora_client_id = form.cora_client_id.trim();
+      if (form.cora_certificate.trim()) secretsPayload.cora_certificate = form.cora_certificate.trim();
+      if (form.cora_private_key.trim()) secretsPayload.cora_private_key = form.cora_private_key.trim();
+      if (Object.keys(secretsPayload).length > 0) {
+        const { error: secErr } = await supabase.rpc("update_unit_secrets", {
+          _unit_id: newUnitId,
+          _secrets: secretsPayload,
+        });
+        if (secErr) {
+          toast({ title: "Aviso: dados salvos, mas falha ao gravar credenciais", description: secErr.message, variant: "destructive" });
+        }
+      }
     }
 
     if (error) {
