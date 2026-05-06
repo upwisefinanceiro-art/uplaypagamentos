@@ -1557,7 +1557,7 @@ const AdminContracts = () => {
                       <RotateCcw size={12} className="mr-1" /> Reabrir Contrato
                     </Button>
                   )}
-                  {hasRole("ADMIN_MASTER") && (
+                  {(hasRole("ADMIN_MASTER") || hasRole("ADMIN_UNIDADE")) && (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -1567,19 +1567,17 @@ const AdminContracts = () => {
                       <Trash2 size={12} className="mr-1" /> Excluir
                     </Button>
                   )}
-                  {hasRole("ADMIN_MASTER") && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-xs text-destructive hover:text-destructive font-semibold"
-                      onClick={() => {
-                        setDeleteClientConfirm("");
-                        setDeleteClientTarget({ id: c.responsible_id, name: c.responsible_name || "Cliente" });
-                      }}
-                    >
-                      <Trash2 size={12} className="mr-1" /> Excluir Cliente
-                    </Button>
-                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs text-destructive hover:text-destructive font-semibold"
+                    onClick={() => {
+                      setDeleteClientConfirm("");
+                      setDeleteClientTarget({ id: c.responsible_id, name: c.responsible_name || "Cliente" });
+                    }}
+                  >
+                    <Trash2 size={12} className="mr-1" /> Excluir Cliente
+                  </Button>
                 </div>
               </div>
             </div>
