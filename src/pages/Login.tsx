@@ -110,8 +110,11 @@ const Login = () => {
         return;
       }
 
-      // Check if profile is active
-      const { data: profileData } = await supabase.from("profiles").select("active, unit_id").eq("email", email).maybeSingle();
+      // Check if profile is active (lookup by user id since profile.email may diverge from auth email)
+      const { data: { user: authedUser } } = await supabase.auth.getUser();
+      const { data: profileData } = authedUser
+        ? await supabase.from("profiles").select("active, unit_id").eq("id", authedUser.id).maybeSingle()
+        : { data: null };
 
       if (profileData && !profileData.active) {
         console.warn("[auth] Usuário inativo", { email });
