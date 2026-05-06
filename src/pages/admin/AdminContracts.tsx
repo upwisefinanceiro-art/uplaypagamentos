@@ -1611,6 +1611,65 @@ const AdminContracts = () => {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Permanent client deletion */}
+      <AlertDialog open={!!deleteClientTarget} onOpenChange={(open) => { if (!open) { setDeleteClientTarget(null); setDeleteClientConfirm(""); } }}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">Excluir cliente definitivamente</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <span className="block">
+                Tem certeza que deseja excluir definitivamente <strong>{deleteClientTarget?.name}</strong>? Essa ação não poderá ser desfeita.
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                Todos os contratos, parcelas pendentes, alunos e histórico vinculado serão removidos. Pagamentos já confirmados bloqueiam a exclusão (use desativar).
+              </span>
+              <span className="block pt-2">
+                Para confirmar, digite <strong>EXCLUIR</strong> abaixo:
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            autoFocus
+            className="bg-input border-border text-foreground"
+            placeholder="Digite EXCLUIR"
+            value={deleteClientConfirm}
+            onChange={(e) => setDeleteClientConfirm(e.target.value)}
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-border" disabled={deletingClient}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deletingClient || deleteClientConfirm.trim().toUpperCase() !== "EXCLUIR"}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+              onClick={async () => {
+                if (!deleteClientTarget) return;
+                setDeletingClient(true);
+                const { data, error } = await supabase.functions.invoke("delete-user", {
+                  body: { user_id: deleteClientTarget.id, action: "permanent_delete", force_cascade: true },
+                });
+                setDeletingClient(false);
+                if (error || data?.error) {
+                  toast({
+                    title: "Não foi possível excluir",
+                    description: data?.has_paid
+                      ? "Este cliente possui pagamentos confirmados e não pode ser excluído. Use desativar."
+                      : (data?.error || error?.message || "Erro inesperado"),
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                toast({ title: "Cliente excluído definitivamente com sucesso." });
+                setDeleteClientTarget(null);
+                setDeleteClientConfirm("");
+                await fetchData();
+              }}
+            >
+              {deletingClient ? <Loader2 size={14} className="animate-spin mr-2" /> : null}
+              Excluir Definitivamente
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <UserEditDialog
         open={!!editResponsible}
         onOpenChange={(open) => !open && setEditResponsible(null)}
