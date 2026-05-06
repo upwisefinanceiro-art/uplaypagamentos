@@ -1213,21 +1213,16 @@ const AdminUnits = () => {
                 <Button
                   size="sm" variant="outline"
                   onClick={() => handleTestConnection(unit.id)}
-                  disabled={testingUnit === unit.id || !unit.asaas_api_key}
+                  disabled={testingUnit === unit.id}
                   className="text-xs"
                 >
                   {testingUnit === unit.id ? (
                     <Loader2 size={12} className="mr-1.5 animate-spin" />
-                  ) : unit.asaas_api_key ? (
-                    <Wifi size={12} className="mr-1.5" />
                   ) : (
-                    <WifiOff size={12} className="mr-1.5" />
+                    <Wifi size={12} className="mr-1.5" />
                   )}
                   {testingUnit === unit.id ? "Testando..." : "Testar conexão Asaas"}
                 </Button>
-                {!unit.asaas_api_key && (
-                  <span className="text-[10px] text-destructive">API Asaas não configurada</span>
-                )}
 
                 <Button
                   size="sm" variant="outline"
