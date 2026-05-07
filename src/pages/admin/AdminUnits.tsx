@@ -1231,7 +1231,7 @@ const AdminUnits = () => {
 
                 <Button
                   size="sm" variant="outline"
-                  onClick={() => handleTestCora(unit.id)}
+                  onClick={() => handleTestCora(unit.id, unit.name)}
                   disabled={testingCora === unit.id}
                   className="text-xs"
                 >
