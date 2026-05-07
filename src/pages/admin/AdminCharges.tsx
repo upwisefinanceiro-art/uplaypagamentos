@@ -1342,7 +1342,25 @@ const AdminCharges = () => {
 
                       if (gw === "CORA") {
                         if (payment.cora_invoice_id) return (
-                          <span className="text-[10px] text-muted-foreground italic">Gateway: Banco Cora</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-muted-foreground italic">Gateway: Banco Cora</span>
+                            {payment.status !== "PAID" && payment.status !== "CANCELLED" && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-1.5 text-xs h-7"
+                                disabled={syncingPaymentId === payment.id}
+                                onClick={() => handleSyncPayment(payment.id)}
+                              >
+                                {syncingPaymentId === payment.id ? (
+                                  <Loader2 size={12} className="animate-spin" />
+                                ) : (
+                                  <RefreshCw size={12} />
+                                )}
+                                Sincronizar
+                              </Button>
+                            )}
+                          </div>
                         );
                         return (
                           <Button
