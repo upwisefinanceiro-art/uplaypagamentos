@@ -217,7 +217,7 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
           final_value: finalParc,
           status: "PENDING",
           payment_method: paymentMethod,
-          gateway: paymentMethod === "BOLETO" ? gateway : "ASAAS",
+          gateway: paymentMethod === "BOLETO" ? effectiveGateway : "ASAAS",
           payment_type: "MENSALIDADE",
           description: contract.description + (notes ? ` — ${notes}` : ""),
         });
@@ -247,7 +247,7 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
             final_value: parc,
             status: "PENDING",
             payment_method: paymentMethod,
-            gateway: paymentMethod === "BOLETO" ? gateway : "ASAAS",
+            gateway: paymentMethod === "BOLETO" ? effectiveGateway : "ASAAS",
             payment_type: "APOSTILA",
             description: `Apostila ${i + 1}/${apostilasCount}`,
           });
@@ -268,7 +268,7 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
           final_value: matricula,
           status: "PENDING",
           payment_method: paymentMethod,
-          gateway: paymentMethod === "BOLETO" ? gateway : "ASAAS",
+          gateway: paymentMethod === "BOLETO" ? effectiveGateway : "ASAAS",
           payment_type: "MATRICULA",
           description: matriculaDescription || "Matrícula",
         });
