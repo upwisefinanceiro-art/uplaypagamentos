@@ -443,7 +443,7 @@ const AdminCharges = () => {
       };
       const { data: inserted, error: insErr } = await supabase
         .from("payments")
-        .insert(insertPayload)
+        .insert(insertPayload as never)
         .select("id")
         .single();
       if (insErr || !inserted) {
