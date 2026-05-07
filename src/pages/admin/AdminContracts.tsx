@@ -539,7 +539,16 @@ const AdminContracts = () => {
       const totalParcelas = insertedPayments?.length || payments.length;
 
       const useCora = paymentMethod === "BOLETO" && gateway === "CORA";
+      const finalProvider = useCora ? "cora" : "asaas";
       const gatewayLabel = useCora ? "Banco Cora" : "Asaas";
+      console.log("[PAYMENT_PROVIDER_SELECTED]", {
+        selectedGateway: gateway,
+        paymentMethod,
+        unidadeId: resolvedUnitId,
+        contractId: contract.id,
+        finalProvider,
+        parcelas: insertedPayments?.length ?? 0,
+      });
 
       // Fechar diálogo e mostrar progresso da geração
       setDialogOpen(false);
@@ -556,6 +565,7 @@ const AdminContracts = () => {
         let errCount = 0;
 
         const fnName = useCora ? "create-cora-charge" : "sync-asaas-payment";
+        console.log(useCora ? "[CORA_FLOW_STARTED]" : "[ASAAS_FLOW_STARTED]", { count: ids.length, fn: fnName });
 
         for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
           const chunk = ids.slice(i, i + CHUNK_SIZE);
