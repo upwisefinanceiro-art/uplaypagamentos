@@ -409,9 +409,73 @@ const AdminCharges = () => {
       return;
     }
 
+    if (chargeGateway === "CORA" && billingType !== "BOLETO") {
+      toast({ title: "Banco Cora só emite Boleto", description: "Altere a forma de pagamento para Boleto ou troque o gateway.", variant: "destructive" });
+      return;
+    }
+
     setCreatingCharge(true);
     setChargeResult(null);
 
+    if (chargeGateway === "CORA") {
+      // 1) Cria parcela local marcada como Cora
+      const respUnitId = profiles[selectedResponsible]?.unit_id;
+      if (!respUnitId) {
+        setCreatingCharge(false);
+        toast({ title: "Responsável sem unidade vinculada", variant: "destructive" });
+        return;
+      }
+      const insertPayload: Record<string, unknown> = {
+        unit_id: respUnitId,
+        responsible_id: selectedResponsible,
+        student_id: selectedStudent !== "NONE" ? selectedStudent : null,
+        contract_id: selectedContract !== "NONE" ? selectedContract : null,
+        installment_number: 1,
+        due_date: chargeDueDate,
+        value: parseFloat(chargeValue),
+        original_value: parseFloat(chargeValue),
+        final_value: parseFloat(chargeValue),
+        status: "PENDING",
+        payment_method: "BOLETO",
+        gateway: "CORA",
+        payment_type: chargePaymentType,
+        description: chargeDescription || "Cobrança avulsa",
+      };
+      const { data: inserted, error: insErr } = await supabase
+        .from("payments")
+        .insert(insertPayload)
+        .select("id")
+        .single();
+      if (insErr || !inserted) {
+        setCreatingCharge(false);
+        toast({ title: "Erro ao criar parcela local", description: insErr?.message, variant: "destructive" });
+        return;
+      }
+      // 2) Emite boleto na Cora — sem fallback para Asaas
+      const { data: coraResp, error: coraErr } = await supabase.functions.invoke("create-cora-charge", {
+        body: { payment_id: inserted.id },
+      });
+      let body: any = coraResp;
+      if (coraErr && (coraErr as any)?.context?.json) {
+        try { body = await (coraErr as any).context.json(); } catch { /* */ }
+      }
+      setCreatingCharge(false);
+      if (coraErr || body?.error) {
+        const status = body?.cora_status ? ` (HTTP ${body.cora_status})` : "";
+        const msg = body?.validation_message || body?.error || coraErr?.message || "Falha ao emitir na Cora";
+        toast({ title: "Erro Cora — cobrança NÃO criada no Asaas", description: `${msg}${status}`, variant: "destructive", duration: 12000 });
+        console.error("[Cora] erro completo:", body);
+        // mantém parcela local sem invoice (admin pode reemitir)
+        fetchData();
+        return;
+      }
+      setChargeResult({ payment_id: inserted.id, asaas_charge_id: body?.cora_invoice_id || "—", invoice_url: body?.invoice_url || body?.boleto_url || null });
+      toast({ title: "Boleto Cora emitido!" });
+      fetchData();
+      return;
+    }
+
+    // Gateway = ASAAS
     const { data, error } = await supabase.functions.invoke("create-asaas-charge", {
       body: {
         responsible_id: selectedResponsible,
