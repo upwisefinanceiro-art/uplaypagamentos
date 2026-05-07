@@ -856,6 +856,11 @@ const AdminCharges = () => {
                         setSelectedResponsible(value);
                         setSelectedStudent("NONE");
                         setSelectedContract("NONE");
+                        // Pré-define gateway com base na unidade do responsável
+                        const respUnitId = profiles[value]?.unit_id;
+                        const respUnit = units.find((u) => u.id === respUnitId);
+                        const pref = (respUnit?.preferred_bank || "asaas").toLowerCase();
+                        setChargeGateway(pref === "cora" ? "CORA" : "ASAAS");
                       }}
                     >
                       <SelectTrigger><SelectValue placeholder="Selecione o responsável" /></SelectTrigger>
