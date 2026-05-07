@@ -77,6 +77,7 @@ interface ResponsibleRow {
 interface UnitRow {
   id: string;
   name: string;
+  preferred_bank?: string | null;
 }
 
 const ESTADOS_BR = [
