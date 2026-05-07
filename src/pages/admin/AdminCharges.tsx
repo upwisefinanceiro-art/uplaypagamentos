@@ -85,6 +85,7 @@ interface PaymentRow {
   description: string;
   payment_type: string;
   cora_invoice_id?: string | null;
+  gateway?: string | null;
 }
 
 interface ContractRow {
