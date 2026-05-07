@@ -187,6 +187,7 @@ const AdminContracts = () => {
   const [installments, setInstallments] = useState("1");
   // dueDay is now derived from firstDueDate
   const [paymentMethod, setPaymentMethod] = useState("");
+  const [gateway, setGateway] = useState<"ASAAS" | "CORA">("ASAAS");
   const [notes, setNotes] = useState("");
   const [password, setPassword] = useState("");
   const [contractNumber, setContractNumber] = useState("");
