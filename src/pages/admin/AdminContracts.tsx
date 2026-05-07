@@ -364,8 +364,9 @@ const AdminContracts = () => {
     setSaving(true);
     try {
       // FONTE DA VERDADE: re-buscar preferred_bank da unidade no momento do save
+      const gatewaySupported = paymentMethod === "BOLETO" || paymentMethod === "PIX";
       let effectiveGateway: "ASAAS" | "CORA" = gateway;
-      if (paymentMethod === "BOLETO" && resolvedUnitId) {
+      if (gatewaySupported && resolvedUnitId) {
         const { data: unitRow } = await supabase
           .from("units")
           .select("preferred_bank")
