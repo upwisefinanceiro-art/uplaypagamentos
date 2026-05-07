@@ -163,7 +163,7 @@ Deno.serve(async (req) => {
             district: (addrDistrict || "Centro").slice(0, 60),
             city: addrCity.slice(0, 60),
             state: addrState,
-            complement: (addrComplement || "").slice(0, 60),
+            complement: (addrComplement || "N/A").slice(0, 60),
             zip_code: addrZip,
           },
         },
@@ -178,18 +178,9 @@ Deno.serve(async (req) => {
         payment_forms: ["BANK_SLIP", "PIX"],
       };
 
-      // Notificações (opcional)
-      const channels: Array<Record<string, unknown>> = [];
-      if (emailTrim) {
-        channels.push({
-          channel: "EMAIL",
-          contact: emailTrim,
-          rules: ["NOTIFY_THREE_DAYS_BEFORE_DUE_DATE", "NOTIFY_ON_DUE_DATE"],
-        });
-      }
-      if (channels.length) {
-        payload.notification = { name: customerName, channels };
-      }
+      // NOTA: removido `notification` — os valores de `rules` exigem enums específicos
+      // que não estão claramente documentados; sem isso o boleto é criado e a Cora
+      // aplica notificações padrão. Configurar depois via API de notificações.
 
       // Mascara dados sensíveis em logs
       const maskedPayload = JSON.parse(JSON.stringify(payload));
@@ -203,8 +194,17 @@ Deno.serve(async (req) => {
         maskedPayload.customer.email = `${u.slice(0, 2)}***@${d || ""}`;
       }
 
+      // Endpoint OFICIAL Cora — Integração Direta v2 (mTLS)
+      // https://developers.cora.com.br/reference/emissão-de-boleto-registrado-v2
       const endpoint = "/v2/invoices";
-      console.info("[create-cora-charge] POST", endpoint, JSON.stringify(maskedPayload));
+      console.info("[create-cora-charge] POST FULL", endpoint, JSON.stringify({
+        base_url: session.baseUrl,
+        full_url: `${session.baseUrl}${endpoint}`,
+        method: "POST",
+        content_type: "application/json; charset=utf-8",
+        payload_bytes: JSON.stringify(payload).length,
+        masked_payload: maskedPayload,
+      }, null, 2));
 
       const result = await coraRequest(session, endpoint, "POST", payload);
 
