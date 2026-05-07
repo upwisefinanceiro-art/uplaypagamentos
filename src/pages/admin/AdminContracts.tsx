@@ -247,7 +247,7 @@ const AdminContracts = () => {
       supabase.from("contracts").select("*, units(name), students(full_name)").order("created_at", { ascending: false }),
       supabase.from("students").select("id, full_name, responsible_id, unit_id").eq("active", true),
       supabase.from("profiles").select("id, full_name, cpf, phone, email, unit_id, asaas_customer_id").eq("active", true),
-      supabase.from("units").select("id, name").eq("active", true),
+      supabase.from("units").select("id, name, preferred_bank").eq("active", true),
       supabase.from("user_roles").select("user_id").in("role", ["ADMIN_MASTER", "ADMIN_UNIDADE"]),
       fetchAllPaginated<{ id: string; contract_id: string | null; status: string; due_date: string }>((from, to) =>
         supabase
