@@ -94,24 +94,40 @@ export async function authenticateCora(creds: CoraCredentials): Promise<CoraSess
 }
 
 export async function coraRequest(session: CoraSession, path: string, method: string, body?: unknown) {
-  const res = await fetch(`${session.baseUrl}${path}`, {
+  const url = `${session.baseUrl}${path}`;
+  const idempotencyKey = crypto.randomUUID();
+  const reqHeaders: Record<string, string> = {
+    Authorization: `Bearer ${session.accessToken.slice(0, 12)}...(masked)`,
+    "Content-Type": "application/json; charset=utf-8",
+    Accept: "application/json",
+    "Idempotency-Key": idempotencyKey,
+  };
+  const bodyStr = body ? JSON.stringify(body) : undefined;
+  console.info("[cora-request] →", JSON.stringify({
+    method, url, headers: reqHeaders, body_bytes: bodyStr?.length ?? 0,
+  }));
+
+  const res = await fetch(url, {
     method,
     // @ts-ignore
     client: session.httpClient,
     headers: {
       Authorization: `Bearer ${session.accessToken}`,
-      "Content-Type": "application/json",
+      "Content-Type": "application/json; charset=utf-8",
       Accept: "application/json",
-      "Idempotency-Key": crypto.randomUUID(),
+      "Idempotency-Key": idempotencyKey,
     },
-    body: body ? JSON.stringify(body) : undefined,
+    body: bodyStr,
   });
   const text = await res.text();
   let parsed: any = null;
   try { parsed = JSON.parse(text); } catch { /* not json */ }
   const headers: Record<string, string> = {};
   res.headers.forEach((v, k) => { headers[k] = v; });
-  return { ok: res.ok, status: res.status, data: parsed, raw: text, headers, url: `${session.baseUrl}${path}` };
+  console.info("[cora-request] ←", JSON.stringify({
+    status: res.status, statusText: res.statusText, url, headers, body_preview: text.slice(0, 1000),
+  }));
+  return { ok: res.ok, status: res.status, statusText: res.statusText, data: parsed, raw: text, headers, url, request_headers: reqHeaders, idempotency_key: idempotencyKey };
 }
 
 export function onlyDigits(v: string | null | undefined): string {
