@@ -926,6 +926,21 @@ const AdminContracts = () => {
             </Select>
           </div>
         </div>
+        {paymentMethod === "BOLETO" && (
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Gateway de Pagamento *</Label>
+            <Select value={gateway} onValueChange={(v) => setGateway(v as "ASAAS" | "CORA")}>
+              <SelectTrigger className="bg-input border-border text-foreground"><SelectValue /></SelectTrigger>
+              <SelectContent className="bg-card border-border">
+                <SelectItem value="ASAAS">Asaas</SelectItem>
+                <SelectItem value="CORA">Banco Cora</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-[10px] text-muted-foreground">
+              Os boletos serão emitidos automaticamente em {gateway === "CORA" ? "Banco Cora" : "Asaas"} ao salvar.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
