@@ -954,7 +954,7 @@ const AdminContracts = () => {
             </Select>
           </div>
         </div>
-        {paymentMethod === "BOLETO" && (
+        {(paymentMethod === "BOLETO" || paymentMethod === "PIX") && (
           <div className="space-y-1">
             <Label className="text-foreground text-xs">Gateway de Pagamento *</Label>
             <Select value={gateway} onValueChange={(v) => setGateway(v as "ASAAS" | "CORA")}>
@@ -965,7 +965,7 @@ const AdminContracts = () => {
               </SelectContent>
             </Select>
             <p className="text-[10px] text-muted-foreground">
-              Os boletos serão emitidos automaticamente em {gateway === "CORA" ? "Banco Cora" : "Asaas"} ao salvar.
+              As cobranças serão emitidas automaticamente em {gateway === "CORA" ? "Banco Cora" : "Asaas"} ao salvar. Cora emite boleto + PIX no mesmo invoice.
             </p>
           </div>
         )}
