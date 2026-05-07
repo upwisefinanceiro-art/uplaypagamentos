@@ -731,24 +731,23 @@ const AdminCharges = () => {
   const handleSyncAll = async () => {
     setSyncingAll(true);
     try {
-      const { data, error } = await supabase.functions.invoke("sync-all-payments", {
-        body: unitFilter !== "ALL" ? { unit_id: unitFilter } : {},
-      });
+      const baseBody = unitFilter !== "ALL" ? { unit_id: unitFilter } : {};
+      // Sincroniza Asaas e Cora em paralelo
+      const [asaasRes, coraRes] = await Promise.all([
+        supabase.functions.invoke("sync-all-payments", { body: baseBody }),
+        supabase.functions.invoke("sync-cora-payment", { body: { ...baseBody, all: true } }),
+      ]);
 
-      if (error) {
-        toast({ title: "Erro ao sincronizar", description: "Falha na comunicação", variant: "destructive" });
-        return;
-      }
+      const aData: any = asaasRes.data; const aErr = asaasRes.error;
+      const cData: any = coraRes.data;  const cErr = coraRes.error;
 
-      if (data?.error) {
-        toast({ title: "Erro", description: data.error, variant: "destructive" });
-        return;
-      }
+      const parts: string[] = [];
+      if (aErr || aData?.error) parts.push(`Asaas: erro (${aErr?.message || aData?.error})`);
+      else parts.push(aData?.message || `Asaas: ${aData?.synced ?? 0}`);
+      if (cErr || cData?.error) parts.push(`Cora: erro (${cErr?.message || cData?.error})`);
+      else parts.push(`Cora: ${cData?.message || `${cData?.synced ?? 0} sincronizada(s)`}`);
 
-      toast({
-        title: "Sincronização concluída",
-        description: data.message || `${data.synced} pagamento(s) sincronizado(s)`,
-      });
+      toast({ title: "Sincronização concluída", description: parts.join(" | ") });
       fetchData();
     } catch (err: unknown) {
       toast({ title: "Erro inesperado", description: err instanceof Error ? err.message : "Erro desconhecido", variant: "destructive" });
