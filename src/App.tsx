@@ -33,6 +33,7 @@ import AdminUplayBilling from "./pages/admin/AdminUplayBilling";
 import AdminSaasPlans from "./pages/admin/AdminSaasPlans";
 import AdminBackup from "./pages/admin/AdminBackup";
 import AdminAsaasFees from "./pages/admin/AdminAsaasFees";
+import AdminCoraFees from "./pages/admin/AdminCoraFees";
 import AdminFinancialPro from "./pages/admin/AdminFinancialPro";
 import SuperAdminLayout from "./components/layouts/SuperAdminLayout";
 import SuperDashboard from "./pages/super/SuperDashboard";
@@ -97,6 +98,7 @@ const App = () => {
                 <Route path="financeiro" element={<AdminFinancial />} />
                 <Route path="financeiro-pro" element={<AdminFinancialPro />} />
                 <Route path="taxas-asaas" element={<AdminAsaasFees />} />
+                <Route path="taxas-cora" element={<AdminCoraFees />} />
                 <Route path="estoque" element={<AdminStock />} />
                 <Route path="cursos" element={<AdminCourses />} />
                 <Route path="cobrancas-saas" element={<AdminSaasBilling />} />
