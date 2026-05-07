@@ -204,6 +204,7 @@ const AdminCharges = () => {
   const [chargeValue, setChargeValue] = useState("");
   const [chargeDueDate, setChargeDueDate] = useState("");
   const [billingType, setBillingType] = useState<BillingType>("PIX");
+  const [chargeGateway, setChargeGateway] = useState<"ASAAS" | "CORA">("ASAAS");
   const [chargeDescription, setChargeDescription] = useState("");
   const [chargePaymentType, setChargePaymentType] = useState<PaymentType>("AVULSA");
 
