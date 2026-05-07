@@ -85,6 +85,7 @@ interface PaymentRow {
   description: string;
   payment_type: string;
   cora_invoice_id?: string | null;
+  gateway?: string | null;
 }
 
 interface ContractRow {
@@ -115,6 +116,7 @@ interface UnitRow {
   id: string;
   name: string;
   partnership_plan?: string | null;
+  preferred_bank?: string | null;
 }
 
 interface ChargeResult {
@@ -202,6 +204,7 @@ const AdminCharges = () => {
   const [chargeValue, setChargeValue] = useState("");
   const [chargeDueDate, setChargeDueDate] = useState("");
   const [billingType, setBillingType] = useState<BillingType>("PIX");
+  const [chargeGateway, setChargeGateway] = useState<"ASAAS" | "CORA">("ASAAS");
   const [chargeDescription, setChargeDescription] = useState("");
   const [chargePaymentType, setChargePaymentType] = useState<PaymentType>("AVULSA");
 
@@ -223,12 +226,12 @@ const AdminCharges = () => {
       fetchAllPaginated<PaymentRow>((from, to) =>
         supabase
           .from("payments")
-          .select("id, value, final_value, due_date, status, payment_method, pix_copy_paste, invoice_url, checkout_url, boleto_url, pix_qr_code, asaas_payment_id, responsible_id, unit_id, installment_number, contract_id, student_id, description, payment_type, cora_invoice_id")
+          .select("id, value, final_value, due_date, status, payment_method, pix_copy_paste, invoice_url, checkout_url, boleto_url, pix_qr_code, asaas_payment_id, responsible_id, unit_id, installment_number, contract_id, student_id, description, payment_type, cora_invoice_id, gateway")
           .order("due_date", { ascending: false })
           .range(from, to),
       ),
       supabase.from("students").select("id, full_name, responsible_id").order("full_name"),
-      supabase.from("units").select("id, name, partnership_plan").order("name"),
+      supabase.from("units").select("id, name, partnership_plan, preferred_bank").order("name"),
       supabase.from("profiles").select("id, full_name, unit_id, active, phone").order("full_name"),
       supabase.from("user_roles").select("user_id").eq("role", "RESPONSAVEL"),
       fetchAllPaginated<ContractRow>((from, to) =>
@@ -385,6 +388,7 @@ const AdminCharges = () => {
     setChargeValue("");
     setChargeDueDate("");
     setBillingType("PIX");
+    setChargeGateway("ASAAS");
     setChargeDescription("");
     setChargePaymentType("AVULSA");
     setChargeResult(null);
@@ -405,9 +409,73 @@ const AdminCharges = () => {
       return;
     }
 
+    if (chargeGateway === "CORA" && billingType !== "BOLETO") {
+      toast({ title: "Banco Cora só emite Boleto", description: "Altere a forma de pagamento para Boleto ou troque o gateway.", variant: "destructive" });
+      return;
+    }
+
     setCreatingCharge(true);
     setChargeResult(null);
 
+    if (chargeGateway === "CORA") {
+      // 1) Cria parcela local marcada como Cora
+      const respUnitId = profiles[selectedResponsible]?.unit_id;
+      if (!respUnitId) {
+        setCreatingCharge(false);
+        toast({ title: "Responsável sem unidade vinculada", variant: "destructive" });
+        return;
+      }
+      const insertPayload: Record<string, unknown> = {
+        unit_id: respUnitId,
+        responsible_id: selectedResponsible,
+        student_id: selectedStudent !== "NONE" ? selectedStudent : null,
+        contract_id: selectedContract !== "NONE" ? selectedContract : null,
+        installment_number: 1,
+        due_date: chargeDueDate,
+        value: parseFloat(chargeValue),
+        original_value: parseFloat(chargeValue),
+        final_value: parseFloat(chargeValue),
+        status: "PENDING",
+        payment_method: "BOLETO",
+        gateway: "CORA",
+        payment_type: chargePaymentType,
+        description: chargeDescription || "Cobrança avulsa",
+      };
+      const { data: inserted, error: insErr } = await supabase
+        .from("payments")
+        .insert(insertPayload as never)
+        .select("id")
+        .single();
+      if (insErr || !inserted) {
+        setCreatingCharge(false);
+        toast({ title: "Erro ao criar parcela local", description: insErr?.message, variant: "destructive" });
+        return;
+      }
+      // 2) Emite boleto na Cora — sem fallback para Asaas
+      const { data: coraResp, error: coraErr } = await supabase.functions.invoke("create-cora-charge", {
+        body: { payment_id: inserted.id },
+      });
+      let body: any = coraResp;
+      if (coraErr && (coraErr as any)?.context?.json) {
+        try { body = await (coraErr as any).context.json(); } catch { /* */ }
+      }
+      setCreatingCharge(false);
+      if (coraErr || body?.error) {
+        const status = body?.cora_status ? ` (HTTP ${body.cora_status})` : "";
+        const msg = body?.validation_message || body?.error || coraErr?.message || "Falha ao emitir na Cora";
+        toast({ title: "Erro Cora — cobrança NÃO criada no Asaas", description: `${msg}${status}`, variant: "destructive", duration: 12000 });
+        console.error("[Cora] erro completo:", body);
+        // mantém parcela local sem invoice (admin pode reemitir)
+        fetchData();
+        return;
+      }
+      setChargeResult({ payment_id: inserted.id, asaas_charge_id: body?.cora_invoice_id || "—", invoice_url: body?.invoice_url || body?.boleto_url || null });
+      toast({ title: "Boleto Cora emitido!" });
+      fetchData();
+      return;
+    }
+
+    // Gateway = ASAAS
     const { data, error } = await supabase.functions.invoke("create-asaas-charge", {
       body: {
         responsible_id: selectedResponsible,
@@ -852,6 +920,11 @@ const AdminCharges = () => {
                         setSelectedResponsible(value);
                         setSelectedStudent("NONE");
                         setSelectedContract("NONE");
+                        // Pré-define gateway com base na unidade do responsável
+                        const respUnitId = profiles[value]?.unit_id;
+                        const respUnit = units.find((u) => u.id === respUnitId);
+                        const pref = (respUnit?.preferred_bank || "asaas").toLowerCase();
+                        setChargeGateway(pref === "cora" ? "CORA" : "ASAAS");
                       }}
                     >
                       <SelectTrigger><SelectValue placeholder="Selecione o responsável" /></SelectTrigger>
@@ -925,6 +998,20 @@ const AdminCharges = () => {
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Gateway de Pagamento *</Label>
+                    <Select value={chargeGateway} onValueChange={(v) => setChargeGateway(v as "ASAAS" | "CORA")}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ASAAS">Asaas</SelectItem>
+                        <SelectItem value="CORA">Banco Cora (somente boleto)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {chargeGateway === "CORA" && billingType !== "BOLETO" && (
+                      <p className="text-[11px] text-warning">Banco Cora só emite Boleto. Altere a forma de pagamento.</p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -1231,14 +1318,18 @@ const AdminCharges = () => {
                       </button>
                     </div>
 
-                    {/* Emissão dinâmica conforme plano da unidade */}
+                    {/* Emissão dinâmica conforme gateway da parcela */}
                     {(() => {
-                      const unit = units.find((u) => u.id === payment.unit_id);
-                      const isUplay = unit?.partnership_plan === "PLANO_UPLAY";
                       if (payment.payment_method === "DINHEIRO") return null;
+                      const unit = units.find((u) => u.id === payment.unit_id);
+                      const unitPref = (unit?.preferred_bank || "").toLowerCase();
+                      // Gateway efetivo: o salvo na parcela tem precedência total
+                      const gw = (payment.gateway || (unitPref === "cora" ? "CORA" : "ASAAS")).toUpperCase();
 
-                      if (isUplay) {
-                        if (payment.cora_invoice_id) return null;
+                      if (gw === "CORA") {
+                        if (payment.cora_invoice_id) return (
+                          <span className="text-[10px] text-muted-foreground italic">Gateway: Banco Cora</span>
+                        );
                         return (
                           <Button
                             variant="outline"
@@ -1257,6 +1348,7 @@ const AdminCharges = () => {
                         );
                       }
 
+                      // Asaas
                       if (!payment.asaas_payment_id) {
                         return (
                           <Button
@@ -1275,7 +1367,9 @@ const AdminCharges = () => {
                           </Button>
                         );
                       }
-                      return null;
+                      return (
+                        <span className="text-[10px] text-muted-foreground italic">Gateway: Asaas</span>
+                      );
                     })()}
 
                     {payment.asaas_payment_id && !(payment.invoice_url || payment.boleto_url) && (
