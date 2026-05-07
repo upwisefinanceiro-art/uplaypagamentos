@@ -116,6 +116,7 @@ interface UnitRow {
   id: string;
   name: string;
   partnership_plan?: string | null;
+  preferred_bank?: string | null;
 }
 
 interface ChargeResult {
