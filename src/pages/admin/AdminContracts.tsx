@@ -556,7 +556,7 @@ const AdminContracts = () => {
 
       const totalParcelas = insertedPayments?.length || payments.length;
 
-      const useCora = paymentMethod === "BOLETO" && effectiveGateway === "CORA";
+      const useCora = gatewaySupported && effectiveGateway === "CORA";
       const finalProvider = useCora ? "cora" : "asaas";
       const gatewayLabel = useCora ? "Banco Cora" : "Asaas";
       console.log("[PAYMENT_PROVIDER_SELECTED]", {
