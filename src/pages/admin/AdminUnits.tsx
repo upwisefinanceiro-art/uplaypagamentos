@@ -891,6 +891,13 @@ const AdminUnits = () => {
                     <p className="text-[10px] text-muted-foreground">
                       Cole o conteúdo completo dos arquivos <code>.pem</code> gerados no painel Cora. Cada unidade pode ter sua própria conta Cora.
                     </p>
+                    <div className="mt-2 rounded border border-primary/30 bg-primary/5 p-2">
+                      <p className="text-[10px] font-semibold text-primary">Webhook Cora (cadastre na conta Cora)</p>
+                      <code className="text-[10px] break-all block mt-1">https://kfhjoffsqfnwiiwgelhl.supabase.co/functions/v1/cora-webhook</code>
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Eventos: cobrança paga, boleto pago, Pix recebido. A baixa automática acontece via webhook + sincronização periódica a cada 5 min.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </>
