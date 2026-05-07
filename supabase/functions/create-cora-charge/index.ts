@@ -75,10 +75,10 @@ Deno.serve(async (req) => {
 
     const cpfDigits = onlyDigits(resp.cpf);
     if (cpfDigits.length !== 11 && cpfDigits.length !== 14) {
-      return json({ error: "CPF/CNPJ do responsável inválido" }, 400);
+      return json({ error: "CPF/CNPJ do responsável inválido (deve ter 11 ou 14 dígitos)" }, 400);
     }
 
-    // Endereço — combina contrato + profile (fallback). Contrato tem precedência quando preenchido.
+    // Endereço — combina contrato + profile (fallback)
     let ct: any = null;
     if (payment.contract_id) {
       const { data: contractData } = await admin
@@ -103,26 +103,39 @@ Deno.serve(async (req) => {
     const addrZip = onlyDigits(pick(ct?.zip_code, resp.zip_code));
     const addrComplement = pick(ct?.complement, resp.complement);
 
-    // Validações de endereço (Cora exige CEP de 8 dígitos, cidade e UF)
-    const missing: string[] = [];
-    if (!addrStreet || addrStreet.trim().length < 3) missing.push("logradouro");
-    if (!addrZip || addrZip.length !== 8) missing.push("CEP (8 dígitos)");
-    if (!addrCity) missing.push("cidade");
-    if (!addrState || addrState.length !== 2) missing.push("UF");
-    if (missing.length) {
-      return json({
-        error: `Endereço do responsável incompleto: ${missing.join(", ")}. Edite o cadastro do contrato/cliente.`,
-      }, 400);
-    }
-
-    // Sanitiza nome — remove acentos e caracteres não permitidos
     const sanitizeName = (s: string) =>
       s.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
         .replace(/[^A-Za-z0-9 .'-]/g, " ")
         .replace(/\s+/g, " ")
         .trim()
         .slice(0, 100);
-    const customerName = sanitizeName(resp.full_name);
+    const customerName = sanitizeName(resp.full_name || "");
+    const phoneDigits = onlyDigits(resp.phone);
+    const emailTrim = (resp.email || "").trim();
+    const isoDateRe = /^\d{4}-\d{2}-\d{2}$/;
+    const dueDate = String(payment.due_date || "");
+
+    // Validação completa pré-envio
+    const validationErrors: string[] = [];
+    if (!customerName || customerName.length < 3) validationErrors.push("nome do cliente (mínimo 3 caracteres)");
+    if (cpfDigits.length !== 11 && cpfDigits.length !== 14) validationErrors.push("CPF/CNPJ");
+    if (!emailTrim || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrim)) validationErrors.push("e-mail válido");
+    if (phoneDigits && (phoneDigits.length < 10 || phoneDigits.length > 11)) validationErrors.push("telefone (10 ou 11 dígitos)");
+    if (!addrStreet || addrStreet.trim().length < 3) validationErrors.push("logradouro");
+    if (!addrZip || addrZip.length !== 8) validationErrors.push("CEP (8 dígitos)");
+    if (!addrCity) validationErrors.push("cidade");
+    if (!addrState || addrState.length !== 2) validationErrors.push("UF (2 letras)");
+    if (!isoDateRe.test(dueDate)) validationErrors.push("vencimento em formato ISO YYYY-MM-DD");
+
+    const valueCents = Math.round(Number(payment.final_value || payment.value || 0) * 100);
+    if (!valueCents || valueCents < 1000) validationErrors.push("valor mínimo R$ 10,00");
+
+    if (validationErrors.length) {
+      return json({
+        error: `Dados inválidos para emissão Cora: ${validationErrors.join(", ")}.`,
+        validation_errors: validationErrors,
+      }, 400);
+    }
 
     // Credenciais globais
     const credsOrErr = getGlobalCoraCredentials();
@@ -133,18 +146,17 @@ Deno.serve(async (req) => {
     const session = sessionOrErr;
 
     try {
-      const valueCents = Math.round(Number(payment.final_value || payment.value) * 100);
-      if (valueCents < 1000) {
-        return json({ error: "Valor mínimo R$ 10,00 para boleto Cora" }, 400);
-      }
-
-      // Payload Cora — boleto + PIX (BANK_SLIP)
-      const payload = {
+      // Payload OFICIAL Cora V2 — invoices (boleto + PIX)
+      // Doc: https://developers.cora.com.br/reference/criar-um-boleto
+      const payload: Record<string, unknown> = {
         code: payment.id,
         customer: {
           name: customerName,
-          email: resp.email || undefined,
-          document: { identity: cpfDigits, type: cpfDigits.length === 11 ? "CPF" : "CNPJ" },
+          email: emailTrim,
+          document: {
+            identity: cpfDigits,
+            type: cpfDigits.length === 11 ? "CPF" : "CNPJ",
+          },
           address: {
             street: addrStreet.slice(0, 100),
             number: String(addrNumber).slice(0, 10),
@@ -162,46 +174,86 @@ Deno.serve(async (req) => {
             amount: valueCents,
           },
         ],
-        payment_terms: { due_date: payment.due_date },
+        payment_terms: { due_date: dueDate },
         payment_forms: ["BANK_SLIP", "PIX"],
-        notification: {
-          name: customerName,
-          channels: resp.email
-            ? [{ channel: "EMAIL", contact: resp.email, rules: ["NOTIFY_THREE_DAYS_BEFORE_DUE_DATE", "NOTIFY_ON_DUE_DATE"] }]
-            : [],
-        },
       };
 
-      console.info("[create-cora-charge] enviando payload Cora", {
-        payment_id: payment.id,
-        amount: valueCents,
-        zip: addrZip,
-        state: addrState,
-      });
+      // Notificações (opcional)
+      const channels: Array<Record<string, unknown>> = [];
+      if (emailTrim) {
+        channels.push({
+          channel: "EMAIL",
+          contact: emailTrim,
+          rules: ["NOTIFY_THREE_DAYS_BEFORE_DUE_DATE", "NOTIFY_ON_DUE_DATE"],
+        });
+      }
+      if (channels.length) {
+        payload.notification = { name: customerName, channels };
+      }
 
-      const result = await coraRequest(session, "/v2/invoices", "POST", payload);
+      // Mascara dados sensíveis em logs
+      const maskedPayload = JSON.parse(JSON.stringify(payload));
+      if (maskedPayload.customer?.document?.identity) {
+        const id = String(maskedPayload.customer.document.identity);
+        maskedPayload.customer.document.identity = id.slice(0, 3) + "***" + id.slice(-2);
+      }
+      if (maskedPayload.customer?.email) {
+        const em = String(maskedPayload.customer.email);
+        const [u, d] = em.split("@");
+        maskedPayload.customer.email = `${u.slice(0, 2)}***@${d || ""}`;
+      }
+
+      const endpoint = "/v2/invoices";
+      console.info("[create-cora-charge] POST", endpoint, JSON.stringify(maskedPayload));
+
+      const result = await coraRequest(session, endpoint, "POST", payload);
 
       if (!result.ok) {
+        // Extrai mensagem detalhada da Cora
         const errors = result.data?.errors;
         const errList = Array.isArray(errors)
-          ? errors.map((e: any) => `${e.field || e.code || ""}: ${e.description || e.message || JSON.stringify(e)}`).join(" | ")
+          ? errors.map((e: any) => `[${e.field || e.code || "erro"}] ${e.description || e.message || JSON.stringify(e)}`).join(" | ")
           : null;
-        const detail = errList || result.data?.message || result.data?.error || result.raw.slice(0, 500);
-        console.error("[create-cora-charge] Cora retornou erro", {
+        const detail =
+          errList ||
+          result.data?.message ||
+          result.data?.error_description ||
+          result.data?.error ||
+          (result.raw ? result.raw.slice(0, 500) : `(corpo vazio — headers: ${JSON.stringify(result.headers)})`);
+
+        const fullError = `Cora ${result.status} em ${endpoint}: ${detail}`;
+
+        console.error("[create-cora-charge] ERRO Cora", JSON.stringify({
           status: result.status,
-          response: result.data || result.raw,
-          payload_sent: payload,
-        });
+          endpoint: result.url,
+          response_headers: result.headers,
+          response_body: result.data ?? result.raw,
+          payload_sent: maskedPayload,
+        }, null, 2));
+
         try {
           await admin.from("webhook_logs").insert({
             event: "cora:create_charge_error",
             local_payment_id: payment_id,
-            payload: { status: result.status, response: result.data || result.raw, sent: payload },
+            payload: {
+              status: result.status,
+              endpoint: result.url,
+              response_headers: result.headers,
+              response_body: result.data ?? result.raw,
+              payload_sent: maskedPayload,
+              detail,
+            },
           });
         } catch (_) { /* ignore log failure */ }
+
         return json({
-          error: `Cora retornou ${result.status}: ${detail}`,
-          cora_response: result.data || result.raw,
+          error: fullError,
+          cora_status: result.status,
+          cora_endpoint: result.url,
+          cora_response: result.data ?? result.raw,
+          cora_response_headers: result.headers,
+          payload_sent: maskedPayload,
+          validation_message: detail,
         }, 502);
       }
 
