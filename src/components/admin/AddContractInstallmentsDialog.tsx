@@ -173,6 +173,24 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
     }
     setSubmitting(true);
     try {
+      // FONTE DA VERDADE: re-buscar preferred_bank da unidade no momento do submit
+      let effectiveGateway: "ASAAS" | "CORA" = gateway;
+      if (paymentMethod === "BOLETO") {
+        const { data: unitRow } = await supabase
+          .from("units")
+          .select("preferred_bank")
+          .eq("id", contract.unit_id)
+          .maybeSingle();
+        const pref = (unitRow?.preferred_bank || "").toString().toLowerCase();
+        const unitGw: "ASAAS" | "CORA" = pref === "cora" ? "CORA" : "ASAAS";
+        // Se o usuário escolheu CORA explicitamente OU a unidade prefere CORA, usa CORA
+        effectiveGateway = gateway === "CORA" || unitGw === "CORA" ? "CORA" : "ASAAS";
+        if (effectiveGateway !== gateway) {
+          console.warn("[GATEWAY_OVERRIDE] gateway do form sobreposto pela unidade", { form: gateway, unit: unitGw, final: effectiveGateway });
+          setGateway(effectiveGateway);
+        }
+      }
+
       // Buscar maior installment_number atual desse contrato
       const { data: existing } = await supabase
         .from("payments")
