@@ -200,7 +200,43 @@ Deno.serve(async (req) => {
         source,
         environment,
         error: "Cora respondeu 200, mas sem access_token.",
+        oauth_response: parsed ?? rawText.slice(0, 500),
       });
+    }
+
+    // ---- Teste de endpoint autenticado: listar cobranças (probe de conta) ----
+    let accountCheck: Record<string, unknown> = { ok: false };
+    try {
+      // @ts-ignore
+      const accountClient = Deno.createHttpClient({ cert: certPem, key: keyPem });
+      try {
+        const acctRes = await fetch(`${baseUrl}/v2/invoices?page=1&perPage=1`, {
+          method: "GET",
+          // @ts-ignore
+          client: accountClient,
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            Accept: "application/json",
+            "Idempotency-Key": crypto.randomUUID(),
+          },
+        });
+        const acctText = await acctRes.text();
+        let acctParsed: any = null;
+        try { acctParsed = JSON.parse(acctText); } catch { /* not json */ }
+        accountCheck = {
+          ok: acctRes.ok,
+          status: acctRes.status,
+          endpoint: "/v2/invoices?page=1&perPage=1",
+          sample: acctParsed ?? acctText.slice(0, 400),
+        };
+      } finally {
+        try { accountClient.close(); } catch { /* noop */ }
+      }
+    } catch (e) {
+      accountCheck = {
+        ok: false,
+        error: `Falha ao consultar endpoint autenticado: ${e instanceof Error ? e.message : String(e)}`,
+      };
     }
 
     return jsonResponse({
@@ -211,7 +247,11 @@ Deno.serve(async (req) => {
       client_id: clientId,
       token_preview: `${accessToken.slice(0, 12)}...`,
       expires_in: expiresIn ?? null,
-      message: `Conexão Cora OK (origem: ${source === "unit" ? "credenciais da unidade" : "secrets globais"}).`,
+      account_check: accountCheck,
+      ready_for_boletos: accountCheck.ok === true,
+      message: accountCheck.ok
+        ? `Conexão Cora OK e endpoint autenticado respondeu (origem: ${source === "unit" ? "unidade" : "global"}). Pronto para emitir boletos.`
+        : `OAuth OK, mas endpoint autenticado falhou. Verifique permissões da conta Cora.`,
     });
   } catch (err) {
     return jsonResponse({
