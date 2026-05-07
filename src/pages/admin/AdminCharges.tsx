@@ -937,6 +937,20 @@ const AdminCharges = () => {
                   </div>
 
                   <div className="space-y-1.5">
+                    <Label>Gateway de Pagamento *</Label>
+                    <Select value={chargeGateway} onValueChange={(v) => setChargeGateway(v as "ASAAS" | "CORA")}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ASAAS">Asaas</SelectItem>
+                        <SelectItem value="CORA">Banco Cora (somente boleto)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {chargeGateway === "CORA" && billingType !== "BOLETO" && (
+                      <p className="text-[11px] text-warning">Banco Cora só emite Boleto. Altere a forma de pagamento.</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
                     <Label>Descrição</Label>
                     <Input value={chargeDescription} onChange={(event) => setChargeDescription(event.target.value)} placeholder="Ex: Mensalidade UPLAY" />
                   </div>
