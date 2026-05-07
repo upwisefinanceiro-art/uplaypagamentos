@@ -597,18 +597,27 @@ const AdminCharges = () => {
       const { data, error } = await supabase.functions.invoke("create-cora-charge", {
         body: { payment_id: paymentId },
       });
-      if (error || data?.error) {
-        let msg = error?.message || data?.error || "Falha ao emitir boleto Cora";
-        try {
-          if ((error as any)?.context?.json) {
-            const body = await (error as any).context.json();
-            msg = body?.error || msg;
-          }
-        } catch { /* */ }
-        toast({ title: "Erro ao emitir na Cora", description: msg, variant: "destructive" });
+
+      // Tenta extrair body completo do erro (FunctionsHttpError)
+      let body: any = data;
+      if (error && (error as any)?.context?.json) {
+        try { body = await (error as any).context.json(); } catch { /* */ }
+      }
+
+      if (error || body?.error) {
+        const status = body?.cora_status ? ` (HTTP ${body.cora_status})` : "";
+        const validation = body?.validation_message || body?.error || error?.message || "Falha ao emitir boleto Cora";
+        const description = `${validation}${status}`;
+        toast({
+          title: "Erro ao emitir na Cora",
+          description,
+          variant: "destructive",
+          duration: 12000,
+        });
+        console.error("[Cora] erro completo:", body);
         return;
       }
-      toast({ title: data?.already_emitted ? "Boleto já emitido" : "Boleto emitido na Cora!" });
+      toast({ title: body?.already_emitted ? "Boleto já emitido" : "Boleto emitido na Cora!" });
       fetchData();
     } catch (err) {
       toast({ title: "Erro inesperado", description: err instanceof Error ? err.message : "", variant: "destructive" });
