@@ -487,25 +487,30 @@ const AdminUnits = () => {
   };
 
   const [testingCora, setTestingCora] = useState<string | null>(null);
-  const handleTestCora = async (unitId: string) => {
+  const [coraDiagnostic, setCoraDiagnostic] = useState<{ open: boolean; data: any; unitName: string }>({ open: false, data: null, unitName: "" });
+  const handleTestCora = async (unitId: string, unitName: string) => {
     setTestingCora(unitId);
     try {
       const { data, error } = await supabase.functions.invoke("cora-test-connection", { body: { unit_id: unitId } });
       if (error) {
         toast({ title: "Erro ao testar Cora", description: error.message, variant: "destructive" });
+        setCoraDiagnostic({ open: true, data: { error: error.message }, unitName });
         return;
       }
+      setCoraDiagnostic({ open: true, data, unitName });
       if (data?.success) {
         const env = data.environment === "production" ? "Produção" : "Stage (Sandbox)";
         toast({
-          title: "✅ Cora conectado",
-          description: `${env} — ${data.message ?? ""} Token: ${data.token_preview}`,
+          title: data.ready_for_boletos ? "✅ Cora pronto para boletos" : "⚠️ OAuth OK, conta com restrição",
+          description: `${env} — ${data.message ?? ""}`,
+          variant: data.ready_for_boletos ? "default" : "destructive",
         });
       } else {
         toast({ title: "❌ Falha na conexão Cora", description: data?.error || "Erro desconhecido", variant: "destructive" });
       }
     } catch (err: any) {
       toast({ title: "Erro", description: err.message, variant: "destructive" });
+      setCoraDiagnostic({ open: true, data: { error: err.message }, unitName });
     } finally {
       setTestingCora(null);
     }
@@ -1226,7 +1231,7 @@ const AdminUnits = () => {
 
                 <Button
                   size="sm" variant="outline"
-                  onClick={() => handleTestCora(unit.id)}
+                  onClick={() => handleTestCora(unit.id, unit.name)}
                   disabled={testingCora === unit.id}
                   className="text-xs"
                 >
@@ -1341,6 +1346,51 @@ const AdminUnits = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={coraDiagnostic.open} onOpenChange={(o) => setCoraDiagnostic(prev => ({ ...prev, open: o }))}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Diagnóstico Cora — {coraDiagnostic.unitName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-xs">
+            {coraDiagnostic.data?.success ? (
+              <div className="rounded border border-green-500/30 bg-green-500/10 p-3">
+                <div className="font-semibold text-green-700 dark:text-green-400">✅ OAuth2 mTLS autenticado</div>
+                <div className="mt-1">Ambiente: <strong>{coraDiagnostic.data.environment}</strong></div>
+                <div>Base URL: <code>{coraDiagnostic.data.base_url}</code></div>
+                <div>Client ID: <code>{coraDiagnostic.data.client_id}</code></div>
+                <div>Token: <code>{coraDiagnostic.data.token_preview}</code> (expira em {coraDiagnostic.data.expires_in}s)</div>
+              </div>
+            ) : (
+              <div className="rounded border border-destructive/30 bg-destructive/10 p-3">
+                <div className="font-semibold text-destructive">❌ Falha</div>
+                <div className="mt-1 whitespace-pre-wrap">{coraDiagnostic.data?.error || "Erro desconhecido"}</div>
+                {coraDiagnostic.data?.status_code && <div>HTTP {coraDiagnostic.data.status_code}</div>}
+              </div>
+            )}
+
+            {coraDiagnostic.data?.account_check && (
+              <div className={`rounded border p-3 ${coraDiagnostic.data.account_check.ok ? "border-green-500/30 bg-green-500/10" : "border-destructive/30 bg-destructive/10"}`}>
+                <div className="font-semibold">
+                  {coraDiagnostic.data.account_check.ok ? "✅" : "❌"} Endpoint autenticado: {coraDiagnostic.data.account_check.endpoint || "/v2/invoices"}
+                </div>
+                {coraDiagnostic.data.account_check.status && <div>HTTP {coraDiagnostic.data.account_check.status}</div>}
+                {coraDiagnostic.data.account_check.error && <div className="mt-1 whitespace-pre-wrap">{coraDiagnostic.data.account_check.error}</div>}
+                <div className="mt-2">
+                  {coraDiagnostic.data.ready_for_boletos
+                    ? "Liberado para emitir boletos."
+                    : "Boleto bloqueado até endpoint autenticado responder OK."}
+                </div>
+              </div>
+            )}
+
+            <details>
+              <summary className="cursor-pointer font-semibold">Resposta completa (JSON)</summary>
+              <pre className="mt-2 max-h-72 overflow-auto rounded bg-muted p-2 text-[10px]">{JSON.stringify(coraDiagnostic.data, null, 2)}</pre>
+            </details>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
