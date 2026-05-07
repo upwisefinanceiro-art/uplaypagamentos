@@ -174,8 +174,9 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
     setSubmitting(true);
     try {
       // FONTE DA VERDADE: re-buscar preferred_bank da unidade no momento do submit
+      const gatewaySupported = paymentMethod === "BOLETO" || paymentMethod === "PIX";
       let effectiveGateway: "ASAAS" | "CORA" = gateway;
-      if (paymentMethod === "BOLETO") {
+      if (gatewaySupported) {
         const { data: unitRow } = await supabase
           .from("units")
           .select("preferred_bank")
@@ -217,7 +218,7 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
           final_value: finalParc,
           status: "PENDING",
           payment_method: paymentMethod,
-          gateway: paymentMethod === "BOLETO" ? effectiveGateway : "ASAAS",
+          gateway: gatewaySupported ? effectiveGateway : "ASAAS",
           payment_type: "MENSALIDADE",
           description: contract.description + (notes ? ` — ${notes}` : ""),
         });
@@ -247,7 +248,7 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
             final_value: parc,
             status: "PENDING",
             payment_method: paymentMethod,
-            gateway: paymentMethod === "BOLETO" ? effectiveGateway : "ASAAS",
+            gateway: gatewaySupported ? effectiveGateway : "ASAAS",
             payment_type: "APOSTILA",
             description: `Apostila ${i + 1}/${apostilasCount}`,
           });
@@ -268,7 +269,7 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
           final_value: matricula,
           status: "PENDING",
           payment_method: paymentMethod,
-          gateway: paymentMethod === "BOLETO" ? effectiveGateway : "ASAAS",
+          gateway: gatewaySupported ? effectiveGateway : "ASAAS",
           payment_type: "MATRICULA",
           description: matriculaDescription || "Matrícula",
         });
@@ -305,7 +306,7 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
 
       // Geração automática no gateway escolhido (best effort)
       if (generateAsaas && inserted && inserted.length > 0) {
-        const finalProvider = paymentMethod === "BOLETO" && effectiveGateway === "CORA" ? "cora" : "asaas";
+        const finalProvider = gatewaySupported && effectiveGateway === "CORA" ? "cora" : "asaas";
         console.log("[PAYMENT_PROVIDER_SELECTED]", {
           selectedGateway: effectiveGateway,
           paymentMethod,
@@ -430,7 +431,7 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
             </Select>
           </div>
 
-          {paymentMethod === "BOLETO" && (
+          {(paymentMethod === "BOLETO" || paymentMethod === "PIX") && (
             <div className="space-y-2">
               <Label className="text-foreground text-sm font-semibold">Gateway de Pagamento</Label>
               <Select value={gateway} onValueChange={(v) => setGateway(v as any)}>
@@ -442,6 +443,7 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
                   <SelectItem value="CORA">Banco Cora</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-[10px] text-muted-foreground">Cora emite boleto + PIX no mesmo invoice.</p>
             </div>
           )}
 

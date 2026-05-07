@@ -364,8 +364,9 @@ const AdminContracts = () => {
     setSaving(true);
     try {
       // FONTE DA VERDADE: re-buscar preferred_bank da unidade no momento do save
+      const gatewaySupported = paymentMethod === "BOLETO" || paymentMethod === "PIX";
       let effectiveGateway: "ASAAS" | "CORA" = gateway;
-      if (paymentMethod === "BOLETO" && resolvedUnitId) {
+      if (gatewaySupported && resolvedUnitId) {
         const { data: unitRow } = await supabase
           .from("units")
           .select("preferred_bank")
@@ -488,7 +489,7 @@ const AdminContracts = () => {
           payment_method: paymentMethod,
           payment_type: "MENSALIDADE",
           description: `${description} - Parcela ${i + 1}/${numInstallments}`,
-          status: "PENDING", gateway: paymentMethod === "BOLETO" ? effectiveGateway : "ASAAS",
+          status: "PENDING", gateway: gatewaySupported ? effectiveGateway : "ASAAS",
         });
       }
 
@@ -520,7 +521,7 @@ const AdminContracts = () => {
             payment_method: paymentMethod,
             payment_type: "APOSTILA",
             description: `Apostila ${i + 1}/${apostilasCount}`,
-            status: "PENDING", gateway: paymentMethod === "BOLETO" ? effectiveGateway : "ASAAS",
+            status: "PENDING", gateway: gatewaySupported ? effectiveGateway : "ASAAS",
             stock_item_id: apostilaStockItemId || null,
             stock_quantity: 1,
           });
@@ -543,7 +544,7 @@ const AdminContracts = () => {
           payment_method: paymentMethod,
           payment_type: "MATRICULA",
           description: matriculaDescription || "Matrícula",
-          status: "PENDING", gateway: paymentMethod === "BOLETO" ? effectiveGateway : "ASAAS",
+          status: "PENDING", gateway: gatewaySupported ? effectiveGateway : "ASAAS",
         });
       }
 
@@ -555,7 +556,7 @@ const AdminContracts = () => {
 
       const totalParcelas = insertedPayments?.length || payments.length;
 
-      const useCora = paymentMethod === "BOLETO" && effectiveGateway === "CORA";
+      const useCora = gatewaySupported && effectiveGateway === "CORA";
       const finalProvider = useCora ? "cora" : "asaas";
       const gatewayLabel = useCora ? "Banco Cora" : "Asaas";
       console.log("[PAYMENT_PROVIDER_SELECTED]", {
@@ -953,7 +954,7 @@ const AdminContracts = () => {
             </Select>
           </div>
         </div>
-        {paymentMethod === "BOLETO" && (
+        {(paymentMethod === "BOLETO" || paymentMethod === "PIX") && (
           <div className="space-y-1">
             <Label className="text-foreground text-xs">Gateway de Pagamento *</Label>
             <Select value={gateway} onValueChange={(v) => setGateway(v as "ASAAS" | "CORA")}>
@@ -964,7 +965,7 @@ const AdminContracts = () => {
               </SelectContent>
             </Select>
             <p className="text-[10px] text-muted-foreground">
-              Os boletos serão emitidos automaticamente em {gateway === "CORA" ? "Banco Cora" : "Asaas"} ao salvar.
+              As cobranças serão emitidas automaticamente em {gateway === "CORA" ? "Banco Cora" : "Asaas"} ao salvar. Cora emite boleto + PIX no mesmo invoice.
             </p>
           </div>
         )}
