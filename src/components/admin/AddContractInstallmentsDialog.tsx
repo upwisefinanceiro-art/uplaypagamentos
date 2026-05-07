@@ -107,8 +107,21 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
       setMatriculaDueDate("");
       setMatriculaDescription("Matrícula");
       setGenerateAsaas(true);
+      return;
     }
-  }, [open]);
+    // Pré-seleciona o gateway com base na unidade do contrato
+    if (contract?.unit_id) {
+      supabase
+        .from("units")
+        .select("preferred_bank")
+        .eq("id", contract.unit_id)
+        .maybeSingle()
+        .then(({ data }) => {
+          const pref = (data?.preferred_bank || "").toString().toLowerCase();
+          setGateway(pref === "cora" ? "CORA" : "ASAAS");
+        });
+    }
+  }, [open, contract?.unit_id]);
 
   const numInst = parseInt(installments) || 0;
   const real = parseMoney(realValue);
