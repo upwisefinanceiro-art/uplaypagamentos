@@ -639,7 +639,11 @@ const AdminCharges = () => {
   const handleSyncPayment = async (paymentId: string) => {
     setSyncingPaymentId(paymentId);
     try {
-      const { data, error } = await supabase.functions.invoke("sync-asaas-payment", {
+      // Roteia para a função correta conforme gateway da parcela
+      const target = payments.find((p) => p.id === paymentId);
+      const gw = (target?.gateway || "").toUpperCase();
+      const fn = gw === "CORA" ? "sync-cora-payment" : "sync-asaas-payment";
+      const { data, error } = await supabase.functions.invoke(fn, {
         body: { payment_id: paymentId },
       });
       setSyncingPaymentId(null);
@@ -727,24 +731,23 @@ const AdminCharges = () => {
   const handleSyncAll = async () => {
     setSyncingAll(true);
     try {
-      const { data, error } = await supabase.functions.invoke("sync-all-payments", {
-        body: unitFilter !== "ALL" ? { unit_id: unitFilter } : {},
-      });
+      const baseBody = unitFilter !== "ALL" ? { unit_id: unitFilter } : {};
+      // Sincroniza Asaas e Cora em paralelo
+      const [asaasRes, coraRes] = await Promise.all([
+        supabase.functions.invoke("sync-all-payments", { body: baseBody }),
+        supabase.functions.invoke("sync-cora-payment", { body: { ...baseBody, all: true } }),
+      ]);
 
-      if (error) {
-        toast({ title: "Erro ao sincronizar", description: "Falha na comunicação", variant: "destructive" });
-        return;
-      }
+      const aData: any = asaasRes.data; const aErr = asaasRes.error;
+      const cData: any = coraRes.data;  const cErr = coraRes.error;
 
-      if (data?.error) {
-        toast({ title: "Erro", description: data.error, variant: "destructive" });
-        return;
-      }
+      const parts: string[] = [];
+      if (aErr || aData?.error) parts.push(`Asaas: erro (${aErr?.message || aData?.error})`);
+      else parts.push(aData?.message || `Asaas: ${aData?.synced ?? 0}`);
+      if (cErr || cData?.error) parts.push(`Cora: erro (${cErr?.message || cData?.error})`);
+      else parts.push(`Cora: ${cData?.message || `${cData?.synced ?? 0} sincronizada(s)`}`);
 
-      toast({
-        title: "Sincronização concluída",
-        description: data.message || `${data.synced} pagamento(s) sincronizado(s)`,
-      });
+      toast({ title: "Sincronização concluída", description: parts.join(" | ") });
       fetchData();
     } catch (err: unknown) {
       toast({ title: "Erro inesperado", description: err instanceof Error ? err.message : "Erro desconhecido", variant: "destructive" });
@@ -1339,7 +1342,25 @@ const AdminCharges = () => {
 
                       if (gw === "CORA") {
                         if (payment.cora_invoice_id) return (
-                          <span className="text-[10px] text-muted-foreground italic">Gateway: Banco Cora</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-muted-foreground italic">Gateway: Banco Cora</span>
+                            {payment.status !== "PAID" && payment.status !== "CANCELLED" && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-1.5 text-xs h-7"
+                                disabled={syncingPaymentId === payment.id}
+                                onClick={() => handleSyncPayment(payment.id)}
+                              >
+                                {syncingPaymentId === payment.id ? (
+                                  <Loader2 size={12} className="animate-spin" />
+                                ) : (
+                                  <RefreshCw size={12} />
+                                )}
+                                Sincronizar
+                              </Button>
+                            )}
+                          </div>
                         );
                         return (
                           <Button
