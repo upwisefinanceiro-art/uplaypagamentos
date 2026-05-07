@@ -1318,14 +1318,18 @@ const AdminCharges = () => {
                       </button>
                     </div>
 
-                    {/* Emissão dinâmica conforme plano da unidade */}
+                    {/* Emissão dinâmica conforme gateway da parcela */}
                     {(() => {
-                      const unit = units.find((u) => u.id === payment.unit_id);
-                      const isUplay = unit?.partnership_plan === "PLANO_UPLAY";
                       if (payment.payment_method === "DINHEIRO") return null;
+                      const unit = units.find((u) => u.id === payment.unit_id);
+                      const unitPref = (unit?.preferred_bank || "").toLowerCase();
+                      // Gateway efetivo: o salvo na parcela tem precedência total
+                      const gw = (payment.gateway || (unitPref === "cora" ? "CORA" : "ASAAS")).toUpperCase();
 
-                      if (isUplay) {
-                        if (payment.cora_invoice_id) return null;
+                      if (gw === "CORA") {
+                        if (payment.cora_invoice_id) return (
+                          <span className="text-[10px] text-muted-foreground italic">Gateway: Banco Cora</span>
+                        );
                         return (
                           <Button
                             variant="outline"
@@ -1344,6 +1348,7 @@ const AdminCharges = () => {
                         );
                       }
 
+                      // Asaas
                       if (!payment.asaas_payment_id) {
                         return (
                           <Button
@@ -1362,7 +1367,9 @@ const AdminCharges = () => {
                           </Button>
                         );
                       }
-                      return null;
+                      return (
+                        <span className="text-[10px] text-muted-foreground italic">Gateway: Asaas</span>
+                      );
                     })()}
 
                     {payment.asaas_payment_id && !(payment.invoice_url || payment.boleto_url) && (
