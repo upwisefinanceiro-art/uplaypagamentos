@@ -27,6 +27,26 @@ export interface CoraCredentials {
   environment: string;
 }
 
+export function getUnitCoraCredentials(unit: {
+  cora_client_id?: string | null;
+  cora_certificate?: string | null;
+  cora_private_key?: string | null;
+  cora_environment?: string | null;
+}): CoraCredentials | { error: string } {
+  const clientId = (unit.cora_client_id || "").trim();
+  const certificate = (unit.cora_certificate || "").trim();
+  const privateKey = (unit.cora_private_key || "").trim();
+  const environment = (unit.cora_environment || "stage").toLowerCase();
+  const missing: string[] = [];
+  if (!clientId) missing.push("cora_client_id");
+  if (!certificate) missing.push("cora_certificate");
+  if (!privateKey) missing.push("cora_private_key");
+  if (missing.length) {
+    return { error: `Credenciais Cora da unidade incompletas: ${missing.join(", ")}. Configure em Unidades → Banco Cora.` };
+  }
+  return { clientId, certificate, privateKey, environment };
+}
+
 export function getGlobalCoraCredentials(): CoraCredentials | { error: string } {
   const clientId = Deno.env.get("CORA_CLIENT_ID");
   const certificate = Deno.env.get("CORA_CERTIFICATE");
