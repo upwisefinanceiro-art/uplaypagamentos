@@ -897,6 +897,31 @@ const AdminUnits = () => {
                     <p className="text-[10px] text-muted-foreground">
                       Cole o conteúdo completo dos arquivos <code>.pem</code> gerados no painel Cora. Cada unidade pode ter sua própria conta Cora.
                     </p>
+
+                    {/* Tarifas Cora */}
+                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Tarifa por PIX recebido (R$)</Label>
+                        <Input
+                          type="number" step="0.01" min="0"
+                          value={form.cora_fee_pix}
+                          onChange={e => setField("cora_fee_pix", e.target.value)}
+                          placeholder="0,00"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Tarifa por boleto liquidado (R$)</Label>
+                        <Input
+                          type="number" step="0.01" min="0"
+                          value={form.cora_fee_boleto}
+                          onChange={e => setField("cora_fee_boleto", e.target.value)}
+                          placeholder="2,50"
+                        />
+                      </div>
+                      <p className="col-span-2 text-[10px] text-muted-foreground">
+                        Estas tarifas alimentam o relatório <strong>Taxas Cora</strong>. Quando a reconciliação por extrato rodar, o valor real cobrado pela Cora substitui esta estimativa.
+                      </p>
+                    </div>
                     <div className="mt-2 rounded border border-primary/30 bg-primary/5 p-2">
                       <p className="text-[10px] font-semibold text-primary">Webhook Cora (cadastre na conta Cora)</p>
                       <code className="text-[10px] break-all block mt-1">https://kfhjoffsqfnwiiwgelhl.supabase.co/functions/v1/cora-webhook</code>
