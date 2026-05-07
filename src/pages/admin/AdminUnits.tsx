@@ -487,25 +487,30 @@ const AdminUnits = () => {
   };
 
   const [testingCora, setTestingCora] = useState<string | null>(null);
-  const handleTestCora = async (unitId: string) => {
+  const [coraDiagnostic, setCoraDiagnostic] = useState<{ open: boolean; data: any; unitName: string }>({ open: false, data: null, unitName: "" });
+  const handleTestCora = async (unitId: string, unitName: string) => {
     setTestingCora(unitId);
     try {
       const { data, error } = await supabase.functions.invoke("cora-test-connection", { body: { unit_id: unitId } });
       if (error) {
         toast({ title: "Erro ao testar Cora", description: error.message, variant: "destructive" });
+        setCoraDiagnostic({ open: true, data: { error: error.message }, unitName });
         return;
       }
+      setCoraDiagnostic({ open: true, data, unitName });
       if (data?.success) {
         const env = data.environment === "production" ? "Produção" : "Stage (Sandbox)";
         toast({
-          title: "✅ Cora conectado",
-          description: `${env} — ${data.message ?? ""} Token: ${data.token_preview}`,
+          title: data.ready_for_boletos ? "✅ Cora pronto para boletos" : "⚠️ OAuth OK, conta com restrição",
+          description: `${env} — ${data.message ?? ""}`,
+          variant: data.ready_for_boletos ? "default" : "destructive",
         });
       } else {
         toast({ title: "❌ Falha na conexão Cora", description: data?.error || "Erro desconhecido", variant: "destructive" });
       }
     } catch (err: any) {
       toast({ title: "Erro", description: err.message, variant: "destructive" });
+      setCoraDiagnostic({ open: true, data: { error: err.message }, unitName });
     } finally {
       setTestingCora(null);
     }
