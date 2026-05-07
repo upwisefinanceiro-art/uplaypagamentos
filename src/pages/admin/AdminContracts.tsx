@@ -77,6 +77,7 @@ interface ResponsibleRow {
 interface UnitRow {
   id: string;
   name: string;
+  preferred_bank?: string | null;
 }
 
 const ESTADOS_BR = [
@@ -186,6 +187,7 @@ const AdminContracts = () => {
   const [installments, setInstallments] = useState("1");
   // dueDay is now derived from firstDueDate
   const [paymentMethod, setPaymentMethod] = useState("");
+  const [gateway, setGateway] = useState<"ASAAS" | "CORA">("ASAAS");
   const [notes, setNotes] = useState("");
   const [password, setPassword] = useState("");
   const [contractNumber, setContractNumber] = useState("");
@@ -213,6 +215,13 @@ const AdminContracts = () => {
   const selectedStudent = students.find(s => s.id === studentId);
   const resolvedUnitId = responsibleMode === "existing" ? (selectedResponsible?.unit_id || "") : unitId;
   const unitName = units.find(u => u.id === resolvedUnitId)?.name || "";
+  const resolvedUnit = units.find(u => u.id === resolvedUnitId);
+
+  useEffect(() => {
+    if (resolvedUnit?.preferred_bank) {
+      setGateway(resolvedUnit.preferred_bank.toLowerCase() === "cora" ? "CORA" : "ASAAS");
+    }
+  }, [resolvedUnit?.preferred_bank]);
 
   const filteredStudents = useMemo(() => {
     if (!responsibleId || responsibleMode !== "existing") return [];
@@ -246,7 +255,7 @@ const AdminContracts = () => {
       supabase.from("contracts").select("*, units(name), students(full_name)").order("created_at", { ascending: false }),
       supabase.from("students").select("id, full_name, responsible_id, unit_id").eq("active", true),
       supabase.from("profiles").select("id, full_name, cpf, phone, email, unit_id, asaas_customer_id").eq("active", true),
-      supabase.from("units").select("id, name").eq("active", true),
+      supabase.from("units").select("id, name, preferred_bank").eq("active", true),
       supabase.from("user_roles").select("user_id").in("role", ["ADMIN_MASTER", "ADMIN_UNIDADE"]),
       fetchAllPaginated<{ id: string; contract_id: string | null; status: string; due_date: string }>((from, to) =>
         supabase
@@ -462,7 +471,7 @@ const AdminContracts = () => {
           payment_method: paymentMethod,
           payment_type: "MENSALIDADE",
           description: `${description} - Parcela ${i + 1}/${numInstallments}`,
-          status: "PENDING",
+          status: "PENDING", gateway: paymentMethod === "BOLETO" ? gateway : "ASAAS",
         });
       }
 
@@ -494,7 +503,7 @@ const AdminContracts = () => {
             payment_method: paymentMethod,
             payment_type: "APOSTILA",
             description: `Apostila ${i + 1}/${apostilasCount}`,
-            status: "PENDING",
+            status: "PENDING", gateway: paymentMethod === "BOLETO" ? gateway : "ASAAS",
             stock_item_id: apostilaStockItemId || null,
             stock_quantity: 1,
           });
@@ -517,7 +526,7 @@ const AdminContracts = () => {
           payment_method: paymentMethod,
           payment_type: "MATRICULA",
           description: matriculaDescription || "Matrícula",
-          status: "PENDING",
+          status: "PENDING", gateway: paymentMethod === "BOLETO" ? gateway : "ASAAS",
         });
       }
 
@@ -529,48 +538,53 @@ const AdminContracts = () => {
 
       const totalParcelas = insertedPayments?.length || payments.length;
 
-      // Fechar diálogo e mostrar progresso da geração no Asaas
+      const useCora = paymentMethod === "BOLETO" && gateway === "CORA";
+      const gatewayLabel = useCora ? "Banco Cora" : "Asaas";
+
+      // Fechar diálogo e mostrar progresso da geração
       setDialogOpen(false);
       toast({
         title: "Contrato criado!",
-        description: `${totalParcelas} parcelas geradas. Enviando para o Asaas...`,
+        description: `${totalParcelas} parcelas geradas. Emitindo no ${gatewayLabel}...`,
       });
 
-      // Disparar criação automática no Asaas (síncrono, em paralelo controlado)
+      // Disparar criação automática no gateway escolhido (em paralelo controlado)
       if (insertedPayments && insertedPayments.length > 0) {
         const ids = insertedPayments.map((p: any) => p.id);
         const CHUNK_SIZE = 3;
-        let asaasOk = 0;
-        let asaasErr = 0;
+        let okCount = 0;
+        let errCount = 0;
+
+        const fnName = useCora ? "create-cora-charge" : "sync-asaas-payment";
 
         for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
           const chunk = ids.slice(i, i + CHUNK_SIZE);
           const results = await Promise.allSettled(
             chunk.map((payment_id) =>
-              supabase.functions.invoke("sync-asaas-payment", {
+              supabase.functions.invoke(fnName, {
                 body: { payment_id },
               }),
             ),
           );
           for (const r of results) {
             if (r.status === "fulfilled" && !r.value.error && !(r.value.data as any)?.error) {
-              asaasOk++;
+              okCount++;
             } else {
-              asaasErr++;
-              console.error("[asaas-sync] falha", r);
+              errCount++;
+              console.error(`[${fnName}] falha`, r);
             }
           }
         }
 
-        if (asaasErr === 0) {
+        if (errCount === 0) {
           toast({
-            title: "Cobranças enviadas ao Asaas!",
-            description: `${asaasOk} parcela(s) registrada(s). 📱 Notificações via WhatsApp agendadas no gateway.`,
+            title: `Cobranças emitidas no ${gatewayLabel}!`,
+            description: `${okCount} boleto(s) emitido(s) com sucesso.`,
           });
         } else {
           toast({
-            title: `${asaasOk} de ${ids.length} parcelas enviadas`,
-            description: `${asaasErr} falharam. Use 'Sincronizar com Asaas' em Cobranças para reprocessar.`,
+            title: `${okCount} de ${ids.length} boletos emitidos`,
+            description: `${errCount} falharam. Use o botão "Emitir boleto ${useCora ? "Cora" : "Asaas"}" em Cobranças para reemitir.`,
             variant: "destructive",
           });
         }
@@ -912,6 +926,21 @@ const AdminContracts = () => {
             </Select>
           </div>
         </div>
+        {paymentMethod === "BOLETO" && (
+          <div className="space-y-1">
+            <Label className="text-foreground text-xs">Gateway de Pagamento *</Label>
+            <Select value={gateway} onValueChange={(v) => setGateway(v as "ASAAS" | "CORA")}>
+              <SelectTrigger className="bg-input border-border text-foreground"><SelectValue /></SelectTrigger>
+              <SelectContent className="bg-card border-border">
+                <SelectItem value="ASAAS">Asaas</SelectItem>
+                <SelectItem value="CORA">Banco Cora</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-[10px] text-muted-foreground">
+              Os boletos serão emitidos automaticamente em {gateway === "CORA" ? "Banco Cora" : "Asaas"} ao salvar.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
