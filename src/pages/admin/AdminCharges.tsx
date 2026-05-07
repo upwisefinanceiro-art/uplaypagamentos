@@ -230,7 +230,7 @@ const AdminCharges = () => {
           .range(from, to),
       ),
       supabase.from("students").select("id, full_name, responsible_id").order("full_name"),
-      supabase.from("units").select("id, name, partnership_plan").order("name"),
+      supabase.from("units").select("id, name, partnership_plan, preferred_bank").order("name"),
       supabase.from("profiles").select("id, full_name, unit_id, active, phone").order("full_name"),
       supabase.from("user_roles").select("user_id").eq("role", "RESPONSAVEL"),
       fetchAllPaginated<ContractRow>((from, to) =>
