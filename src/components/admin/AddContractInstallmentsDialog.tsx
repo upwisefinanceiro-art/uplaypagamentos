@@ -287,8 +287,17 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
 
       // Geração automática no gateway escolhido (best effort)
       if (generateAsaas && inserted && inserted.length > 0) {
-        if (paymentMethod === "BOLETO" && gateway === "CORA") {
-          toast({ title: "Emitindo boletos no Banco Cora...", description: "Pode levar alguns segundos." });
+        const finalProvider = paymentMethod === "BOLETO" && gateway === "CORA" ? "cora" : "asaas";
+        console.log("[PAYMENT_PROVIDER_SELECTED]", {
+          selectedGateway: gateway,
+          paymentMethod,
+          unidadeId: contract.unit_id,
+          contractId: contract.id,
+          finalProvider,
+          parcelas: inserted.length,
+        });
+        if (finalProvider === "cora") {
+          console.log("[CORA_FLOW_STARTED]", { count: inserted.length });
           let ok = 0;
           let fail = 0;
           for (const p of inserted) {
