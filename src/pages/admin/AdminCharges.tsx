@@ -388,6 +388,7 @@ const AdminCharges = () => {
     setChargeValue("");
     setChargeDueDate("");
     setBillingType("PIX");
+    setChargeGateway("ASAAS");
     setChargeDescription("");
     setChargePaymentType("AVULSA");
     setChargeResult(null);
