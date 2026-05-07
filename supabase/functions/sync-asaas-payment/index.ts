@@ -127,6 +127,12 @@ Deno.serve(async (req) => {
 
     if (payErr || !payment) return respond({ error: "Pagamento não encontrado" }, 404);
 
+    // GUARD: nunca tocar parcelas marcadas como CORA — provider é decidido na criação
+    if ((payment.gateway || "").toUpperCase() === "CORA") {
+      console.warn("[sync-asaas-payment] BLOQUEADO: parcela com gateway=CORA", JSON.stringify({ payment_id, gateway: payment.gateway }));
+      return respond({ error: "Esta parcela foi criada com gateway Banco Cora. Use 'Emitir boleto Cora' para emiti-la." }, 400);
+    }
+
     // RESPONSAVEL can only sync their own payments
     if (isResponsavel && !isAdmin) {
       if (payment.responsible_id !== caller.id) {

@@ -107,8 +107,21 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
       setMatriculaDueDate("");
       setMatriculaDescription("Matrícula");
       setGenerateAsaas(true);
+      return;
     }
-  }, [open]);
+    // Pré-seleciona o gateway com base na unidade do contrato
+    if (contract?.unit_id) {
+      supabase
+        .from("units")
+        .select("preferred_bank")
+        .eq("id", contract.unit_id)
+        .maybeSingle()
+        .then(({ data }) => {
+          const pref = (data?.preferred_bank || "").toString().toLowerCase();
+          setGateway(pref === "cora" ? "CORA" : "ASAAS");
+        });
+    }
+  }, [open, contract?.unit_id]);
 
   const numInst = parseInt(installments) || 0;
   const real = parseMoney(realValue);
@@ -274,8 +287,17 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
 
       // Geração automática no gateway escolhido (best effort)
       if (generateAsaas && inserted && inserted.length > 0) {
-        if (paymentMethod === "BOLETO" && gateway === "CORA") {
-          toast({ title: "Emitindo boletos no Banco Cora...", description: "Pode levar alguns segundos." });
+        const finalProvider = paymentMethod === "BOLETO" && gateway === "CORA" ? "cora" : "asaas";
+        console.log("[PAYMENT_PROVIDER_SELECTED]", {
+          selectedGateway: gateway,
+          paymentMethod,
+          unidadeId: contract.unit_id,
+          contractId: contract.id,
+          finalProvider,
+          parcelas: inserted.length,
+        });
+        if (finalProvider === "cora") {
+          console.log("[CORA_FLOW_STARTED]", { count: inserted.length });
           let ok = 0;
           let fail = 0;
           for (const p of inserted) {
@@ -300,6 +322,7 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
             variant: fail && !ok ? "destructive" : "default",
           });
         } else {
+          console.log("[ASAAS_FLOW_STARTED]", { count: inserted.length });
           toast({ title: "Gerando cobranças no Asaas...", description: "Pode levar alguns segundos." });
           let ok = 0;
           let fail = 0;
