@@ -96,6 +96,7 @@ const AdminUnits = () => {
     asaas_api_key: "", asaas_base_url: "https://api.asaas.com/v3", asaas_webhook_token: "",
     whatsapp_financeiro: "", usar_whatsapp_padrao: true,
     cora_client_id: "", cora_certificate: "", cora_private_key: "", cora_environment: "stage",
+    cora_fee_pix: "0", cora_fee_boleto: "2.50",
     preferred_bank: "asaas",
     partnership_plan: "PLANO_ASAAS",
     uplay_fee_type: "PERCENT",
@@ -112,7 +113,7 @@ const AdminUnits = () => {
     setLoading(true);
     // NOTE: secret columns (asaas_api_key, asaas_webhook_token, cora_*) are NOT
     // selectable directly — they must be loaded via the get_unit_secrets RPC.
-    const NON_SECRET_COLS = "id, name, active, status, cnpj, address, phone, asaas_base_url, whatsapp_financeiro, usar_whatsapp_padrao, razao_social, tipo_cadastro, cpf, rg_ie, cidade, estado, bairro, cep, whatsapp, email_empresa, email_acesso, cora_environment, preferred_bank, partnership_plan, uplay_fee_type, uplay_fee_value, uplay_balance, company_id";
+    const NON_SECRET_COLS = "id, name, active, status, cnpj, address, phone, asaas_base_url, whatsapp_financeiro, usar_whatsapp_padrao, razao_social, tipo_cadastro, cpf, rg_ie, cidade, estado, bairro, cep, whatsapp, email_empresa, email_acesso, cora_environment, cora_fee_pix, cora_fee_boleto, preferred_bank, partnership_plan, uplay_fee_type, uplay_fee_value, uplay_balance, company_id";
     const { data } = await supabase.from("units").select(NON_SECRET_COLS).order("name");
     if (data) {
       // Mark secret fields as null on the row — they will be loaded on demand.
@@ -158,6 +159,7 @@ const AdminUnits = () => {
       asaas_api_key: "", asaas_base_url: "https://api.asaas.com/v3", asaas_webhook_token: "",
       whatsapp_financeiro: "", usar_whatsapp_padrao: true,
       cora_client_id: "", cora_certificate: "", cora_private_key: "", cora_environment: "stage",
+      cora_fee_pix: "0", cora_fee_boleto: "2.50",
       preferred_bank: "asaas",
       partnership_plan: "PLANO_ASAAS",
       uplay_fee_type: "PERCENT",
@@ -207,6 +209,8 @@ const AdminUnits = () => {
       cora_certificate: secrets.cora_certificate || "",
       cora_private_key: secrets.cora_private_key || "",
       cora_environment: unit.cora_environment || "stage",
+      cora_fee_pix: String((unit as any).cora_fee_pix ?? "0"),
+      cora_fee_boleto: String((unit as any).cora_fee_boleto ?? "2.50"),
       preferred_bank: unit.preferred_bank || "asaas",
       partnership_plan: (unit as any).partnership_plan || "PLANO_ASAAS",
       uplay_fee_type: (unit as any).uplay_fee_type || "PERCENT",
@@ -291,6 +295,8 @@ const AdminUnits = () => {
       whatsapp_financeiro: form.whatsapp_financeiro.trim() || null,
       usar_whatsapp_padrao: form.usar_whatsapp_padrao,
       cora_environment: form.cora_environment || "stage",
+      cora_fee_pix: parseFloat(String(form.cora_fee_pix).replace(",", ".")) || 0,
+      cora_fee_boleto: parseFloat(String(form.cora_fee_boleto).replace(",", ".")) || 0,
       preferred_bank: form.preferred_bank || "asaas",
       partnership_plan: form.partnership_plan || "PLANO_ASAAS",
       uplay_fee_type: form.uplay_fee_type || "PERCENT",
@@ -891,6 +897,31 @@ const AdminUnits = () => {
                     <p className="text-[10px] text-muted-foreground">
                       Cole o conteúdo completo dos arquivos <code>.pem</code> gerados no painel Cora. Cada unidade pode ter sua própria conta Cora.
                     </p>
+
+                    {/* Tarifas Cora */}
+                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Tarifa por PIX recebido (R$)</Label>
+                        <Input
+                          type="number" step="0.01" min="0"
+                          value={form.cora_fee_pix}
+                          onChange={e => setField("cora_fee_pix", e.target.value)}
+                          placeholder="0,00"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Tarifa por boleto liquidado (R$)</Label>
+                        <Input
+                          type="number" step="0.01" min="0"
+                          value={form.cora_fee_boleto}
+                          onChange={e => setField("cora_fee_boleto", e.target.value)}
+                          placeholder="2,50"
+                        />
+                      </div>
+                      <p className="col-span-2 text-[10px] text-muted-foreground">
+                        Estas tarifas alimentam o relatório <strong>Taxas Cora</strong>. Quando a reconciliação por extrato rodar, o valor real cobrado pela Cora substitui esta estimativa.
+                      </p>
+                    </div>
                     <div className="mt-2 rounded border border-primary/30 bg-primary/5 p-2">
                       <p className="text-[10px] font-semibold text-primary">Webhook Cora (cadastre na conta Cora)</p>
                       <code className="text-[10px] break-all block mt-1">https://kfhjoffsqfnwiiwgelhl.supabase.co/functions/v1/cora-webhook</code>

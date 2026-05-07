@@ -18,6 +18,7 @@ import {
   Receipt,
   Activity,
   Banknote,
+  Landmark,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -34,6 +35,7 @@ const menuItems = [
   { path: "/admin/financeiro", icon: TrendingUp, label: "Financeiro Avançado", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
   { path: "/admin/financeiro-pro", icon: Activity, label: "Financeiro Pro", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
   { path: "/admin/taxas-asaas", icon: Receipt, label: "Taxas Asaas", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
+  { path: "/admin/taxas-cora", icon: Landmark, label: "Taxas Cora", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
   { path: "/admin/estoque", icon: Package, label: "Estoque", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
   { path: "/admin/cursos", icon: GraduationCap, label: "Cursos", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
   { path: "/admin/boletos-uplay", icon: Banknote, label: "Boletos UpPlay", roles: ["ADMIN_MASTER"] },
