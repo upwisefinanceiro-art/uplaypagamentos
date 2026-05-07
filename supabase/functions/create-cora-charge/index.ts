@@ -53,15 +53,17 @@ Deno.serve(async (req) => {
       return json({ success: true, already_emitted: true, cora_invoice_id: payment.cora_invoice_id });
     }
 
-    // Verifica plano UPLAY
+    // Carrega unidade incluindo credenciais Cora próprias
     const { data: unit } = await admin
       .from("units")
-      .select("id, partnership_plan, name")
+      .select("id, partnership_plan, name, cora_client_id, cora_certificate, cora_private_key, cora_environment")
       .eq("id", payment.unit_id)
       .single();
     if (!unit) return json({ error: "Unidade não encontrada" }, 404);
-    if (unit.partnership_plan !== "PLANO_UPLAY") {
-      return json({ error: "Esta unidade não está no Plano UPLAY (Cora)" }, 400);
+
+    const hasUnitCora = !!(unit.cora_client_id && unit.cora_certificate && unit.cora_private_key);
+    if (!hasUnitCora && unit.partnership_plan !== "PLANO_UPLAY") {
+      return json({ error: "Unidade sem credenciais Cora próprias e não está no Plano UPLAY (intermediação)" }, 400);
     }
 
     // Pagador
