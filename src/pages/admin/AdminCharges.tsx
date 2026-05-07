@@ -417,7 +417,17 @@ const AdminCharges = () => {
     setCreatingCharge(true);
     setChargeResult(null);
 
+    const finalProvider = chargeGateway === "CORA" ? "cora" : "asaas";
+    console.log("[PAYMENT_PROVIDER_SELECTED]", {
+      selectedGateway: chargeGateway,
+      billingType,
+      responsibleId: selectedResponsible,
+      unidadeId: profiles[selectedResponsible]?.unit_id,
+      finalProvider,
+    });
+
     if (chargeGateway === "CORA") {
+      console.log("[CORA_FLOW_STARTED]", { responsible: selectedResponsible });
       // 1) Cria parcela local marcada como Cora
       const respUnitId = profiles[selectedResponsible]?.unit_id;
       if (!respUnitId) {
