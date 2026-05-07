@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.cora-webhook]
 verify_jwt = false
+
+[functions.cora-auto-sync]
+verify_jwt = false
