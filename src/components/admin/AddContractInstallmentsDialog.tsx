@@ -174,8 +174,9 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
     setSubmitting(true);
     try {
       // FONTE DA VERDADE: re-buscar preferred_bank da unidade no momento do submit
+      const gatewaySupported = paymentMethod === "BOLETO" || paymentMethod === "PIX";
       let effectiveGateway: "ASAAS" | "CORA" = gateway;
-      if (paymentMethod === "BOLETO") {
+      if (gatewaySupported) {
         const { data: unitRow } = await supabase
           .from("units")
           .select("preferred_bank")
@@ -217,7 +218,7 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
           final_value: finalParc,
           status: "PENDING",
           payment_method: paymentMethod,
-          gateway: paymentMethod === "BOLETO" ? effectiveGateway : "ASAAS",
+          gateway: gatewaySupported ? effectiveGateway : "ASAAS",
           payment_type: "MENSALIDADE",
           description: contract.description + (notes ? ` — ${notes}` : ""),
         });
@@ -247,7 +248,7 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
             final_value: parc,
             status: "PENDING",
             payment_method: paymentMethod,
-            gateway: paymentMethod === "BOLETO" ? effectiveGateway : "ASAAS",
+            gateway: gatewaySupported ? effectiveGateway : "ASAAS",
             payment_type: "APOSTILA",
             description: `Apostila ${i + 1}/${apostilasCount}`,
           });
@@ -268,7 +269,7 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
           final_value: matricula,
           status: "PENDING",
           payment_method: paymentMethod,
-          gateway: paymentMethod === "BOLETO" ? effectiveGateway : "ASAAS",
+          gateway: gatewaySupported ? effectiveGateway : "ASAAS",
           payment_type: "MATRICULA",
           description: matriculaDescription || "Matrícula",
         });
