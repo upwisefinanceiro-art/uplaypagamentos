@@ -718,6 +718,8 @@ export type Database = {
           boleto_url: string | null
           checkout_url: string | null
           contract_id: string | null
+          cora_fee_amount: number | null
+          cora_fee_source: string | null
           cora_invoice_id: string | null
           cora_status: string | null
           cora_synced_at: string | null
@@ -757,6 +759,8 @@ export type Database = {
           boleto_url?: string | null
           checkout_url?: string | null
           contract_id?: string | null
+          cora_fee_amount?: number | null
+          cora_fee_source?: string | null
           cora_invoice_id?: string | null
           cora_status?: string | null
           cora_synced_at?: string | null
@@ -796,6 +800,8 @@ export type Database = {
           boleto_url?: string | null
           checkout_url?: string | null
           contract_id?: string | null
+          cora_fee_amount?: number | null
+          cora_fee_source?: string | null
           cora_invoice_id?: string | null
           cora_status?: string | null
           cora_synced_at?: string | null
@@ -1395,6 +1401,8 @@ export type Database = {
           cora_certificate: string | null
           cora_client_id: string | null
           cora_environment: string | null
+          cora_fee_boleto: number
+          cora_fee_pix: number
           cora_private_key: string | null
           cpf: string | null
           created_at: string
@@ -1432,6 +1440,8 @@ export type Database = {
           cora_certificate?: string | null
           cora_client_id?: string | null
           cora_environment?: string | null
+          cora_fee_boleto?: number
+          cora_fee_pix?: number
           cora_private_key?: string | null
           cpf?: string | null
           created_at?: string
@@ -1469,6 +1479,8 @@ export type Database = {
           cora_certificate?: string | null
           cora_client_id?: string | null
           cora_environment?: string | null
+          cora_fee_boleto?: number
+          cora_fee_pix?: number
           cora_private_key?: string | null
           cpf?: string | null
           created_at?: string
