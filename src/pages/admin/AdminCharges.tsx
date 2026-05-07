@@ -486,6 +486,7 @@ const AdminCharges = () => {
     }
 
     // Gateway = ASAAS
+    console.log("[ASAAS_FLOW_STARTED]", { responsible: selectedResponsible, billingType });
     const { data, error } = await supabase.functions.invoke("create-asaas-charge", {
       body: {
         responsible_id: selectedResponsible,
