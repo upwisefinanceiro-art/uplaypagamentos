@@ -538,48 +538,53 @@ const AdminContracts = () => {
 
       const totalParcelas = insertedPayments?.length || payments.length;
 
-      // Fechar diálogo e mostrar progresso da geração no Asaas
+      const useCora = paymentMethod === "BOLETO" && gateway === "CORA";
+      const gatewayLabel = useCora ? "Banco Cora" : "Asaas";
+
+      // Fechar diálogo e mostrar progresso da geração
       setDialogOpen(false);
       toast({
         title: "Contrato criado!",
-        description: `${totalParcelas} parcelas geradas. Enviando para o Asaas...`,
+        description: `${totalParcelas} parcelas geradas. Emitindo no ${gatewayLabel}...`,
       });
 
-      // Disparar criação automática no Asaas (síncrono, em paralelo controlado)
+      // Disparar criação automática no gateway escolhido (em paralelo controlado)
       if (insertedPayments && insertedPayments.length > 0) {
         const ids = insertedPayments.map((p: any) => p.id);
         const CHUNK_SIZE = 3;
-        let asaasOk = 0;
-        let asaasErr = 0;
+        let okCount = 0;
+        let errCount = 0;
+
+        const fnName = useCora ? "create-cora-charge" : "sync-asaas-payment";
 
         for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
           const chunk = ids.slice(i, i + CHUNK_SIZE);
           const results = await Promise.allSettled(
             chunk.map((payment_id) =>
-              supabase.functions.invoke("sync-asaas-payment", {
+              supabase.functions.invoke(fnName, {
                 body: { payment_id },
               }),
             ),
           );
           for (const r of results) {
             if (r.status === "fulfilled" && !r.value.error && !(r.value.data as any)?.error) {
-              asaasOk++;
+              okCount++;
             } else {
-              asaasErr++;
-              console.error("[asaas-sync] falha", r);
+              errCount++;
+              console.error(`[${fnName}] falha`, r);
             }
           }
         }
 
-        if (asaasErr === 0) {
+        if (errCount === 0) {
           toast({
-            title: "Cobranças enviadas ao Asaas!",
-            description: `${asaasOk} parcela(s) registrada(s). 📱 Notificações via WhatsApp agendadas no gateway.`,
+            title: `Cobranças emitidas no ${gatewayLabel}!`,
+            description: `${okCount} boleto(s) emitido(s) com sucesso.`,
           });
         } else {
           toast({
-            title: `${asaasOk} de ${ids.length} parcelas enviadas`,
-            description: `${asaasErr} falharam. Use 'Sincronizar com Asaas' em Cobranças para reprocessar.`,
+            title: `${okCount} de ${ids.length} boletos emitidos`,
+            description: `${errCount} falharam. Use o botão "Emitir boleto ${useCora ? "Cora" : "Asaas"}" em Cobranças para reemitir.`,
             variant: "destructive",
           });
         }
