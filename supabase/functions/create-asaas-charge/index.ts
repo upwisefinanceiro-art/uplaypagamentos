@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
     }
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
-    const body: ChargeInput = await req.json();
+    const body: ChargeInput & { _local_payment_id?: string } = await req.json();
   const { responsible_id, student_id, contract_id, value, due_date, billing_type, description, payment_type, stock_item_id, stock_quantity } = body;
 
     if (!responsible_id || !value || !due_date || !billing_type) {
@@ -60,6 +60,22 @@ Deno.serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // GUARD: se referenciar parcela local com gateway=CORA, recusar
+    if (body._local_payment_id) {
+      const { data: localPay } = await supabaseAdmin
+        .from("payments")
+        .select("gateway")
+        .eq("id", body._local_payment_id)
+        .maybeSingle();
+      if (localPay && (localPay.gateway || "").toUpperCase() === "CORA") {
+        console.warn("[create-asaas-charge] BLOQUEADO: parcela local com gateway=CORA", body._local_payment_id);
+        return new Response(JSON.stringify({ error: "Parcela marcada como Banco Cora — não é permitido criar no Asaas." }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     if (value < 10) {
