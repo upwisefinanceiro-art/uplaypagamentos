@@ -666,7 +666,20 @@ const AdminCharges = () => {
         return;
       }
 
-      toast({ title: data?.action === "created" ? "Cobrança criada no Asaas!" : "Dados atualizados do Asaas!" });
+      const target2 = payments.find((p) => p.id === paymentId);
+      const isCora = (target2?.gateway || "").toUpperCase() === "CORA";
+      if (isCora) {
+        if (data?.after === "PAID") {
+          toast({ title: "Pagamento confirmado!", description: "Cora retornou como PAGO." });
+        } else {
+          toast({
+            title: "Ainda não confirmado",
+            description: data?.message || `Status atual na Cora: ${data?.cora_status_found || data?.cora_status || "desconhecido"}`,
+          });
+        }
+      } else {
+        toast({ title: data?.action === "created" ? "Cobrança criada no Asaas!" : "Dados atualizados do Asaas!" });
+      }
       fetchData();
     } catch (err: unknown) {
       setSyncingPaymentId(null);
