@@ -140,9 +140,16 @@ Deno.serve(async (req) => {
       }, 400);
     }
 
-    // Credenciais globais
-    const credsOrErr = getGlobalCoraCredentials();
+    // Credenciais: prioriza unidade (boleto sai em nome da empresa real),
+    // cai para globais UPLAY apenas se a unidade não tiver as próprias.
+    const credsOrErr = hasUnitCora ? getUnitCoraCredentials(unit) : getGlobalCoraCredentials();
     if ("error" in credsOrErr) return json({ error: credsOrErr.error }, 500);
+    console.info("[create-cora-charge] credenciais", JSON.stringify({
+      source: hasUnitCora ? "UNIT" : "GLOBAL_UPLAY",
+      environment: credsOrErr.environment,
+      unit_id: unit.id,
+      unit_name: unit.name,
+    }));
 
     const sessionOrErr = await authenticateCora(credsOrErr);
     if ("error" in sessionOrErr) return json({ error: sessionOrErr.error }, 502);
