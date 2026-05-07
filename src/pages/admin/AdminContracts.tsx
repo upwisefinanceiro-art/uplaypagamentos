@@ -215,6 +215,13 @@ const AdminContracts = () => {
   const selectedStudent = students.find(s => s.id === studentId);
   const resolvedUnitId = responsibleMode === "existing" ? (selectedResponsible?.unit_id || "") : unitId;
   const unitName = units.find(u => u.id === resolvedUnitId)?.name || "";
+  const resolvedUnit = units.find(u => u.id === resolvedUnitId);
+
+  useEffect(() => {
+    if (resolvedUnit?.preferred_bank) {
+      setGateway(resolvedUnit.preferred_bank.toLowerCase() === "cora" ? "CORA" : "ASAAS");
+    }
+  }, [resolvedUnit?.preferred_bank]);
 
   const filteredStudents = useMemo(() => {
     if (!responsibleId || responsibleMode !== "existing") return [];
