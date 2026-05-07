@@ -322,6 +322,7 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
             variant: fail && !ok ? "destructive" : "default",
           });
         } else {
+          console.log("[ASAAS_FLOW_STARTED]", { count: inserted.length });
           toast({ title: "Gerando cobranças no Asaas...", description: "Pode levar alguns segundos." });
           let ok = 0;
           let fail = 0;
