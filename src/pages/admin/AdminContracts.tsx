@@ -363,6 +363,23 @@ const AdminContracts = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
+      // FONTE DA VERDADE: re-buscar preferred_bank da unidade no momento do save
+      let effectiveGateway: "ASAAS" | "CORA" = gateway;
+      if (paymentMethod === "BOLETO" && resolvedUnitId) {
+        const { data: unitRow } = await supabase
+          .from("units")
+          .select("preferred_bank")
+          .eq("id", resolvedUnitId)
+          .maybeSingle();
+        const pref = (unitRow?.preferred_bank || "").toString().toLowerCase();
+        const unitGw: "ASAAS" | "CORA" = pref === "cora" ? "CORA" : "ASAAS";
+        effectiveGateway = gateway === "CORA" || unitGw === "CORA" ? "CORA" : "ASAAS";
+        if (effectiveGateway !== gateway) {
+          console.warn("[GATEWAY_OVERRIDE]", { form: gateway, unit: unitGw, final: effectiveGateway });
+          setGateway(effectiveGateway);
+        }
+      }
+
       let finalResponsibleId = responsibleId;
 
       // If new responsible AND user wants to save to base, create via edge function
