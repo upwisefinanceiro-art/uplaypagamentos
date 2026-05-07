@@ -109,7 +109,9 @@ export async function coraRequest(session: CoraSession, path: string, method: st
   const text = await res.text();
   let parsed: any = null;
   try { parsed = JSON.parse(text); } catch { /* not json */ }
-  return { ok: res.ok, status: res.status, data: parsed, raw: text };
+  const headers: Record<string, string> = {};
+  res.headers.forEach((v, k) => { headers[k] = v; });
+  return { ok: res.ok, status: res.status, data: parsed, raw: text, headers, url: `${session.baseUrl}${path}` };
 }
 
 export function onlyDigits(v: string | null | undefined): string {
