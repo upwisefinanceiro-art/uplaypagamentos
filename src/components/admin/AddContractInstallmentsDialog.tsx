@@ -305,9 +305,9 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
 
       // Geração automática no gateway escolhido (best effort)
       if (generateAsaas && inserted && inserted.length > 0) {
-        const finalProvider = paymentMethod === "BOLETO" && gateway === "CORA" ? "cora" : "asaas";
+        const finalProvider = paymentMethod === "BOLETO" && effectiveGateway === "CORA" ? "cora" : "asaas";
         console.log("[PAYMENT_PROVIDER_SELECTED]", {
-          selectedGateway: gateway,
+          selectedGateway: effectiveGateway,
           paymentMethod,
           unidadeId: contract.unit_id,
           contractId: contract.id,
