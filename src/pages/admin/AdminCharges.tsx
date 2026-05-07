@@ -639,7 +639,11 @@ const AdminCharges = () => {
   const handleSyncPayment = async (paymentId: string) => {
     setSyncingPaymentId(paymentId);
     try {
-      const { data, error } = await supabase.functions.invoke("sync-asaas-payment", {
+      // Roteia para a função correta conforme gateway da parcela
+      const target = payments.find((p) => p.id === paymentId);
+      const gw = (target?.gateway || "").toUpperCase();
+      const fn = gw === "CORA" ? "sync-cora-payment" : "sync-asaas-payment";
+      const { data, error } = await supabase.functions.invoke(fn, {
         body: { payment_id: paymentId },
       });
       setSyncingPaymentId(null);
