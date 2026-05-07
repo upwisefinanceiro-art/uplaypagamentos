@@ -488,7 +488,7 @@ const AdminContracts = () => {
           payment_method: paymentMethod,
           payment_type: "MENSALIDADE",
           description: `${description} - Parcela ${i + 1}/${numInstallments}`,
-          status: "PENDING", gateway: paymentMethod === "BOLETO" ? gateway : "ASAAS",
+          status: "PENDING", gateway: paymentMethod === "BOLETO" ? effectiveGateway : "ASAAS",
         });
       }
 
@@ -520,7 +520,7 @@ const AdminContracts = () => {
             payment_method: paymentMethod,
             payment_type: "APOSTILA",
             description: `Apostila ${i + 1}/${apostilasCount}`,
-            status: "PENDING", gateway: paymentMethod === "BOLETO" ? gateway : "ASAAS",
+            status: "PENDING", gateway: paymentMethod === "BOLETO" ? effectiveGateway : "ASAAS",
             stock_item_id: apostilaStockItemId || null,
             stock_quantity: 1,
           });
@@ -543,7 +543,7 @@ const AdminContracts = () => {
           payment_method: paymentMethod,
           payment_type: "MATRICULA",
           description: matriculaDescription || "Matrícula",
-          status: "PENDING", gateway: paymentMethod === "BOLETO" ? gateway : "ASAAS",
+          status: "PENDING", gateway: paymentMethod === "BOLETO" ? effectiveGateway : "ASAAS",
         });
       }
 
