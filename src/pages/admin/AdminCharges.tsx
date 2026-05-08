@@ -1378,72 +1378,88 @@ const AdminCharges = () => {
                     {/* Emissão dinâmica conforme gateway da parcela */}
                     {(() => {
                       if (payment.payment_method === "DINHEIRO") return null;
+                      if (payment.status === "PAID" || payment.status === "CANCELLED") return null;
                       const unit = units.find((u) => u.id === payment.unit_id);
                       const unitPref = (unit?.preferred_bank || "").toLowerCase();
-                      // Gateway efetivo: o salvo na parcela tem precedência total
                       const gw = (payment.gateway || (unitPref === "cora" ? "CORA" : "ASAAS")).toUpperCase();
+                      const hasExternalId = gw === "CORA" ? !!payment.cora_invoice_id : !!payment.asaas_payment_id;
+                      const emissionStatus = (payment.emission_status || (hasExternalId ? "EMITTED" : "PENDING")).toUpperCase();
+                      const isError = emissionStatus === "ERROR" && !hasExternalId;
+                      const isEmitted = hasExternalId || emissionStatus === "EMITTED";
 
-                      if (gw === "CORA") {
-                        if (payment.cora_invoice_id) return (
+                      // Sucesso → mostra link/sincronizar
+                      if (isEmitted) {
+                        return (
                           <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-muted-foreground italic">Gateway: Banco Cora</span>
-                            {payment.status !== "PAID" && payment.status !== "CANCELLED" && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="gap-1.5 text-xs h-7"
-                                disabled={syncingPaymentId === payment.id}
-                                onClick={() => handleSyncPayment(payment.id)}
-                              >
-                                {syncingPaymentId === payment.id ? (
-                                  <Loader2 size={12} className="animate-spin" />
-                                ) : (
-                                  <RefreshCw size={12} />
-                                )}
-                                Sincronizar
-                              </Button>
-                            )}
+                            <span className="text-[10px] text-muted-foreground italic">
+                              Banco: {gw === "CORA" ? "Cora" : "Asaas"} · Emitida
+                            </span>
+                            <Button
+                              variant="ghost" size="sm"
+                              className="gap-1.5 text-xs h-7"
+                              disabled={syncingPaymentId === payment.id}
+                              onClick={() => handleSyncPayment(payment.id)}
+                            >
+                              {syncingPaymentId === payment.id ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                              Sincronizar
+                            </Button>
                           </div>
                         );
+                      }
+
+                      // Erro → mostra mensagem real + botão de reemitir
+                      if (isError) {
+                        const errMsg = payment.emission_error_message || "Erro desconhecido na emissão.";
+                        const attempts = payment.emission_attempts ?? 0;
                         return (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-1.5 text-xs h-7 border-primary/40 text-primary hover:bg-primary/10"
-                            disabled={syncingPaymentId === payment.id}
-                            onClick={() => handleEmitCora(payment.id)}
-                          >
-                            {syncingPaymentId === payment.id ? (
-                              <Loader2 size={12} className="animate-spin" />
-                            ) : (
-                              <RefreshCw size={12} />
-                            )}
-                            Reemitir cobrança
-                          </Button>
+                          <div className="flex flex-col gap-1.5 w-full">
+                            <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1.5">
+                              <span className="text-[10px] font-semibold text-destructive whitespace-nowrap">
+                                ⚠ Erro {gw === "CORA" ? "Cora" : "Asaas"}
+                                {attempts > 0 ? ` (${attempts}x)` : ""}:
+                              </span>
+                              <span className="text-[10px] text-destructive/90 leading-tight">
+                                {errMsg}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline" size="sm"
+                                className="gap-1.5 text-xs h-7 border-destructive/40 text-destructive hover:bg-destructive/10"
+                                disabled={syncingPaymentId === payment.id}
+                                onClick={() => gw === "CORA" ? handleEmitCora(payment.id) : handleSyncPayment(payment.id)}
+                              >
+                                {syncingPaymentId === payment.id ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                                Reemitir cobrança
+                              </Button>
+                              <Button
+                                variant="ghost" size="sm"
+                                className="text-[10px] h-7 text-muted-foreground"
+                                onClick={() => navigate(`/app/payment/${payment.id}`)}
+                              >
+                                Ver detalhes
+                              </Button>
+                            </div>
+                          </div>
                         );
                       }
 
-                      // Asaas
-                      if (!payment.asaas_payment_id) {
-                        return (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-1.5 text-xs h-7 border-warning/40 text-warning hover:bg-warning/10"
-                            disabled={syncingPaymentId === payment.id}
-                            onClick={() => handleSyncPayment(payment.id)}
-                          >
-                            {syncingPaymentId === payment.id ? (
-                              <Loader2 size={12} className="animate-spin" />
-                            ) : (
-                              <RefreshCw size={12} />
-                            )}
-                            Reemitir cobrança
-                          </Button>
-                        );
-                      }
+                      // PENDING (ainda não tentou) → emitir
                       return (
-                        <span className="text-[10px] text-muted-foreground italic">Gateway: Asaas</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-muted-foreground italic">
+                            Banco: {gw === "CORA" ? "Cora" : "Asaas"} · Aguardando emissão
+                          </span>
+                          <Button
+                            variant="outline" size="sm"
+                            className="gap-1.5 text-xs h-7 border-primary/40 text-primary hover:bg-primary/10"
+                            disabled={syncingPaymentId === payment.id}
+                            onClick={() => gw === "CORA" ? handleEmitCora(payment.id) : handleSyncPayment(payment.id)}
+                          >
+                            {syncingPaymentId === payment.id ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                            Emitir agora
+                          </Button>
+                        </div>
                       );
                     })()}
 
