@@ -135,7 +135,7 @@ Deno.serve(async (req) => {
         cpf: cleanCpf,
         full_name: normalizedName,
         phone: normalizedPhone,
-        email: normalizedEmail,
+        email: profileEmail,
         unit_id: nextUnitId,
         active: true,
       });
