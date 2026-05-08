@@ -19,6 +19,35 @@ function validateCpf(cpf: string): boolean {
   return true;
 }
 
+// Grava falha de emissão na própria parcela (apenas para fluxo CREATE)
+async function recordEmissionError(
+  admin: any,
+  paymentId: string,
+  code: string,
+  message: string,
+  payload?: unknown,
+  response?: unknown,
+) {
+  try {
+    const { data: cur } = await admin
+      .from("payments").select("emission_attempts").eq("id", paymentId).maybeSingle();
+    const attempts = (cur?.emission_attempts ?? 0) + 1;
+    await admin.from("payments").update({
+      emission_status: "ERROR",
+      emission_error_code: code,
+      emission_error_message: message,
+      emission_payload: payload ?? null,
+      emission_response: response ?? null,
+      emission_last_attempt_at: new Date().toISOString(),
+      emission_attempts: attempts,
+      gateway: "ASAAS",
+      updated_at: new Date().toISOString(),
+    }).eq("id", paymentId);
+  } catch (e) {
+    console.error("[sync-asaas-payment] failed to record emission error", e);
+  }
+}
+
 function mapAsaasStatus(status?: string | null): string | null {
   const statusMap: Record<string, string> = {
     PENDING: "PENDING",
