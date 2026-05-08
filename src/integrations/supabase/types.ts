@@ -730,6 +730,13 @@ export type Database = {
           dunning_manual: boolean
           dunning_status: string | null
           dunning_synced_at: string | null
+          emission_attempts: number
+          emission_error_code: string | null
+          emission_error_message: string | null
+          emission_last_attempt_at: string | null
+          emission_payload: Json | null
+          emission_response: Json | null
+          emission_status: string
           final_value: number | null
           gateway: string | null
           id: string
@@ -771,6 +778,13 @@ export type Database = {
           dunning_manual?: boolean
           dunning_status?: string | null
           dunning_synced_at?: string | null
+          emission_attempts?: number
+          emission_error_code?: string | null
+          emission_error_message?: string | null
+          emission_last_attempt_at?: string | null
+          emission_payload?: Json | null
+          emission_response?: Json | null
+          emission_status?: string
           final_value?: number | null
           gateway?: string | null
           id?: string
@@ -812,6 +826,13 @@ export type Database = {
           dunning_manual?: boolean
           dunning_status?: string | null
           dunning_synced_at?: string | null
+          emission_attempts?: number
+          emission_error_code?: string | null
+          emission_error_message?: string | null
+          emission_last_attempt_at?: string | null
+          emission_payload?: Json | null
+          emission_response?: Json | null
+          emission_status?: string
           final_value?: number | null
           gateway?: string | null
           id?: string
