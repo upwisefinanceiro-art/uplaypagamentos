@@ -101,7 +101,13 @@ export async function authenticateCora(creds: CoraCredentials): Promise<CoraSess
   const text = await tokenRes.text();
   if (!tokenRes.ok) {
     close();
-    return { error: `Cora auth ${tokenRes.status}: ${text.slice(0, 300)}` };
+    const preview = text.slice(0, 300);
+    const environmentLabel = creds.environment === "production" ? "produção" : "homologação";
+    const isInvalidClient = tokenRes.status === 401 && /invalid_client/i.test(text);
+    const hint = isInvalidClient
+      ? `Client ID inválido para o certificado/chave ou para o ambiente ${environmentLabel}. Confira se as credenciais Cora da unidade pertencem ao mesmo ambiente configurado.`
+      : `Falha de autenticação no ambiente ${environmentLabel}.`;
+    return { error: `Cora auth ${tokenRes.status}: ${hint} Resposta Cora: ${preview}` };
   }
   let parsed: any = null;
   try { parsed = JSON.parse(text); } catch { /* ignore */ }
