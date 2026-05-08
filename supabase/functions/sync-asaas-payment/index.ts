@@ -119,33 +119,35 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    const supabaseUser = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    const { data: { user: caller } } = await supabaseUser.auth.getUser();
-    if (!caller) return respond({ error: "Não autorizado" }, 401);
-
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
     const body = await req.json();
     const { payment_id } = body;
-
     if (!payment_id) return respond({ error: "payment_id é obrigatório" }, 400);
 
-    // Check caller roles
-    const { data: callerRoles } = await supabaseAdmin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", caller.id);
+    // Suporta chamada interna (auto-emit / cron) via service role
+    const isInternal = authHeader === `Bearer ${serviceRoleKey}`;
+    let caller: any = null;
+    let isAdmin = false;
+    let isResponsavel = false;
 
-    const isAdmin = callerRoles?.some((r: { role: string }) =>
-      r.role === "ADMIN_MASTER" || r.role === "ADMIN_UNIDADE"
-    );
-    const isResponsavel = callerRoles?.some((r: { role: string }) =>
-      r.role === "RESPONSAVEL"
-    );
+    if (!isInternal) {
+      const supabaseUser = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: userData } = await supabaseUser.auth.getUser();
+      caller = userData?.user;
+      if (!caller) return respond({ error: "Não autorizado" }, 401);
 
-    if (!isAdmin && !isResponsavel) return respond({ error: "Sem permissão" }, 403);
+      const { data: callerRoles } = await supabaseAdmin
+        .from("user_roles").select("role").eq("user_id", caller.id);
+      isAdmin = !!callerRoles?.some((r: { role: string }) =>
+        r.role === "ADMIN_MASTER" || r.role === "ADMIN_UNIDADE" || r.role === "SUPER_ADMIN"
+      );
+      isResponsavel = !!callerRoles?.some((r: { role: string }) => r.role === "RESPONSAVEL");
+      if (!isAdmin && !isResponsavel) return respond({ error: "Sem permissão" }, 403);
+    } else {
+      isAdmin = true;
+    }
 
     // Get payment
     const { data: payment, error: payErr } = await supabaseAdmin
