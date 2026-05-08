@@ -162,7 +162,7 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
           .eq("id", user.id).maybeSingle();
         if (fresh) {
           setName(fresh.full_name || ""); setCpf(fresh.cpf || ""); setPhone(fresh.phone || "");
-          setEmail(fresh.email || ""); setAddress(fresh.address || "");
+          setEmail(displayEmail(fresh.email)); setAddress(fresh.address || "");
         }
         await loadProfileExtras(user.id);
         await Promise.resolve(onSaved());
