@@ -135,6 +135,41 @@ Deno.serve(async (req) => {
     const { data: currentAuth } = await supabaseAdmin.auth.admin.getUserById(user_id);
     const currentAuthEmail = currentAuth?.user?.email ?? null;
 
+    if (profileEmail && authEmail.toLowerCase() !== (currentAuthEmail ?? "").toLowerCase()) {
+      let existingAuthUser: { id: string; email?: string } | null = null;
+      for (let page = 1; page <= 50; page += 1) {
+        const { data: usersPage, error: listError } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+        if (listError) {
+          console.error("[update-user] auth.admin.listUsers failed", { message: listError.message, status: (listError as any).status, code: (listError as any).code });
+          return jsonResponse({ error: "Não foi possível validar se o e-mail já está em uso. Tente salvar novamente." });
+        }
+
+        existingAuthUser = usersPage.users.find((u: { id: string; email?: string }) =>
+          u.id !== user_id && u.email?.toLowerCase() === authEmail.toLowerCase()
+        ) ?? null;
+        if (existingAuthUser || usersPage.users.length < 1000) break;
+      }
+
+      if (existingAuthUser) {
+        const { data: existingProfile } = await supabaseAdmin
+          .from("profiles")
+          .select("full_name, cpf")
+          .eq("id", existingAuthUser.id)
+          .maybeSingle();
+
+        const ownerLabel = existingProfile?.full_name
+          ? `${existingProfile.full_name}${existingProfile.cpf ? ` (CPF ${existingProfile.cpf})` : ""}`
+          : "outro cadastro";
+
+        return jsonResponse({
+          error: `Este e-mail já está em uso por ${ownerLabel}. Use outro e-mail ou remova este e-mail do cadastro existente antes de salvar.`,
+          duplicate_email: true,
+          existing_id: existingAuthUser.id,
+          existing_name: existingProfile?.full_name ?? null,
+        });
+      }
+    }
+
     const authPayload: Record<string, unknown> = {
       user_metadata: {
         ...(currentAuth?.user?.user_metadata ?? {}),
