@@ -95,16 +95,20 @@ Deno.serve(async (req) => {
     const cleanCpf = String(cpf).replace(/\D/g, "");
     const normalizedName = String(full_name).trim();
     const normalizedPhone = typeof phone === "string" && phone.trim() ? phone.trim() : null;
-    const requestedEmail = typeof email_override === "string" && email_override.trim()
-      ? email_override.trim()
+    // E-mail real informado pelo usuário (pode ser vazio).
+    const userTypedEmail = typeof email_override === "string" && email_override.trim()
+      ? email_override.trim().toLowerCase()
       : typeof email === "string" && email.trim()
-        ? email.trim()
-        : `${cleanCpf}@uplay.app`;
-    const normalizedEmail = requestedEmail.toLowerCase();
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+        ? email.trim().toLowerCase()
+        : "";
+    const isFakeEmail = (e: string) => /@(uplay\.app|imported\.uplay\.app)$/i.test(e);
+    if (userTypedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userTypedEmail)) {
       return jsonResponse({ error: "E-mail inválido" });
     }
+    // Profile guarda APENAS o e-mail real do cliente (ou null). Nunca CPF@uplay.app.
+    const profileEmail: string | null = userTypedEmail && !isFakeEmail(userTypedEmail) ? userTypedEmail : null;
+    // Auth precisa de um e-mail para login: usa o real se houver, senão fallback CPF@uplay.app.
+    const normalizedEmail = profileEmail || `${cleanCpf}@uplay.app`;
 
     // Check if email already exists in auth
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
