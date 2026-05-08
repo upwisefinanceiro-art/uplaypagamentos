@@ -319,6 +319,7 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
           console.log("[CORA_FLOW_STARTED]", { count: inserted.length });
           let ok = 0;
           let fail = 0;
+          let firstError = "";
           for (const p of inserted) {
             try {
               const { data: chData, error: chErr } = await supabase.functions.invoke("create-cora-charge", {
@@ -326,18 +327,20 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
               });
               if (chErr || (chData as any)?.error) {
                 fail++;
+                firstError ||= (chData as any)?.error || chErr?.message || "Falha ao emitir na Cora";
                 console.warn("[Cora] falha em", p.id, chErr || (chData as any)?.error);
               } else {
                 ok++;
               }
             } catch (err) {
               fail++;
+              firstError ||= err instanceof Error ? err.message : "Falha inesperada ao emitir na Cora";
               console.warn("[Cora] exceção em", p.id, err);
             }
           }
           toast({
             title: "Emissão Cora concluída",
-            description: `${ok} boleto(s) emitido(s)${fail ? `, ${fail} falha(s) — verifique os logs` : ""}.`,
+            description: `${ok} boleto(s) emitido(s)${fail ? `, ${fail} falha(s): ${firstError}` : ""}.`,
             variant: fail && !ok ? "destructive" : "default",
           });
         } else {
@@ -345,37 +348,27 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
           toast({ title: "Gerando cobranças no Asaas...", description: "Pode levar alguns segundos." });
           let ok = 0;
           let fail = 0;
+          let firstError = "";
           for (const p of inserted) {
-          try {
-            const { error: chErr } = await supabase.functions.invoke("create-asaas-charge", {
-              body: {
-                responsible_id: contract.responsible_id,
-                student_id: contract.student_id,
-                contract_id: contract.id,
-                value: Number(p.value),
-                due_date: p.due_date,
-                billing_type: paymentMethod,
-                description: p.description,
-                payment_type: p.payment_type,
-                stock_item_id: p.stock_item_id || undefined,
-                stock_quantity: p.stock_quantity || undefined,
-                _local_payment_id: p.id,
-              },
-            });
-            if (chErr) {
+            try {
+              const { data: chData, error: chErr } = await supabase.functions.invoke("sync-asaas-payment", {
+                body: { payment_id: p.id },
+              });
+              if (chErr || (chData as any)?.error) {
+                fail++;
+                firstError ||= (chData as any)?.error || chErr?.message || "Falha ao emitir no Asaas";
+              } else {
+                ok++;
+              }
+            } catch (err: any) {
               fail++;
-            } else {
-              ok++;
-              // Remover o registro local duplicado (a edge function cria o seu próprio)
-              await supabase.from("payments").delete().eq("id", p.id);
+              firstError ||= err?.message || "Falha inesperada ao emitir no Asaas";
             }
-          } catch {
-            fail++;
           }
-        }
           toast({
             title: "Sincronização Asaas concluída",
-            description: `${ok} gerada(s) no Asaas${fail ? `, ${fail} falha(s) — mantidas como locais` : ""}.`,
+            description: `${ok} gerada(s) no Asaas${fail ? `, ${fail} falha(s): ${firstError}` : ""}.`,
+            variant: fail && !ok ? "destructive" : "default",
           });
         }
       }

@@ -203,8 +203,14 @@ Deno.serve(async (req) => {
 
     const sessionOrErr = await authenticateCora(credsOrErr);
     if ("error" in sessionOrErr) {
-      await recordEmissionError(admin, payment.id, "AUTH_FAILED", `Falha de autenticação Cora: ${sessionOrErr.error}`);
-      return json({ error: sessionOrErr.error }, 502);
+      const msg = `Falha de autenticação Cora: ${sessionOrErr.error}`;
+      await recordEmissionError(admin, payment.id, "AUTH_FAILED", msg, {
+        unit_id: unit.id,
+        credential_source: hasUnitCora ? "UNIT" : "GLOBAL_UPLAY",
+        environment: credsOrErr.environment,
+        client_id_preview: `${credsOrErr.clientId.slice(0, 6)}...${credsOrErr.clientId.slice(-4)}`,
+      });
+      return json({ error: msg }, 502);
     }
     const session = sessionOrErr;
 

@@ -581,6 +581,7 @@ const AdminContracts = () => {
         const CHUNK_SIZE = 3;
         let okCount = 0;
         let errCount = 0;
+        let firstError = "";
 
         const fnName = useCora ? "create-cora-charge" : "sync-asaas-payment";
         console.log(useCora ? "[CORA_FLOW_STARTED]" : "[ASAAS_FLOW_STARTED]", { count: ids.length, fn: fnName });
@@ -599,6 +600,9 @@ const AdminContracts = () => {
               okCount++;
             } else {
               errCount++;
+              firstError ||= r.status === "fulfilled"
+                ? ((r.value.data as any)?.error || r.value.error?.message || "Falha ao emitir cobrança")
+                : (r.reason instanceof Error ? r.reason.message : "Falha inesperada ao emitir cobrança");
               console.error(`[${fnName}] falha`, r);
             }
           }
@@ -612,7 +616,7 @@ const AdminContracts = () => {
         } else {
           toast({
             title: `${okCount} de ${ids.length} boletos emitidos`,
-            description: `${errCount} falharam. Use o botão "Emitir boleto ${useCora ? "Cora" : "Asaas"}" em Cobranças para reemitir.`,
+            description: `${errCount} falharam: ${firstError || "abra Cobranças para ver o erro por parcela."}`,
             variant: "destructive",
           });
         }
