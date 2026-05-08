@@ -319,6 +319,7 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
           console.log("[CORA_FLOW_STARTED]", { count: inserted.length });
           let ok = 0;
           let fail = 0;
+          let firstError = "";
           for (const p of inserted) {
             try {
               const { data: chData, error: chErr } = await supabase.functions.invoke("create-cora-charge", {
@@ -326,18 +327,20 @@ const AddContractInstallmentsDialog = ({ open, onOpenChange, contract, onSuccess
               });
               if (chErr || (chData as any)?.error) {
                 fail++;
+                firstError ||= (chData as any)?.error || chErr?.message || "Falha ao emitir na Cora";
                 console.warn("[Cora] falha em", p.id, chErr || (chData as any)?.error);
               } else {
                 ok++;
               }
             } catch (err) {
               fail++;
+              firstError ||= err instanceof Error ? err.message : "Falha inesperada ao emitir na Cora";
               console.warn("[Cora] exceção em", p.id, err);
             }
           }
           toast({
             title: "Emissão Cora concluída",
-            description: `${ok} boleto(s) emitido(s)${fail ? `, ${fail} falha(s) — verifique os logs` : ""}.`,
+            description: `${ok} boleto(s) emitido(s)${fail ? `, ${fail} falha(s): ${firstError}` : ""}.`,
             variant: fail && !ok ? "destructive" : "default",
           });
         } else {
