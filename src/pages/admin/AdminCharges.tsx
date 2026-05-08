@@ -1411,7 +1411,7 @@ const AdminCharges = () => {
                             ) : (
                               <RefreshCw size={12} />
                             )}
-                            Emitir boleto Cora
+                            Reemitir cobrança
                           </Button>
                         );
                       }
