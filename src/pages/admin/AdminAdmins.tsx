@@ -83,13 +83,13 @@ const AdminAdmins = () => {
     setCreating(true);
     try {
       const cleanCpf = formCpf.replace(/\D/g, "");
-      const email = formEmail.trim() || `${cleanCpf}@uplay.app`;
+      const typedEmail = formEmail.trim();
       const { data, error } = await supabase.functions.invoke("create-user", {
         body: {
           full_name: formName.trim(),
           cpf: cleanCpf,
           phone: formPhone.trim() || null,
-          email,
+          email: typedEmail || undefined,
           password: formPassword,
           unit_id: formUnitId || null,
           role: formRole,

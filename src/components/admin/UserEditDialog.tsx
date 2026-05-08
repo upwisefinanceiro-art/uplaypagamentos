@@ -96,12 +96,16 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
     }
   };
 
+  const isFakeEmail = (e: string | null | undefined) =>
+    !!e && /@(uplay\.app|imported\.uplay\.app)$/i.test(e);
+  const displayEmail = (e: string | null | undefined) => (e && !isFakeEmail(e) ? e : "");
+
   useEffect(() => {
     if (user) {
       setName(user.full_name || "");
       setCpf(user.cpf || "");
       setPhone(user.phone || "");
-      setEmail(user.email || "");
+      setEmail(displayEmail(user.email));
       setAddress(user.address || "");
       setUnitId(user.unit_id || "");
       setBirthDate(""); setRg(""); setAddressNumber(""); setComplement("");
@@ -158,7 +162,7 @@ const UserEditDialog = ({ open, onOpenChange, user, units, onSaved, showUnitSele
           .eq("id", user.id).maybeSingle();
         if (fresh) {
           setName(fresh.full_name || ""); setCpf(fresh.cpf || ""); setPhone(fresh.phone || "");
-          setEmail(fresh.email || ""); setAddress(fresh.address || "");
+          setEmail(displayEmail(fresh.email)); setAddress(fresh.address || "");
         }
         await loadProfileExtras(user.id);
         await Promise.resolve(onSaved());
