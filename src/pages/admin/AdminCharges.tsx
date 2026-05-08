@@ -1431,7 +1431,7 @@ const AdminCharges = () => {
                             ) : (
                               <RefreshCw size={12} />
                             )}
-                            Enviar ao Asaas
+                            Reemitir cobrança
                           </Button>
                         );
                       }
