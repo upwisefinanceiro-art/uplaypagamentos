@@ -131,16 +131,37 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(user_id, {
-      email: authEmail,
+    // Busca o e-mail atual no auth para evitar update desnecessário (que costuma quebrar com "Error updating user")
+    const { data: currentAuth } = await supabaseAdmin.auth.admin.getUserById(user_id);
+    const currentAuthEmail = currentAuth?.user?.email ?? null;
+
+    const authPayload: Record<string, unknown> = {
       user_metadata: {
+        ...(currentAuth?.user?.user_metadata ?? {}),
         cpf: cleanCpf,
         full_name: normalizedName,
       },
-    });
+    };
+    if (authEmail && authEmail.toLowerCase() !== (currentAuthEmail ?? "").toLowerCase()) {
+      authPayload.email = authEmail;
+    }
+
+    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(user_id, authPayload);
 
     if (authError) {
-      return jsonResponse({ error: authError.message });
+      console.error("[update-user] auth.admin.updateUserById failed", {
+        user_id,
+        currentAuthEmail,
+        authEmail,
+        emailChanged: authEmail.toLowerCase() !== (currentAuthEmail ?? "").toLowerCase(),
+        code: (authError as any).code,
+        status: (authError as any).status,
+        name: authError.name,
+        message: authError.message,
+      });
+      return jsonResponse({
+        error: `Falha ao atualizar autenticação: ${authError.message}${(authError as any).code ? ` (${(authError as any).code})` : ""}`,
+      });
     }
 
     const norm = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
