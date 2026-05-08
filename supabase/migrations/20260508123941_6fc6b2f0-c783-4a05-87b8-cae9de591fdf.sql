@@ -1,0 +1,2 @@
+update auth.users set email='herbertmaxx@gmail.com', email_confirmed_at=coalesce(email_confirmed_at, now()) where id='6e32fa3c-c89f-48b0-8e3c-b01d7479e3a1';
+update public.profiles set email='herbertmaxx@gmail.com' where id='6e32fa3c-c89f-48b0-8e3c-b01d7479e3a1';
