@@ -406,9 +406,11 @@ Deno.serve(async (req) => {
         const detail = customerData?.errors?.[0]?.description
           || customerData?.errors?.[0]?.code
           || JSON.stringify(customerData);
+        const msg = `Erro ao criar cliente no Asaas: ${detail}`;
         console.error("Asaas customer error:", JSON.stringify(customerData));
+        await recordEmissionError(supabaseAdmin, payment_id, "ASAAS_CUSTOMER_ERROR", msg, customerPayload, customerData);
         return respond({
-          error: `Erro ao criar cliente no Asaas: ${detail}`,
+          error: msg,
           details: customerData,
         }, 502);
       }
