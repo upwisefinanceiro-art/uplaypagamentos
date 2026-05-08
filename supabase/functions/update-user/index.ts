@@ -94,9 +94,22 @@ Deno.serve(async (req) => {
     }
     const normalizedPhone = typeof phone === "string" && phone.trim() ? phone.trim() : null;
     const normalizedAddress = typeof address === "string" && address.trim() ? address.trim() : null;
-    const normalizedEmail = typeof email === "string" && email.trim()
-      ? email.trim().toLowerCase()
-      : targetProfile.email || `${cleanCpf}@uplay.app`;
+    // E-mail real do cliente (pode ser null). NUNCA grava CPF@uplay.app no perfil.
+    const rawEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+    const isFake = (e: string | null | undefined) =>
+      !!e && /@(uplay\.app|imported\.uplay\.app)$/i.test(e);
+    let profileEmail: string | null = null;
+    if (rawEmail) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail)) {
+        return jsonResponse({ error: "E-mail inválido" });
+      }
+      profileEmail = isFake(rawEmail) ? null : rawEmail;
+    } else if (targetProfile.email && !isFake(targetProfile.email)) {
+      // mantém e-mail real já existente quando o campo vier vazio
+      profileEmail = targetProfile.email;
+    }
+    // E-mail de autenticação: usa o real quando houver, senão mantém fallback CPF@uplay.app só p/ login
+    const authEmail = profileEmail || `${cleanCpf}@uplay.app`;
 
     let nextUnitId = targetProfile.unit_id;
 
