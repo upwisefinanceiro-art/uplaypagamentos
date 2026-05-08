@@ -19,6 +19,35 @@ function validateCpf(cpf: string): boolean {
   return true;
 }
 
+// Grava falha de emissão na própria parcela (apenas para fluxo CREATE)
+async function recordEmissionError(
+  admin: any,
+  paymentId: string,
+  code: string,
+  message: string,
+  payload?: unknown,
+  response?: unknown,
+) {
+  try {
+    const { data: cur } = await admin
+      .from("payments").select("emission_attempts").eq("id", paymentId).maybeSingle();
+    const attempts = (cur?.emission_attempts ?? 0) + 1;
+    await admin.from("payments").update({
+      emission_status: "ERROR",
+      emission_error_code: code,
+      emission_error_message: message,
+      emission_payload: payload ?? null,
+      emission_response: response ?? null,
+      emission_last_attempt_at: new Date().toISOString(),
+      emission_attempts: attempts,
+      gateway: "ASAAS",
+      updated_at: new Date().toISOString(),
+    }).eq("id", paymentId);
+  } catch (e) {
+    console.error("[sync-asaas-payment] failed to record emission error", e);
+  }
+}
+
 function mapAsaasStatus(status?: string | null): string | null {
   const statusMap: Record<string, string> = {
     PENDING: "PENDING",
@@ -90,33 +119,35 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    const supabaseUser = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    const { data: { user: caller } } = await supabaseUser.auth.getUser();
-    if (!caller) return respond({ error: "Não autorizado" }, 401);
-
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
     const body = await req.json();
     const { payment_id } = body;
-
     if (!payment_id) return respond({ error: "payment_id é obrigatório" }, 400);
 
-    // Check caller roles
-    const { data: callerRoles } = await supabaseAdmin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", caller.id);
+    // Suporta chamada interna (auto-emit / cron) via service role
+    const isInternal = authHeader === `Bearer ${serviceRoleKey}`;
+    let caller: any = null;
+    let isAdmin = false;
+    let isResponsavel = false;
 
-    const isAdmin = callerRoles?.some((r: { role: string }) =>
-      r.role === "ADMIN_MASTER" || r.role === "ADMIN_UNIDADE"
-    );
-    const isResponsavel = callerRoles?.some((r: { role: string }) =>
-      r.role === "RESPONSAVEL"
-    );
+    if (!isInternal) {
+      const supabaseUser = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: userData } = await supabaseUser.auth.getUser();
+      caller = userData?.user;
+      if (!caller) return respond({ error: "Não autorizado" }, 401);
 
-    if (!isAdmin && !isResponsavel) return respond({ error: "Sem permissão" }, 403);
+      const { data: callerRoles } = await supabaseAdmin
+        .from("user_roles").select("role").eq("user_id", caller.id);
+      isAdmin = !!callerRoles?.some((r: { role: string }) =>
+        r.role === "ADMIN_MASTER" || r.role === "ADMIN_UNIDADE" || r.role === "SUPER_ADMIN"
+      );
+      isResponsavel = !!callerRoles?.some((r: { role: string }) => r.role === "RESPONSAVEL");
+      if (!isAdmin && !isResponsavel) return respond({ error: "Sem permissão" }, 403);
+    } else {
+      isAdmin = true;
+    }
 
     // Get payment
     const { data: payment, error: payErr } = await supabaseAdmin
@@ -166,7 +197,12 @@ Deno.serve(async (req) => {
       .single();
 
     if (unitErr || !unit?.asaas_api_key) {
-      return respond({ error: "Unidade sem credenciais Asaas configuradas" }, 400);
+      const msg = "Credencial do banco Asaas não configurada para esta unidade.";
+      // só registra emission se for fluxo de criação (sem asaas_payment_id)
+      if (!payment.asaas_payment_id) {
+        await recordEmissionError(supabaseAdmin, payment_id, "UNIT_CREDENTIALS_MISSING", msg);
+      }
+      return respond({ error: msg }, 400);
     }
 
     console.log("[sync-asaas-payment] unidade identificada", JSON.stringify({
@@ -296,22 +332,29 @@ Deno.serve(async (req) => {
       .single();
 
     if (respErr || !responsible) {
+      await recordEmissionError(supabaseAdmin, payment_id, "RESPONSIBLE_NOT_FOUND", "Responsável não encontrado.");
       return respond({ error: "Responsável não encontrado" }, 404);
     }
 
     // ── VALIDATE required fields ──
     if (!responsible.cpf || responsible.cpf.trim() === "") {
-      return respond({ error: "CPF do responsável não está cadastrado. Atualize o cadastro antes de sincronizar." }, 400);
+      const msg = "CPF do responsável não está cadastrado.";
+      await recordEmissionError(supabaseAdmin, payment_id, "VALIDATION_ERROR", msg);
+      return respond({ error: msg }, 400);
     }
 
     const cpfClean = responsible.cpf.replace(/\D/g, "");
 
     if (!validateCpf(cpfClean)) {
-      return respond({ error: `CPF do responsável é inválido: ${responsible.cpf}. Corrija o cadastro.` }, 400);
+      const msg = `CPF do responsável é inválido: ${responsible.cpf}.`;
+      await recordEmissionError(supabaseAdmin, payment_id, "VALIDATION_ERROR", msg);
+      return respond({ error: msg }, 400);
     }
 
     if (!responsible.full_name || responsible.full_name.trim().length < 3) {
-      return respond({ error: "Nome do responsável é obrigatório e deve ter pelo menos 3 caracteres." }, 400);
+      const msg = "Nome do responsável é obrigatório e deve ter pelo menos 3 caracteres.";
+      await recordEmissionError(supabaseAdmin, payment_id, "VALIDATION_ERROR", msg);
+      return respond({ error: msg }, 400);
     }
 
     // ── Ensure customer exists in Asaas ──
@@ -365,9 +408,11 @@ Deno.serve(async (req) => {
         const detail = customerData?.errors?.[0]?.description
           || customerData?.errors?.[0]?.code
           || JSON.stringify(customerData);
+        const msg = `Erro ao criar cliente no Asaas: ${detail}`;
         console.error("Asaas customer error:", JSON.stringify(customerData));
+        await recordEmissionError(supabaseAdmin, payment_id, "ASAAS_CUSTOMER_ERROR", msg, customerPayload, customerData);
         return respond({
-          error: `Erro ao criar cliente no Asaas: ${detail}`,
+          error: msg,
           details: customerData,
         }, 502);
       }
@@ -468,9 +513,11 @@ Deno.serve(async (req) => {
       const detail = chargeData?.errors?.[0]?.description
         || chargeData?.errors?.[0]?.code
         || JSON.stringify(chargeData);
+      const msg = `Asaas recusou a cobrança: ${detail}`;
       console.error("Asaas charge error:", JSON.stringify(chargeData));
+      await recordEmissionError(supabaseAdmin, payment_id, "ASAAS_CHARGE_ERROR", msg, chargePayload, chargeData);
       return respond({
-        error: `Erro ao criar cobrança no Asaas: ${detail}`,
+        error: msg,
         details: chargeData,
       }, 502);
     }
@@ -491,6 +538,9 @@ Deno.serve(async (req) => {
     const resolvedMethod = payment.payment_method === "ASAAS" ? "BOLETO" : payment.payment_method;
     const resolvedStatus = resolvePaymentStatus(payment.status, chargeData.status, chargeData.paymentDate);
 
+    const { data: curEm } = await supabaseAdmin.from("payments").select("emission_attempts").eq("id", payment_id).maybeSingle();
+    const newAttempts = (curEm?.emission_attempts ?? 0) + 1;
+
     const updateData = {
       asaas_payment_id: chargeData.id,
       invoice_url: chargeData.invoiceUrl || null,
@@ -503,6 +553,14 @@ Deno.serve(async (req) => {
       payment_method: mapBillingTypeToPaymentMethod(chargeData.billingType) || resolvedMethod,
       status: resolvedStatus,
       due_date: chargeData.dueDate || payment.due_date,
+      gateway: "ASAAS",
+      emission_status: "EMITTED",
+      emission_error_code: null,
+      emission_error_message: null,
+      emission_payload: chargePayload,
+      emission_response: chargeData,
+      emission_last_attempt_at: new Date().toISOString(),
+      emission_attempts: newAttempts,
     };
 
     const { error: updateErr } = await supabaseAdmin.from("payments").update(updateData).eq("id", payment_id);

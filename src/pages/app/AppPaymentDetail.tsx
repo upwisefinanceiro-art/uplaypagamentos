@@ -696,6 +696,54 @@ const AppPaymentDetail = () => {
         </div>
       </div>
 
+      {/* ─── DIAGNÓSTICO DE EMISSÃO (admin) ─── */}
+      {isAdmin && (payment.emission_status || payment.emission_error_message) && (
+        <div className="glass-card p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold">Diagnóstico de emissão</h3>
+            <span
+              className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
+                (payment.emission_status || "").toUpperCase() === "EMITTED"
+                  ? "bg-success/20 text-success"
+                  : (payment.emission_status || "").toUpperCase() === "ERROR"
+                  ? "bg-destructive/20 text-destructive"
+                  : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {(payment.emission_status || "PENDING").toUpperCase()}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <div><span className="text-muted-foreground">Banco usado:</span> {(payment.gateway || "—").toUpperCase()}</div>
+            <div><span className="text-muted-foreground">ID da parcela:</span> <code className="text-[10px]">{payment.id}</code></div>
+            <div><span className="text-muted-foreground">ID externo Cora:</span> <code className="text-[10px]">{payment.cora_invoice_id || "—"}</code></div>
+            <div><span className="text-muted-foreground">ID externo Asaas:</span> <code className="text-[10px]">{payment.asaas_payment_id || "—"}</code></div>
+            <div><span className="text-muted-foreground">Tentativas:</span> {payment.emission_attempts ?? 0}</div>
+            <div><span className="text-muted-foreground">Última tentativa:</span> {payment.emission_last_attempt_at ? new Date(payment.emission_last_attempt_at).toLocaleString("pt-BR") : "—"}</div>
+          </div>
+          {payment.emission_error_message && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3">
+              <div className="text-[11px] font-semibold text-destructive mb-1">
+                {payment.emission_error_code ? `Erro [${payment.emission_error_code}]` : "Erro retornado"}
+              </div>
+              <div className="text-xs text-destructive/90 whitespace-pre-wrap">{payment.emission_error_message}</div>
+            </div>
+          )}
+          {payment.emission_payload && (
+            <details className="text-xs">
+              <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Dados enviados ao banco</summary>
+              <pre className="mt-2 overflow-auto rounded bg-muted/50 p-2 text-[10px] max-h-48">{JSON.stringify(payment.emission_payload, null, 2)}</pre>
+            </details>
+          )}
+          {payment.emission_response && (
+            <details className="text-xs">
+              <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Resposta da API</summary>
+              <pre className="mt-2 overflow-auto rounded bg-muted/50 p-2 text-[10px] max-h-48">{JSON.stringify(payment.emission_response, null, 2)}</pre>
+            </details>
+          )}
+        </div>
+      )}
+
       {/* ─── HISTORY TIMELINE ─── */}
       <div className="glass-card p-4 space-y-3">
         <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
