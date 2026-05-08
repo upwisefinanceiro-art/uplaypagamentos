@@ -132,7 +132,7 @@ Deno.serve(async (req) => {
     }
 
     const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(user_id, {
-      email: normalizedEmail,
+      email: authEmail,
       user_metadata: {
         cpf: cleanCpf,
         full_name: normalizedName,
@@ -150,7 +150,7 @@ Deno.serve(async (req) => {
       full_name: normalizedName,
       cpf: cleanCpf,
       phone: normalizedPhone,
-      email: normalizedEmail,
+      email: profileEmail,
       address: normalizedAddress,
       unit_id: nextUnitId,
       birth_date: birth_date && String(birth_date).trim() ? birth_date : null,
