@@ -86,6 +86,13 @@ interface PaymentRow {
   payment_type: string;
   cora_invoice_id?: string | null;
   gateway?: string | null;
+  emission_status?: string | null;
+  emission_error_code?: string | null;
+  emission_error_message?: string | null;
+  emission_attempts?: number | null;
+  emission_last_attempt_at?: string | null;
+  emission_payload?: any;
+  emission_response?: any;
 }
 
 interface ContractRow {
