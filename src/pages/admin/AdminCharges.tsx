@@ -893,13 +893,36 @@ const AdminCharges = () => {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
+            variant="default"
+            className="gap-1.5"
+            disabled={syncingAll}
+            onClick={async () => {
+              setSyncingAll(true);
+              try {
+                const baseBody = unitFilter !== "ALL" ? { unit_id: unitFilter } : {};
+                const { data, error } = await supabase.functions.invoke("auto-emit-pending-charges", { body: baseBody });
+                if (error || (data as any)?.error) {
+                  toast({ title: "Erro ao emitir pendentes", description: error?.message || (data as any)?.error, variant: "destructive" });
+                } else {
+                  toast({ title: "Emissão automática iniciada", description: `${(data as any)?.queued ?? 0} parcela(s) sendo emitida(s) no banco escolhido. Atualize em alguns segundos.` });
+                  setTimeout(() => fetchData(), 4000);
+                }
+              } finally {
+                setSyncingAll(false);
+              }
+            }}
+          >
+            {syncingAll ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+            Emitir Pendentes
+          </Button>
+          <Button
             variant="outline"
             className="gap-1.5"
             disabled={syncingAll}
             onClick={handleSyncAll}
           >
             {syncingAll ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-            Sincronizar Todos
+            Sincronizar Status
            </Button>
           <Button
             variant="outline"
