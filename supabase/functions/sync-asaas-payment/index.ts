@@ -195,7 +195,12 @@ Deno.serve(async (req) => {
       .single();
 
     if (unitErr || !unit?.asaas_api_key) {
-      return respond({ error: "Unidade sem credenciais Asaas configuradas" }, 400);
+      const msg = "Credencial do banco Asaas não configurada para esta unidade.";
+      // só registra emission se for fluxo de criação (sem asaas_payment_id)
+      if (!payment.asaas_payment_id) {
+        await recordEmissionError(supabaseAdmin, payment_id, "UNIT_CREDENTIALS_MISSING", msg);
+      }
+      return respond({ error: msg }, 400);
     }
 
     console.log("[sync-asaas-payment] unidade identificada", JSON.stringify({
