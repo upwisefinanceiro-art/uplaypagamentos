@@ -330,22 +330,29 @@ Deno.serve(async (req) => {
       .single();
 
     if (respErr || !responsible) {
+      await recordEmissionError(supabaseAdmin, payment_id, "RESPONSIBLE_NOT_FOUND", "Responsável não encontrado.");
       return respond({ error: "Responsável não encontrado" }, 404);
     }
 
     // ── VALIDATE required fields ──
     if (!responsible.cpf || responsible.cpf.trim() === "") {
-      return respond({ error: "CPF do responsável não está cadastrado. Atualize o cadastro antes de sincronizar." }, 400);
+      const msg = "CPF do responsável não está cadastrado.";
+      await recordEmissionError(supabaseAdmin, payment_id, "VALIDATION_ERROR", msg);
+      return respond({ error: msg }, 400);
     }
 
     const cpfClean = responsible.cpf.replace(/\D/g, "");
 
     if (!validateCpf(cpfClean)) {
-      return respond({ error: `CPF do responsável é inválido: ${responsible.cpf}. Corrija o cadastro.` }, 400);
+      const msg = `CPF do responsável é inválido: ${responsible.cpf}.`;
+      await recordEmissionError(supabaseAdmin, payment_id, "VALIDATION_ERROR", msg);
+      return respond({ error: msg }, 400);
     }
 
     if (!responsible.full_name || responsible.full_name.trim().length < 3) {
-      return respond({ error: "Nome do responsável é obrigatório e deve ter pelo menos 3 caracteres." }, 400);
+      const msg = "Nome do responsável é obrigatório e deve ter pelo menos 3 caracteres.";
+      await recordEmissionError(supabaseAdmin, payment_id, "VALIDATION_ERROR", msg);
+      return respond({ error: msg }, 400);
     }
 
     // ── Ensure customer exists in Asaas ──
