@@ -17,6 +17,24 @@ const corsHeaders = {
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
+async function recordEmissionError(admin: any, paymentId: string, gateway: string, code: string, message: string, response?: unknown) {
+  try {
+    const { data: cur } = await admin.from("payments").select("emission_attempts").eq("id", paymentId).maybeSingle();
+    await admin.from("payments").update({
+      gateway,
+      emission_status: "ERROR",
+      emission_error_code: code,
+      emission_error_message: message,
+      emission_response: response ?? null,
+      emission_last_attempt_at: new Date().toISOString(),
+      emission_attempts: (cur?.emission_attempts ?? 0) + 1,
+      updated_at: new Date().toISOString(),
+    }).eq("id", paymentId);
+  } catch (e) {
+    console.error("[auto-emit-pending-charges] failed to record route error", e);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -84,11 +102,17 @@ Deno.serve(async (req) => {
             body: { payment_id: p.id },
             headers: runHeaders,
           });
-          if ((r as any).error || (r as any).data?.error) fail++;
-          else if (gw === "CORA") okCora++;
+          const err = (r as any).error;
+          const dataErr = (r as any).data?.error;
+          if (err || dataErr) {
+            fail++;
+            const message = dataErr || err?.message || `Falha ao emitir cobrança no ${gw === "CORA" ? "Cora" : "Asaas"}.`;
+            await recordEmissionError(admin, p.id, gw, "AUTO_EMIT_FUNCTION_ERROR", message, (r as any).data ?? err);
+          } else if (gw === "CORA") okCora++;
           else okAsaas++;
-        } catch {
+        } catch (e) {
           fail++;
+          await recordEmissionError(admin, p.id, gw, "AUTO_EMIT_EXCEPTION", e instanceof Error ? e.message : String(e));
         }
       }
       try {
