@@ -1,6 +1,6 @@
 // Edge Function: create-cora-charge
-// Emite boleto+PIX no Banco Cora para uma parcela (payment_id) do Plano UPLAY.
-// Usa credenciais GLOBAIS Cora (intermediação UPLAY).
+// Emite boleto+PIX no Banco Cora para uma parcela (payment_id).
+// Grava status detalhado de emissão (emission_*) em payments para diagnóstico.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.98.0";
 import {
   authenticateCora,
@@ -13,10 +13,46 @@ import {
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+    "authorization, x-client-info, apikey, content-type, x-internal-key, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+// Helper: registra falha de emissão na própria parcela
+async function recordEmissionError(
+  admin: any,
+  paymentId: string,
+  code: string,
+  message: string,
+  payload?: unknown,
+  response?: unknown,
+) {
+  try {
+    // incrementa attempts via select+update
+    const { data: cur } = await admin
+      .from("payments")
+      .select("emission_attempts")
+      .eq("id", paymentId)
+      .maybeSingle();
+    const attempts = (cur?.emission_attempts ?? 0) + 1;
+    await admin
+      .from("payments")
+      .update({
+        emission_status: "ERROR",
+        emission_error_code: code,
+        emission_error_message: message,
+        emission_payload: payload ?? null,
+        emission_response: response ?? null,
+        emission_last_attempt_at: new Date().toISOString(),
+        emission_attempts: attempts,
+        gateway: "CORA",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", paymentId);
+  } catch (e) {
+    console.error("[create-cora-charge] failed to record emission error", e);
+  }
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -31,12 +67,16 @@ Deno.serve(async (req) => {
 
     const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
     const { data: { user: caller } } = await userClient.auth.getUser();
-    if (!caller) return json({ error: "Não autorizado" }, 401);
+    // Permite chamada interna (cron / auto-emit) via service role key
+    const isInternal = authHeader === `Bearer ${serviceRoleKey}`;
+    if (!caller && !isInternal) return json({ error: "Não autorizado" }, 401);
 
     const admin = createClient(supabaseUrl, serviceRoleKey);
-    const { data: roles } = await admin.from("user_roles").select("role").eq("user_id", caller.id);
-    const allowed = roles?.some((r: { role: string }) => ["SUPER_ADMIN", "ADMIN_MASTER", "ADMIN_UNIDADE"].includes(r.role));
-    if (!allowed) return json({ error: "Sem permissão" }, 403);
+    if (caller) {
+      const { data: roles } = await admin.from("user_roles").select("role").eq("user_id", caller.id);
+      const allowed = roles?.some((r: { role: string }) => ["SUPER_ADMIN", "ADMIN_MASTER", "ADMIN_UNIDADE"].includes(r.role));
+      if (!allowed) return json({ error: "Sem permissão" }, 403);
+    }
 
     const { payment_id } = await req.json();
     if (!payment_id) return json({ error: "payment_id obrigatório" }, 400);
@@ -49,7 +89,13 @@ Deno.serve(async (req) => {
     if (pErr || !payment) return json({ error: "Parcela não encontrada" }, 404);
 
     if (payment.status !== "PENDING") return json({ error: `Parcela já está ${payment.status}` }, 400);
+
+    // ── DEDUP: se já tem cora_invoice_id, NÃO recria ──
     if (payment.cora_invoice_id) {
+      await admin
+        .from("payments")
+        .update({ emission_status: "EMITTED", emission_error_code: null, emission_error_message: null, updated_at: new Date().toISOString() })
+        .eq("id", payment.id);
       return json({ success: true, already_emitted: true, cora_invoice_id: payment.cora_invoice_id });
     }
 
@@ -59,11 +105,16 @@ Deno.serve(async (req) => {
       .select("id, partnership_plan, name, cora_client_id, cora_certificate, cora_private_key, cora_environment")
       .eq("id", payment.unit_id)
       .single();
-    if (!unit) return json({ error: "Unidade não encontrada" }, 404);
+    if (!unit) {
+      await recordEmissionError(admin, payment.id, "UNIT_NOT_FOUND", "Unidade não encontrada");
+      return json({ error: "Unidade não encontrada" }, 404);
+    }
 
     const hasUnitCora = !!(unit.cora_client_id && unit.cora_certificate && unit.cora_private_key);
     if (!hasUnitCora && unit.partnership_plan !== "PLANO_UPLAY") {
-      return json({ error: "Unidade sem credenciais Cora próprias e não está no Plano UPLAY (intermediação)" }, 400);
+      const msg = "Credencial do banco Cora não configurada para esta unidade.";
+      await recordEmissionError(admin, payment.id, "UNIT_CREDENTIALS_MISSING", msg);
+      return json({ error: msg }, 400);
     }
 
     // Pagador
@@ -73,13 +124,12 @@ Deno.serve(async (req) => {
       .eq("id", payment.responsible_id)
       .single();
     if (!resp || !resp.full_name || !resp.cpf) {
-      return json({ error: "Responsável sem nome ou CPF cadastrado" }, 400);
+      const msg = "Responsável sem nome ou CPF cadastrado.";
+      await recordEmissionError(admin, payment.id, "RESPONSIBLE_INCOMPLETE", msg);
+      return json({ error: msg }, 400);
     }
 
     const cpfDigits = onlyDigits(resp.cpf);
-    if (cpfDigits.length !== 11 && cpfDigits.length !== 14) {
-      return json({ error: "CPF/CNPJ do responsável inválido (deve ter 11 ou 14 dígitos)" }, 400);
-    }
 
     // Endereço — combina contrato + profile (fallback)
     let ct: any = null;
@@ -121,7 +171,7 @@ Deno.serve(async (req) => {
     // Validação completa pré-envio
     const validationErrors: string[] = [];
     if (!customerName || customerName.length < 3) validationErrors.push("nome do cliente (mínimo 3 caracteres)");
-    if (cpfDigits.length !== 11 && cpfDigits.length !== 14) validationErrors.push("CPF/CNPJ");
+    if (cpfDigits.length !== 11 && cpfDigits.length !== 14) validationErrors.push("CPF/CNPJ (11 ou 14 dígitos)");
     if (!emailTrim || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrim)) validationErrors.push("e-mail válido");
     if (phoneDigits && (phoneDigits.length < 10 || phoneDigits.length > 11)) validationErrors.push("telefone (10 ou 11 dígitos)");
     if (!addrStreet || addrStreet.trim().length < 3) validationErrors.push("logradouro");
@@ -134,16 +184,16 @@ Deno.serve(async (req) => {
     if (!valueCents || valueCents < 1000) validationErrors.push("valor mínimo R$ 10,00");
 
     if (validationErrors.length) {
-      return json({
-        error: `Dados inválidos para emissão Cora: ${validationErrors.join(", ")}.`,
-        validation_errors: validationErrors,
-      }, 400);
+      const msg = `Dados inválidos: ${validationErrors.join(", ")}.`;
+      await recordEmissionError(admin, payment.id, "VALIDATION_ERROR", msg, { validationErrors });
+      return json({ error: msg, validation_errors: validationErrors }, 400);
     }
 
-    // Credenciais: prioriza unidade (boleto sai em nome da empresa real),
-    // cai para globais UPLAY apenas se a unidade não tiver as próprias.
     const credsOrErr = hasUnitCora ? getUnitCoraCredentials(unit) : getGlobalCoraCredentials();
-    if ("error" in credsOrErr) return json({ error: credsOrErr.error }, 500);
+    if ("error" in credsOrErr) {
+      await recordEmissionError(admin, payment.id, "CREDENTIALS_ERROR", credsOrErr.error);
+      return json({ error: credsOrErr.error }, 500);
+    }
     console.info("[create-cora-charge] credenciais", JSON.stringify({
       source: hasUnitCora ? "UNIT" : "GLOBAL_UPLAY",
       environment: credsOrErr.environment,
@@ -152,12 +202,14 @@ Deno.serve(async (req) => {
     }));
 
     const sessionOrErr = await authenticateCora(credsOrErr);
-    if ("error" in sessionOrErr) return json({ error: sessionOrErr.error }, 502);
+    if ("error" in sessionOrErr) {
+      await recordEmissionError(admin, payment.id, "AUTH_FAILED", `Falha de autenticação Cora: ${sessionOrErr.error}`);
+      return json({ error: sessionOrErr.error }, 502);
+    }
     const session = sessionOrErr;
 
     try {
-      // Payload OFICIAL Cora V2 — invoices (boleto + PIX)
-      // Doc: https://developers.cora.com.br/reference/criar-um-boleto
+      // Payload Cora V2 — invoices (boleto + PIX)
       const payload: Record<string, unknown> = {
         code: payment.id,
         customer: {
@@ -188,11 +240,6 @@ Deno.serve(async (req) => {
         payment_forms: ["BANK_SLIP", "PIX"],
       };
 
-      // NOTA: removido `notification` — os valores de `rules` exigem enums específicos
-      // que não estão claramente documentados; sem isso o boleto é criado e a Cora
-      // aplica notificações padrão. Configurar depois via API de notificações.
-
-      // Mascara dados sensíveis em logs
       const maskedPayload = JSON.parse(JSON.stringify(payload));
       if (maskedPayload.customer?.document?.identity) {
         const id = String(maskedPayload.customer.document.identity);
@@ -204,22 +251,10 @@ Deno.serve(async (req) => {
         maskedPayload.customer.email = `${u.slice(0, 2)}***@${d || ""}`;
       }
 
-      // Endpoint OFICIAL Cora — Integração Direta v2 (mTLS)
-      // https://developers.cora.com.br/reference/emissão-de-boleto-registrado-v2
       const endpoint = "/v2/invoices";
-      console.info("[create-cora-charge] POST FULL", endpoint, JSON.stringify({
-        base_url: session.baseUrl,
-        full_url: `${session.baseUrl}${endpoint}`,
-        method: "POST",
-        content_type: "application/json; charset=utf-8",
-        payload_bytes: JSON.stringify(payload).length,
-        masked_payload: maskedPayload,
-      }, null, 2));
-
       const result = await coraRequest(session, endpoint, "POST", payload);
 
       if (!result.ok) {
-        // Extrai mensagem detalhada da Cora
         const errors = result.data?.errors;
         const errList = Array.isArray(errors)
           ? errors.map((e: any) => `[${e.field || e.code || "erro"}] ${e.description || e.message || JSON.stringify(e)}`).join(" | ")
@@ -229,41 +264,37 @@ Deno.serve(async (req) => {
           result.data?.message ||
           result.data?.error_description ||
           result.data?.error ||
-          (result.raw ? result.raw.slice(0, 500) : `(corpo vazio — headers: ${JSON.stringify(result.headers)})`);
+          (result.raw ? result.raw.slice(0, 500) : `(corpo vazio)`);
 
-        const fullError = `Cora ${result.status} em ${endpoint}: ${detail}`;
+        const fullError = `Cora ${result.status}: ${detail}`;
 
         console.error("[create-cora-charge] ERRO Cora", JSON.stringify({
-          status: result.status,
-          endpoint: result.url,
-          response_headers: result.headers,
+          status: result.status, endpoint: result.url,
           response_body: result.data ?? result.raw,
-          payload_sent: maskedPayload,
-        }, null, 2));
+        }));
+
+        await recordEmissionError(
+          admin,
+          payment.id,
+          `CORA_${result.status}`,
+          fullError,
+          maskedPayload,
+          result.data ?? result.raw,
+        );
 
         try {
           await admin.from("webhook_logs").insert({
             event: "cora:create_charge_error",
             local_payment_id: payment_id,
-            payload: {
-              status: result.status,
-              endpoint: result.url,
-              response_headers: result.headers,
-              response_body: result.data ?? result.raw,
-              payload_sent: maskedPayload,
-              detail,
-            },
+            payload: { status: result.status, response_body: result.data ?? result.raw, payload_sent: maskedPayload, detail },
           });
-        } catch (_) { /* ignore log failure */ }
+        } catch (_) { /* ignore */ }
 
         return json({
           error: fullError,
           cora_status: result.status,
-          cora_endpoint: result.url,
           cora_response: result.data ?? result.raw,
-          cora_response_headers: result.headers,
           payload_sent: maskedPayload,
-          validation_message: detail,
         }, 502);
       }
 
@@ -273,6 +304,10 @@ Deno.serve(async (req) => {
       const pixCopia = invoice?.pix?.emv || invoice?.pix?.payload || invoice?.payment_options?.pix?.emv || null;
       const pixQr = invoice?.pix?.qrcode_image || invoice?.pix?.qrcode || null;
       const invoiceUrl = invoice?.url || invoice?.invoice_url || boletoUrl;
+
+      // incrementa attempts
+      const { data: cur2 } = await admin.from("payments").select("emission_attempts").eq("id", payment.id).maybeSingle();
+      const attempts = (cur2?.emission_attempts ?? 0) + 1;
 
       await admin
         .from("payments")
@@ -286,6 +321,13 @@ Deno.serve(async (req) => {
           invoice_url: invoiceUrl,
           pix_copy_paste: pixCopia,
           pix_qr_code: pixQr,
+          emission_status: "EMITTED",
+          emission_error_code: null,
+          emission_error_message: null,
+          emission_payload: maskedPayload,
+          emission_response: invoice,
+          emission_last_attempt_at: new Date().toISOString(),
+          emission_attempts: attempts,
           updated_at: new Date().toISOString(),
         })
         .eq("id", payment.id);
@@ -296,7 +338,7 @@ Deno.serve(async (req) => {
           local_payment_id: payment.id,
           payload: { cora_invoice_id: coraInvoiceId },
         });
-      } catch (_) { /* ignore log failure */ }
+      } catch (_) { /* ignore */ }
 
       return json({ success: true, cora_invoice_id: coraInvoiceId, boleto_url: boletoUrl, pix_copy_paste: pixCopia });
     } finally {
