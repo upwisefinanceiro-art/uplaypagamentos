@@ -184,13 +184,18 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: authUpdateError.message || "Erro ao reutilizar cadastro existente" });
       }
 
-      const { error: existingProfileError } = await supabaseAdmin.from("profiles").update({
+      const reuseUpdate: Record<string, unknown> = {
         cpf: cleanCpf,
         full_name: normalizedName,
         phone: normalizedPhone,
         unit_id: nextUnitId,
         active: true,
-      }).eq("id", existingUserId);
+      };
+      if (profileEmail) reuseUpdate.email = profileEmail;
+      const { error: existingProfileError } = await supabaseAdmin
+        .from("profiles")
+        .update(reuseUpdate)
+        .eq("id", existingUserId);
       if (existingProfileError) {
         return jsonResponse({ error: existingProfileError.message || "Erro ao sincronizar perfil existente" });
       }
