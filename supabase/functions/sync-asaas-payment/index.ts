@@ -511,9 +511,11 @@ Deno.serve(async (req) => {
       const detail = chargeData?.errors?.[0]?.description
         || chargeData?.errors?.[0]?.code
         || JSON.stringify(chargeData);
+      const msg = `Asaas recusou a cobrança: ${detail}`;
       console.error("Asaas charge error:", JSON.stringify(chargeData));
+      await recordEmissionError(supabaseAdmin, payment_id, "ASAAS_CHARGE_ERROR", msg, chargePayload, chargeData);
       return respond({
-        error: `Erro ao criar cobrança no Asaas: ${detail}`,
+        error: msg,
         details: chargeData,
       }, 502);
     }
@@ -534,6 +536,9 @@ Deno.serve(async (req) => {
     const resolvedMethod = payment.payment_method === "ASAAS" ? "BOLETO" : payment.payment_method;
     const resolvedStatus = resolvePaymentStatus(payment.status, chargeData.status, chargeData.paymentDate);
 
+    const { data: curEm } = await supabaseAdmin.from("payments").select("emission_attempts").eq("id", payment_id).maybeSingle();
+    const newAttempts = (curEm?.emission_attempts ?? 0) + 1;
+
     const updateData = {
       asaas_payment_id: chargeData.id,
       invoice_url: chargeData.invoiceUrl || null,
@@ -546,6 +551,14 @@ Deno.serve(async (req) => {
       payment_method: mapBillingTypeToPaymentMethod(chargeData.billingType) || resolvedMethod,
       status: resolvedStatus,
       due_date: chargeData.dueDate || payment.due_date,
+      gateway: "ASAAS",
+      emission_status: "EMITTED",
+      emission_error_code: null,
+      emission_error_message: null,
+      emission_payload: chargePayload,
+      emission_response: chargeData,
+      emission_last_attempt_at: new Date().toISOString(),
+      emission_attempts: newAttempts,
     };
 
     const { error: updateErr } = await supabaseAdmin.from("payments").update(updateData).eq("id", payment_id);
