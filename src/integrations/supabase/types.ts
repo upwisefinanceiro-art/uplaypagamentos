@@ -717,6 +717,63 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_sync_logs: {
+        Row: {
+          action: string
+          asaas_payment_id: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          new_discount: number | null
+          new_value: number | null
+          old_discount: number | null
+          old_value: number | null
+          payment_id: string
+          performed_by: string | null
+          request_payload: Json | null
+          response_payload: Json | null
+          responsible_id: string | null
+          success: boolean
+          unit_id: string
+        }
+        Insert: {
+          action: string
+          asaas_payment_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          new_discount?: number | null
+          new_value?: number | null
+          old_discount?: number | null
+          old_value?: number | null
+          payment_id: string
+          performed_by?: string | null
+          request_payload?: Json | null
+          response_payload?: Json | null
+          responsible_id?: string | null
+          success?: boolean
+          unit_id: string
+        }
+        Update: {
+          action?: string
+          asaas_payment_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          new_discount?: number | null
+          new_value?: number | null
+          old_discount?: number | null
+          old_value?: number | null
+          payment_id?: string
+          performed_by?: string | null
+          request_payload?: Json | null
+          response_payload?: Json | null
+          responsible_id?: string | null
+          success?: boolean
+          unit_id?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           asaas_payment_id: string | null
@@ -729,6 +786,7 @@ export type Database = {
           cora_invoice_id: string | null
           cora_status: string | null
           cora_synced_at: string | null
+          corrected_automatically: boolean
           created_at: string
           description: string
           due_date: string
@@ -763,6 +821,12 @@ export type Database = {
           stock_item_id: string | null
           stock_quantity: number | null
           student_id: string | null
+          sync_attempts: number
+          sync_error: string | null
+          sync_fixed_by: string | null
+          sync_last_check: string | null
+          sync_last_fix: string | null
+          sync_status: string
           unit_id: string
           updated_at: string
           value: number
@@ -778,6 +842,7 @@ export type Database = {
           cora_invoice_id?: string | null
           cora_status?: string | null
           cora_synced_at?: string | null
+          corrected_automatically?: boolean
           created_at?: string
           description?: string
           due_date: string
@@ -812,6 +877,12 @@ export type Database = {
           stock_item_id?: string | null
           stock_quantity?: number | null
           student_id?: string | null
+          sync_attempts?: number
+          sync_error?: string | null
+          sync_fixed_by?: string | null
+          sync_last_check?: string | null
+          sync_last_fix?: string | null
+          sync_status?: string
           unit_id: string
           updated_at?: string
           value: number
@@ -827,6 +898,7 @@ export type Database = {
           cora_invoice_id?: string | null
           cora_status?: string | null
           cora_synced_at?: string | null
+          corrected_automatically?: boolean
           created_at?: string
           description?: string
           due_date?: string
@@ -861,6 +933,12 @@ export type Database = {
           stock_item_id?: string | null
           stock_quantity?: number | null
           student_id?: string | null
+          sync_attempts?: number
+          sync_error?: string | null
+          sync_fixed_by?: string | null
+          sync_last_check?: string | null
+          sync_last_fix?: string | null
+          sync_status?: string
           unit_id?: string
           updated_at?: string
           value?: number
