@@ -100,8 +100,9 @@ Deno.serve(async (req) => {
         : { Authorization: `Bearer ${serviceRoleKey}` };
 
       for (const p of queue) {
-        const gw = String(p.gateway || "ASAAS").toUpperCase();
+        const gw = String(p.payment_provider || p.gateway || "").toUpperCase();
         const fnName = gw === "CORA" ? "create-cora-charge" : "sync-asaas-payment";
+        console.log("[auto-emit-pending-charges] ROUTE", { payment_id: p.id, unit_id: p.unit_id, payment_provider: gw, target_function: fnName, attempt_at: new Date().toISOString() });
         try {
           const r = await admin.functions.invoke(fnName, {
             body: { payment_id: p.id },
