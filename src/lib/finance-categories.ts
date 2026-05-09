@@ -143,16 +143,10 @@ export const FINANCE_CATEGORIES: FinanceCategoryGroup[] = [
     items: ["DAS", "ISS", "Nota fiscal", "Impostos diversos"],
   },
   {
-    group: "Copa / Cozinha",
+    group: "Consumo da Empresa",
     direction: "DESPESA",
     entryType: "CONSUMO",
-    items: ["Copa / Cozinha"],
-  },
-  {
-    group: "Produtos de limpeza",
-    direction: "DESPESA",
-    entryType: "CONSUMO",
-    items: ["Produtos de limpeza"],
+    items: ["Copa / Cozinha", "Produtos de limpeza"],
   },
 ];
 
