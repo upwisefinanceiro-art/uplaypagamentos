@@ -343,6 +343,9 @@ const AdminFinancialPro = () => {
       category: cat,
       direction: grp?.direction || editing.direction,
       entry_type: grp?.entryType || editing.entry_type,
+      // Resetar subcategoria/descrição ao trocar categoria
+      subcategoria: null,
+      descricao_item: null,
     });
   };
 
