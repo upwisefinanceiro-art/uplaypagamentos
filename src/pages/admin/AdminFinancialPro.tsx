@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchAllPaginated } from "@/lib/fetchAllPaginated";
-import { FINANCE_CATEGORIES, findCategoryGroup } from "@/lib/finance-categories";
+import { FINANCE_CATEGORIES, findCategoryGroup, getSubitems } from "@/lib/finance-categories";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
