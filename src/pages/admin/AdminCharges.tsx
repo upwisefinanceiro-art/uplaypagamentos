@@ -86,6 +86,7 @@ interface PaymentRow {
   payment_type: string;
   cora_invoice_id?: string | null;
   gateway?: string | null;
+  payment_provider?: string | null;
   emission_status?: string | null;
   emission_error_code?: string | null;
   emission_error_message?: string | null;
