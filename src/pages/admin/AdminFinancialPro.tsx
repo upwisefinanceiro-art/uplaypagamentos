@@ -37,6 +37,8 @@ interface FinanceEntry {
   reconciliation_status: "PENDENTE" | "PAGO" | "ATRASADO" | "PARCIAL" | "CANCELADO";
   recurrence: "UNICO" | "SEMANAL" | "QUINZENAL" | "MENSAL" | "ANUAL";
   notes: string | null;
+  subcategoria?: string | null;
+  descricao_item?: string | null;
 }
 
 const PAID = ["PAID", "RECEIVED", "CONFIRMED"];
