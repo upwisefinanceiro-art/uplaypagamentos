@@ -16,6 +16,8 @@ interface ChargeInput {
   payment_type?: "MENSALIDADE" | "APOSTILA" | "AVULSA";
   stock_item_id?: string;
   stock_quantity?: number;
+  punctuality_discount?: number;
+  original_value?: number;
 }
 
 Deno.serve(async (req) => {
@@ -53,7 +55,7 @@ Deno.serve(async (req) => {
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
     const body: ChargeInput & { _local_payment_id?: string } = await req.json();
-  const { responsible_id, student_id, contract_id, value, due_date, billing_type, description, payment_type, stock_item_id, stock_quantity } = body;
+  const { responsible_id, student_id, contract_id, value, due_date, billing_type, description, payment_type, stock_item_id, stock_quantity, punctuality_discount, original_value } = body;
 
     if (!responsible_id || !value || !due_date || !billing_type) {
       return new Response(JSON.stringify({ error: "Campos obrigatórios: responsible_id, value, due_date, billing_type" }), {
@@ -256,19 +258,44 @@ Deno.serve(async (req) => {
       CARD: "CREDIT_CARD",
     };
 
+    // Desconto de pontualidade: enviar value cheio + discount separado
+    const discountValue = Number(punctuality_discount ?? 0) || 0;
+    const originalValueNum = Number(original_value ?? value);
+    const hasDiscount = discountValue > 0 && originalValueNum > Number(value);
+    const asaasValue = hasDiscount ? originalValueNum : value;
+
+    const asaasPayload: Record<string, unknown> = {
+      customer: asaasCustomerId,
+      billingType: billingTypeMap[billing_type],
+      value: asaasValue,
+      dueDate: due_date,
+      description: description || "Mensalidade UPLAY",
+    };
+    if (hasDiscount) {
+      asaasPayload.discount = {
+        value: Number(discountValue.toFixed(2)),
+        dueDateLimitDays: 0,
+        type: "FIXED",
+      };
+    }
+
+    console.log("[create-asaas-charge] payload Asaas", JSON.stringify({
+      responsible_id,
+      due_date,
+      original_value: originalValueNum,
+      punctuality_discount: discountValue,
+      final_value_with_discount: Number(value),
+      has_discount: hasDiscount,
+      payload: asaasPayload,
+    }));
+
     const chargeRes = await fetch(`${baseUrl}/payments`, {
       method: "POST",
       headers: {
         access_token: unit.asaas_api_key,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        customer: asaasCustomerId,
-        billingType: billingTypeMap[billing_type],
-        value,
-        dueDate: due_date,
-        description: description || "Mensalidade UPLAY",
-      }),
+      body: JSON.stringify(asaasPayload),
     });
 
     const chargeData = await chargeRes.json();
@@ -314,8 +341,11 @@ Deno.serve(async (req) => {
         student_id: student_id || null,
         installment_number: 1,
         due_date,
-        value,
+        value: hasDiscount ? originalValueNum : value,
+        original_value: hasDiscount ? originalValueNum : value,
         final_value: value,
+        punctuality_discount: discountValue,
+        payment_provider: "ASAAS",
         description: description || "Mensalidade UPLAY",
         payment_type: payment_type || (contract_id ? "MENSALIDADE" : "AVULSA"),
         status: "PENDING",

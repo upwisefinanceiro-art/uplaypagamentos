@@ -68,6 +68,8 @@ interface PaymentRow {
   id: string;
   value: number;
   final_value: number | null;
+  original_value?: number | null;
+  punctuality_discount?: number | null;
   due_date: string;
   status: string;
   payment_method: string | null;
@@ -234,7 +236,7 @@ const AdminCharges = () => {
       fetchAllPaginated<PaymentRow>((from, to) =>
         supabase
           .from("payments")
-          .select("id, value, final_value, due_date, status, payment_method, pix_copy_paste, invoice_url, checkout_url, boleto_url, pix_qr_code, asaas_payment_id, responsible_id, unit_id, installment_number, contract_id, student_id, description, payment_type, cora_invoice_id, gateway, payment_provider, emission_status, emission_error_code, emission_error_message, emission_attempts, emission_last_attempt_at, emission_payload, emission_response")
+          .select("id, value, final_value, original_value, punctuality_discount, due_date, status, payment_method, pix_copy_paste, invoice_url, checkout_url, boleto_url, pix_qr_code, asaas_payment_id, responsible_id, unit_id, installment_number, contract_id, student_id, description, payment_type, cora_invoice_id, gateway, payment_provider, emission_status, emission_error_code, emission_error_message, emission_attempts, emission_last_attempt_at, emission_payload, emission_response")
           .order("due_date", { ascending: false })
           .range(from, to),
       ),
@@ -1253,7 +1255,23 @@ const AdminCharges = () => {
                   </div>
 
                   <div className="flex flex-col items-start gap-3 lg:items-end">
-                    <p className={`text-lg font-bold ${isOverdue ? "text-destructive" : "text-foreground"}`}>R$ {paymentValue.toFixed(2).replace(".", ",")}</p>
+                    {(() => {
+                      const orig = Number(payment.original_value ?? payment.value ?? 0);
+                      const disc = Number(payment.punctuality_discount ?? 0);
+                      const finalV = Number(payment.final_value ?? orig);
+                      const hasDisc = disc > 0 && orig > finalV;
+                      if (!hasDisc) {
+                        return <p className={`text-lg font-bold ${isOverdue ? "text-destructive" : "text-foreground"}`}>R$ {paymentValue.toFixed(2).replace(".", ",")}</p>;
+                      }
+                      return (
+                        <div className="text-right space-y-0.5">
+                          <p className="text-xs text-muted-foreground line-through">R$ {orig.toFixed(2).replace(".", ",")}</p>
+                          <p className="text-[10px] text-emerald-600 font-medium">Desconto pontualidade: R$ {disc.toFixed(2).replace(".", ",")}</p>
+                          <p className={`text-lg font-bold ${isOverdue ? "text-destructive" : "text-emerald-600"}`}>R$ {finalV.toFixed(2).replace(".", ",")}</p>
+                          <p className="text-[10px] text-muted-foreground">até o vencimento</p>
+                        </div>
+                      );
+                    })()}
 
                     {/* Action buttons row */}
                     <div className="flex flex-wrap items-center gap-1.5">

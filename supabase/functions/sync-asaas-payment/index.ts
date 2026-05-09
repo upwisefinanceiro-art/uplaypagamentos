@@ -483,16 +483,44 @@ Deno.serve(async (req) => {
     const todayStr = new Date().toISOString().slice(0, 10);
     const effectiveDueDate = payment.due_date < todayStr ? todayStr : payment.due_date;
 
-    const chargePayload = {
+    // ── Desconto de pontualidade ──
+    // Regra: enviar SEMPRE o valor cheio em `value` e, se houver desconto,
+    // enviar `discount` separado (válido até o vencimento).
+    const punctualityDiscount = Number((payment as any).punctuality_discount ?? 0) || 0;
+    const originalValue = Number(
+      (payment as any).original_value ?? payment.value ?? payment.final_value ?? 0
+    );
+    const finalWithDiscount = Number(payment.final_value ?? originalValue);
+    const hasDiscount = punctualityDiscount > 0 && originalValue > finalWithDiscount;
+
+    const chargePayload: Record<string, unknown> = {
       customer: asaasCustomerId,
       billingType,
-      value: Number(payment.final_value ?? payment.value),
+      value: hasDiscount ? originalValue : finalWithDiscount || originalValue,
       dueDate: effectiveDueDate,
       description: payment.description || "Mensalidade UPLAY",
     };
 
-    console.log("Criando cobrança no Asaas:", JSON.stringify(chargePayload));
-    console.log("[sync-asaas-payment] chamada ao Asaas iniciada", JSON.stringify({ payment_id, mode: "create", billingType, dueDate: payment.due_date }));
+    if (hasDiscount) {
+      chargePayload.discount = {
+        value: Number(punctualityDiscount.toFixed(2)),
+        dueDateLimitDays: 0,
+        type: "FIXED",
+      };
+    }
+
+    console.log("[sync-asaas-payment] payload Asaas (desconto pontualidade)", JSON.stringify({
+      payment_id,
+      responsible_id: payment.responsible_id,
+      payment_provider: (payment as any).payment_provider || "ASAAS",
+      due_date: effectiveDueDate,
+      original_value: originalValue,
+      punctuality_discount: punctualityDiscount,
+      final_value_with_discount: finalWithDiscount,
+      has_discount: hasDiscount,
+      payload: chargePayload,
+    }));
+    console.log("[sync-asaas-payment] chamada ao Asaas iniciada", JSON.stringify({ payment_id, mode: "create", billingType, dueDate: effectiveDueDate }));
 
     const chargeRes = await fetch(`${baseUrl}/payments`, {
       method: "POST",
