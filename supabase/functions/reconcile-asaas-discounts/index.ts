@@ -97,8 +97,8 @@ Deno.serve(async (req) => {
   if (filterUnitId) q = q.eq("unit_id", filterUnitId);
   if (allowedUnitIds) q = q.in("unit_id", allowedUnitIds);
 
-  // Count total remaining
-  const { count: totalRemaining } = await admin
+  // Count total remaining (with same filters/scope)
+  let countQ = admin
     .from("payments")
     .select("id", { count: "exact", head: true })
     .eq("payment_provider", "ASAAS")
@@ -106,8 +106,11 @@ Deno.serve(async (req) => {
     .not("asaas_payment_id", "is", null)
     .gt("punctuality_discount", 0)
     .not("original_value", "is", null)
-    .neq("sync_status", "FIXED")
-    .then((r) => allowedUnitIds ? r : r);
+    .neq("sync_status", "FIXED");
+  if (filterPaymentIds?.length) countQ = countQ.in("id", filterPaymentIds);
+  if (filterUnitId) countQ = countQ.eq("unit_id", filterUnitId);
+  if (allowedUnitIds) countQ = countQ.in("unit_id", allowedUnitIds);
+  const { count: totalRemaining } = await countQ;
 
   const { data: payments, error: pErr } = await q.limit(batchSize);
   if (pErr) return respond({ error: pErr.message }, 500);
