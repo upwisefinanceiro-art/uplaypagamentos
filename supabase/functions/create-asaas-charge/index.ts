@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
     const body: ChargeInput & { _local_payment_id?: string } = await req.json();
-  const { responsible_id, student_id, contract_id, value, due_date, billing_type, description, payment_type, stock_item_id, stock_quantity } = body;
+  const { responsible_id, student_id, contract_id, value, due_date, billing_type, description, payment_type, stock_item_id, stock_quantity, punctuality_discount, original_value } = body;
 
     if (!responsible_id || !value || !due_date || !billing_type) {
       return new Response(JSON.stringify({ error: "Campos obrigatórios: responsible_id, value, due_date, billing_type" }), {
