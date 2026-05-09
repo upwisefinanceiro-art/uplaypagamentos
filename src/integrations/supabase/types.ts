@@ -575,6 +575,7 @@ export type Database = {
           competence_date: string
           created_at: string
           created_by: string | null
+          descricao_item: string | null
           description: string
           direction: string
           due_date: string
@@ -584,6 +585,7 @@ export type Database = {
           paid_date: string | null
           reconciliation_status: string
           recurrence: string
+          subcategoria: string | null
           unit_id: string
           updated_at: string
         }
@@ -594,6 +596,7 @@ export type Database = {
           competence_date?: string
           created_at?: string
           created_by?: string | null
+          descricao_item?: string | null
           description: string
           direction?: string
           due_date?: string
@@ -603,6 +606,7 @@ export type Database = {
           paid_date?: string | null
           reconciliation_status?: string
           recurrence?: string
+          subcategoria?: string | null
           unit_id: string
           updated_at?: string
         }
@@ -613,6 +617,7 @@ export type Database = {
           competence_date?: string
           created_at?: string
           created_by?: string | null
+          descricao_item?: string | null
           description?: string
           direction?: string
           due_date?: string
@@ -622,6 +627,7 @@ export type Database = {
           paid_date?: string | null
           reconciliation_status?: string
           recurrence?: string
+          subcategoria?: string | null
           unit_id?: string
           updated_at?: string
         }

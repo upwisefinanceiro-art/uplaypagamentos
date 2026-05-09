@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchAllPaginated } from "@/lib/fetchAllPaginated";
-import { FINANCE_CATEGORIES, findCategoryGroup } from "@/lib/finance-categories";
+import { FINANCE_CATEGORIES, findCategoryGroup, getSubitems } from "@/lib/finance-categories";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +37,8 @@ interface FinanceEntry {
   reconciliation_status: "PENDENTE" | "PAGO" | "ATRASADO" | "PARCIAL" | "CANCELADO";
   recurrence: "UNICO" | "SEMANAL" | "QUINZENAL" | "MENSAL" | "ANUAL";
   notes: string | null;
+  subcategoria?: string | null;
+  descricao_item?: string | null;
 }
 
 const PAID = ["PAID", "RECEIVED", "CONFIRMED"];
@@ -61,6 +63,7 @@ const emptyEntry = (unitId: string): Partial<FinanceEntry> => ({
   competence_date: isoDate(new Date()),
   due_date: isoDate(new Date()),
   paid_date: null, reconciliation_status: "PENDENTE", recurrence: "UNICO", notes: "",
+  subcategoria: null, descricao_item: null,
 });
 
 const STATUS_COLOR: Record<string, string> = {
@@ -163,6 +166,8 @@ const AdminFinancialPro = () => {
       arr = arr.filter(e =>
         e.description?.toLowerCase().includes(s) ||
         e.category?.toLowerCase().includes(s) ||
+        e.subcategoria?.toLowerCase().includes(s) ||
+        e.descricao_item?.toLowerCase().includes(s) ||
         e.notes?.toLowerCase().includes(s)
       );
     }
@@ -340,6 +345,9 @@ const AdminFinancialPro = () => {
       category: cat,
       direction: grp?.direction || editing.direction,
       entry_type: grp?.entryType || editing.entry_type,
+      // Resetar subcategoria/descrição ao trocar categoria
+      subcategoria: null,
+      descricao_item: null,
     });
   };
 
@@ -348,11 +356,22 @@ const AdminFinancialPro = () => {
       toast.error("Preencha unidade, descrição e valor");
       return;
     }
+    const subitems = getSubitems(editing.category);
+    if (subitems.length > 0 && !editing.subcategoria) {
+      toast.error("Selecione o item da despesa");
+      return;
+    }
+    if (editing.subcategoria === "Outros" && !editing.descricao_item?.trim()) {
+      toast.error("Descreva o item ('Outros')");
+      return;
+    }
     const payload: any = {
       unit_id: editing.unit_id,
       entry_type: editing.entry_type,
       direction: editing.direction,
       category: editing.category || null,
+      subcategoria: editing.subcategoria || null,
+      descricao_item: editing.descricao_item?.trim() || null,
       description: editing.description,
       amount: Number(editing.amount),
       competence_date: editing.competence_date,
@@ -431,11 +450,13 @@ const AdminFinancialPro = () => {
 
   // ==== Exportar CSV ====
   const exportCSV = () => {
-    const header = ["Tipo","Direção","Categoria","Descrição","Unidade","Valor","Competência","Vencimento","Pagamento","Status","Recorrência","Observações"];
+    const header = ["Tipo","Direção","Categoria","Subcategoria","Descrição do item","Descrição","Unidade","Valor","Competência","Vencimento","Pagamento","Status","Recorrência","Observações"];
     const rows = filteredEntries.map(e => [
       TYPE_LABEL[e.entry_type] || e.entry_type,
       e.direction,
       e.category || "",
+      e.subcategoria || "",
+      (e.descricao_item || "").replace(/"/g, '""'),
       (e.description || "").replace(/"/g, '""'),
       units.find(u => u.id === e.unit_id)?.name || "",
       String(e.amount).replace(".", ","),
@@ -727,7 +748,13 @@ const AdminFinancialPro = () => {
                         </td>
                         <td className="py-2 px-2">
                           <div className="font-medium">{e.description}</div>
-                          {e.category && <div className="text-xs text-muted-foreground">{e.category}</div>}
+                          {(e.category || e.subcategoria) && (
+                            <div className="text-xs text-muted-foreground">
+                              {e.category}
+                              {e.subcategoria && ` › ${e.subcategoria}`}
+                              {e.descricao_item && ` (${e.descricao_item})`}
+                            </div>
+                          )}
                         </td>
                         <td className="py-2 px-2 text-xs text-muted-foreground">
                           {units.find(u => u.id === e.unit_id)?.name || "—"}
@@ -874,6 +901,32 @@ const AdminFinancialPro = () => {
                   </SelectContent>
                 </Select>
               </div>
+              {getSubitems(editing.category).length > 0 && (
+                <div className="col-span-2">
+                  <Label>Item da despesa *</Label>
+                  <Select
+                    value={editing.subcategoria || ""}
+                    onValueChange={(v) => setEditing({ ...editing, subcategoria: v, descricao_item: v === "Outros" ? (editing.descricao_item || "") : null })}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Selecione o item..." /></SelectTrigger>
+                    <SelectContent>
+                      {getSubitems(editing.category).map(it => (
+                        <SelectItem key={it} value={it}>{it}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {editing.subcategoria === "Outros" && (
+                <div className="col-span-2">
+                  <Label>Descrição do item *</Label>
+                  <Input
+                    value={editing.descricao_item || ""}
+                    onChange={(e) => setEditing({ ...editing, descricao_item: e.target.value })}
+                    placeholder="Descreva o item da despesa..."
+                  />
+                </div>
+              )}
               <div className="col-span-2">
                 <Label>Descrição *</Label>
                 <Input value={editing.description || ""} onChange={(e) => setEditing({ ...editing, description: e.target.value })}

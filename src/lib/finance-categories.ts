@@ -8,6 +8,48 @@ export type FinanceCategoryGroup = {
   items: string[];
 };
 
+// Subcategorias (itens da despesa) por categoria principal.
+// Quando a categoria estiver presente aqui, o formulário exibe um segundo
+// seletor "Item da despesa". Selecionar "Outros" abre campo livre.
+export const CATEGORY_SUBITEMS: Record<string, string[]> = {
+  "Copa / Cozinha": [
+    "Pó de café",
+    "Açúcar",
+    "Adoçante",
+    "Chá",
+    "Água mineral",
+    "Copos descartáveis",
+    "Guardanapo",
+    "Papel toalha",
+    "Pão",
+    "Manteiga",
+    "Leite",
+    "Biscoitos",
+    "Gás de cozinha",
+    "Utensílios de cozinha",
+    "Outros",
+  ],
+  "Produtos de limpeza": [
+    "Água sanitária",
+    "Desinfetante",
+    "Detergente",
+    "Sabão",
+    "Álcool",
+    "Papel higiênico",
+    "Saco de lixo",
+    "Esponja",
+    "Pano de limpeza",
+    "Luvas",
+    "Produto multiuso",
+    "Outros",
+  ],
+};
+
+export function getSubitems(category: string | null | undefined): string[] {
+  if (!category) return [];
+  return CATEGORY_SUBITEMS[category] || [];
+}
+
 export const FINANCE_CATEGORIES: FinanceCategoryGroup[] = [
   {
     group: "Receitas",
@@ -99,6 +141,18 @@ export const FINANCE_CATEGORIES: FinanceCategoryGroup[] = [
     direction: "DESPESA",
     entryType: "FIXO",
     items: ["DAS", "ISS", "Nota fiscal", "Impostos diversos"],
+  },
+  {
+    group: "Copa / Cozinha",
+    direction: "DESPESA",
+    entryType: "CONSUMO",
+    items: ["Copa / Cozinha"],
+  },
+  {
+    group: "Produtos de limpeza",
+    direction: "DESPESA",
+    entryType: "CONSUMO",
+    items: ["Produtos de limpeza"],
   },
 ];
 
