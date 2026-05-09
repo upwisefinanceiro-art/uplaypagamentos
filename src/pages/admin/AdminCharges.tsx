@@ -68,6 +68,8 @@ interface PaymentRow {
   id: string;
   value: number;
   final_value: number | null;
+  original_value?: number | null;
+  punctuality_discount?: number | null;
   due_date: string;
   status: string;
   payment_method: string | null;
