@@ -142,6 +142,18 @@ export const FINANCE_CATEGORIES: FinanceCategoryGroup[] = [
     entryType: "FIXO",
     items: ["DAS", "ISS", "Nota fiscal", "Impostos diversos"],
   },
+  {
+    group: "Copa / Cozinha",
+    direction: "DESPESA",
+    entryType: "CONSUMO",
+    items: ["Copa / Cozinha"],
+  },
+  {
+    group: "Produtos de limpeza",
+    direction: "DESPESA",
+    entryType: "CONSUMO",
+    items: ["Produtos de limpeza"],
+  },
 ];
 
 export const ALL_CATEGORIES: string[] = FINANCE_CATEGORIES.flatMap((g) => g.items);
