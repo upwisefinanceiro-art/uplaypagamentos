@@ -305,7 +305,7 @@ Deno.serve(async (req) => {
     }
   }
 
-  const remaining = Math.max(0, (totalRemaining?.count ?? (payments?.length ?? 0)) - (stats.fixed + stats.already_ok + stats.skipped));
+  const remaining = Math.max(0, (totalRemaining ?? (payments?.length ?? 0)) - (stats.fixed + stats.already_ok + stats.skipped));
 
   return respond({
     ok: true,
