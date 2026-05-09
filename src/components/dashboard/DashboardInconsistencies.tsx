@@ -69,6 +69,15 @@ const DashboardInconsistencies = ({ unitFilter, units }: Props) => {
   const [scanning, setScanning] = useState(false);
   const [fixing, setFixing] = useState<string | null>(null);
   const [detailIssue, setDetailIssue] = useState<InconsistencyRow | null>(null);
+  const [autoFixing, setAutoFixing] = useState(false);
+  const [autoProgress, setAutoProgress] = useState<{
+    checked: number;
+    fixed: number;
+    already_ok: number;
+    errors: number;
+    skipped: number;
+    remaining: number;
+  } | null>(null);
 
   const unitNameMap = new Map(units.map((u) => [u.id, u.name]));
 
