@@ -158,10 +158,14 @@ Deno.serve(async (req) => {
 
     if (payErr || !payment) return respond({ error: "Pagamento não encontrado" }, 404);
 
-    // GUARD: nunca tocar parcelas marcadas como CORA — provider é decidido na criação
-    if ((payment.gateway || "").toUpperCase() === "CORA") {
-      console.warn("[sync-asaas-payment] BLOQUEADO: parcela com gateway=CORA", JSON.stringify({ payment_id, gateway: payment.gateway }));
-      return respond({ error: "Esta parcela foi criada com gateway Banco Cora. Use 'Emitir boleto Cora' para emiti-la." }, 400);
+    // GUARD ESTRITO: só processa parcelas com payment_provider = ASAAS
+    {
+      const provider = String((payment as any).payment_provider || payment.gateway || "ASAAS").toUpperCase();
+      console.log("[sync-asaas-payment] PROVIDER_CHECK", { payment_id, payment_provider: provider, target_function: "sync-asaas-payment", attempt_at: new Date().toISOString() });
+      if (provider !== "ASAAS") {
+        console.warn("[sync-asaas-payment] BLOQUEADO: payment_provider != ASAAS", JSON.stringify({ payment_id, provider }));
+        return respond({ error: `Erro ao emitir cobrança pelo Asaas: parcela está marcada como ${provider}. Use o serviço correto.` }, 400);
+      }
     }
 
     // RESPONSAVEL can only sync their own payments
