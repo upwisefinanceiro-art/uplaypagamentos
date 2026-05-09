@@ -456,6 +456,7 @@ const AdminCharges = () => {
         status: "PENDING",
         payment_method: "BOLETO",
         gateway: "CORA",
+        payment_provider: "CORA",
         payment_type: chargePaymentType,
         description: chargeDescription || "Cobrança avulsa",
       };
