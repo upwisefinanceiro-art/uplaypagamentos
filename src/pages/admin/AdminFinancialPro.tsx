@@ -166,6 +166,8 @@ const AdminFinancialPro = () => {
       arr = arr.filter(e =>
         e.description?.toLowerCase().includes(s) ||
         e.category?.toLowerCase().includes(s) ||
+        e.subcategoria?.toLowerCase().includes(s) ||
+        e.descricao_item?.toLowerCase().includes(s) ||
         e.notes?.toLowerCase().includes(s)
       );
     }
