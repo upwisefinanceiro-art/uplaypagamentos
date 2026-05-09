@@ -175,7 +175,58 @@ const DashboardInconsistencies = ({ unitFilter, units }: Props) => {
     }
   };
 
-  const fmt = (v: number | null | undefined) =>
+  const runAutoFix = async () => {
+    setAutoFixing(true);
+    const totals = { checked: 0, fixed: 0, already_ok: 0, errors: 0, skipped: 0, remaining: 0 };
+    setAutoProgress({ ...totals });
+    try {
+      const body: Record<string, unknown> = { batch_size: 25 };
+      if (unitFilter !== "all") body.unit_id = unitFilter;
+
+      // Loop until remaining === 0 (with hard cap of 200 batches)
+      for (let i = 0; i < 200; i++) {
+        const { data, error } = await supabase.functions.invoke(
+          "reconcile-asaas-discounts",
+          { body },
+        );
+        if (error) throw error;
+        const r = data as typeof totals & { batch?: number; ok?: boolean; error?: string };
+        if ((r as { error?: string }).error) throw new Error((r as { error: string }).error);
+
+        totals.checked += r.checked ?? 0;
+        totals.fixed += r.fixed ?? 0;
+        totals.already_ok += r.already_ok ?? 0;
+        totals.errors += r.errors ?? 0;
+        totals.skipped += r.skipped ?? 0;
+        totals.remaining = r.remaining ?? 0;
+        setAutoProgress({ ...totals });
+
+        if ((r.batch ?? 0) === 0 || (r.remaining ?? 0) === 0) break;
+      }
+
+      toast({
+        title: "Reconciliação concluída",
+        description: `Verificadas ${totals.checked} · Corrigidas ${totals.fixed} · Já OK ${totals.already_ok} · Erros ${totals.errors}`,
+      });
+
+      // Re-scan inconsistencies to clear the red list
+      try {
+        const scanBody: Record<string, string> = {};
+        if (unitFilter !== "all") scanBody.unit_id = unitFilter;
+        await supabase.functions.invoke("detect-payment-inconsistencies", { body: scanBody });
+      } catch { /* noop */ }
+
+      await fetchIssues();
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Falha na correção automática",
+        description: err instanceof Error ? err.message : "Erro desconhecido",
+      });
+    } finally {
+      setAutoFixing(false);
+    }
+  };
     v == null
       ? "—"
       : v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
