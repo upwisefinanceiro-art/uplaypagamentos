@@ -62,16 +62,18 @@ Deno.serve(async (req) => {
       });
     }
 
-    // GUARD: se referenciar parcela local com gateway=CORA, recusar
+    // GUARD ESTRITO: parcela local deve ter payment_provider = ASAAS
     if (body._local_payment_id) {
       const { data: localPay } = await supabaseAdmin
         .from("payments")
-        .select("gateway")
+        .select("payment_provider, gateway")
         .eq("id", body._local_payment_id)
         .maybeSingle();
-      if (localPay && (localPay.gateway || "").toUpperCase() === "CORA") {
-        console.warn("[create-asaas-charge] BLOQUEADO: parcela local com gateway=CORA", body._local_payment_id);
-        return new Response(JSON.stringify({ error: "Parcela marcada como Banco Cora — não é permitido criar no Asaas." }), {
+      const provider = String(localPay?.payment_provider || localPay?.gateway || "ASAAS").toUpperCase();
+      console.log("[create-asaas-charge] PROVIDER_CHECK", { payment_id: body._local_payment_id, payment_provider: provider, target_function: "create-asaas-charge", attempt_at: new Date().toISOString() });
+      if (provider !== "ASAAS") {
+        console.warn("[create-asaas-charge] BLOQUEADO: payment_provider != ASAAS", body._local_payment_id, provider);
+        return new Response(JSON.stringify({ error: `Erro ao emitir cobrança pelo Asaas: parcela está marcada como ${provider}.` }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
