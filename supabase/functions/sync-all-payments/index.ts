@@ -130,16 +130,25 @@ Deno.serve(async (req) => {
     }
 
     // ── PHASE 2: Get payments WITHOUT asaas_payment_id (need to be CREATED in Asaas) ──
+    // ESTRITO: somente parcelas com payment_provider = ASAAS (ou gateway = ASAAS via espelho).
     let createQuery = supabase
       .from("payments")
-      .select("id, responsible_id, unit_id, status, value, final_value, due_date, description, payment_method, payment_type, installment_number")
+      .select("id, responsible_id, unit_id, status, value, final_value, due_date, description, payment_method, payment_type, installment_number, payment_provider, gateway")
       .is("asaas_payment_id", null)
       .in("status", ["PENDING", "OVERDUE"])
       .neq("payment_method", "DINHEIRO");
 
     if (unitFilter) createQuery = createQuery.eq("unit_id", unitFilter);
 
-    const { data: unsentPayments } = await createQuery;
+    const { data: unsentPaymentsRaw } = await createQuery;
+    const unsentPayments = (unsentPaymentsRaw || []).filter((p: any) => {
+      const provider = String(p.payment_provider || p.gateway || "ASAAS").toUpperCase();
+      if (provider !== "ASAAS") {
+        console.log("[sync-all-payments] SKIP non-ASAAS", { payment_id: p.id, payment_provider: provider });
+        return false;
+      }
+      return true;
+    });
 
     // Group all by unit to reuse API keys
     const allUnits = new Set<string>();
