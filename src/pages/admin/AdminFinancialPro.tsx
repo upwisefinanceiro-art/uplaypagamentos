@@ -893,6 +893,32 @@ const AdminFinancialPro = () => {
                   </SelectContent>
                 </Select>
               </div>
+              {getSubitems(editing.category).length > 0 && (
+                <div className="col-span-2">
+                  <Label>Item da despesa *</Label>
+                  <Select
+                    value={editing.subcategoria || ""}
+                    onValueChange={(v) => setEditing({ ...editing, subcategoria: v, descricao_item: v === "Outros" ? (editing.descricao_item || "") : null })}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Selecione o item..." /></SelectTrigger>
+                    <SelectContent>
+                      {getSubitems(editing.category).map(it => (
+                        <SelectItem key={it} value={it}>{it}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {editing.subcategoria === "Outros" && (
+                <div className="col-span-2">
+                  <Label>Descrição do item *</Label>
+                  <Input
+                    value={editing.descricao_item || ""}
+                    onChange={(e) => setEditing({ ...editing, descricao_item: e.target.value })}
+                    placeholder="Descreva o item da despesa..."
+                  />
+                </div>
+              )}
               <div className="col-span-2">
                 <Label>Descrição *</Label>
                 <Input value={editing.description || ""} onChange={(e) => setEditing({ ...editing, description: e.target.value })}
