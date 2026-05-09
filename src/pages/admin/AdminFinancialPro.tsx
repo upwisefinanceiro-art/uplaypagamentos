@@ -63,6 +63,7 @@ const emptyEntry = (unitId: string): Partial<FinanceEntry> => ({
   competence_date: isoDate(new Date()),
   due_date: isoDate(new Date()),
   paid_date: null, reconciliation_status: "PENDENTE", recurrence: "UNICO", notes: "",
+  subcategoria: null, descricao_item: null,
 });
 
 const STATUS_COLOR: Record<string, string> = {
