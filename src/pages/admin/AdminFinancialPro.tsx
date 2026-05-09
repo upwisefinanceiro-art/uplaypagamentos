@@ -748,7 +748,13 @@ const AdminFinancialPro = () => {
                         </td>
                         <td className="py-2 px-2">
                           <div className="font-medium">{e.description}</div>
-                          {e.category && <div className="text-xs text-muted-foreground">{e.category}</div>}
+                          {(e.category || e.subcategoria) && (
+                            <div className="text-xs text-muted-foreground">
+                              {e.category}
+                              {e.subcategoria && ` › ${e.subcategoria}`}
+                              {e.descricao_item && ` (${e.descricao_item})`}
+                            </div>
+                          )}
                         </td>
                         <td className="py-2 px-2 text-xs text-muted-foreground">
                           {units.find(u => u.id === e.unit_id)?.name || "—"}
