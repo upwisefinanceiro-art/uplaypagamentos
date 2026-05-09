@@ -448,11 +448,13 @@ const AdminFinancialPro = () => {
 
   // ==== Exportar CSV ====
   const exportCSV = () => {
-    const header = ["Tipo","Direção","Categoria","Descrição","Unidade","Valor","Competência","Vencimento","Pagamento","Status","Recorrência","Observações"];
+    const header = ["Tipo","Direção","Categoria","Subcategoria","Descrição do item","Descrição","Unidade","Valor","Competência","Vencimento","Pagamento","Status","Recorrência","Observações"];
     const rows = filteredEntries.map(e => [
       TYPE_LABEL[e.entry_type] || e.entry_type,
       e.direction,
       e.category || "",
+      e.subcategoria || "",
+      (e.descricao_item || "").replace(/"/g, '""'),
       (e.description || "").replace(/"/g, '""'),
       units.find(u => u.id === e.unit_id)?.name || "",
       String(e.amount).replace(".", ","),
