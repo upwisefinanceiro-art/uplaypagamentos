@@ -363,23 +363,10 @@ const AdminContracts = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // FONTE DA VERDADE: re-buscar preferred_bank da unidade no momento do save
+      // FONTE DA VERDADE: o select do form. Nunca sobrepor pela preferência da unidade.
       const gatewaySupported = paymentMethod === "BOLETO" || paymentMethod === "PIX";
-      let effectiveGateway: "ASAAS" | "CORA" = gateway;
-      if (gatewaySupported && resolvedUnitId) {
-        const { data: unitRow } = await supabase
-          .from("units")
-          .select("preferred_bank")
-          .eq("id", resolvedUnitId)
-          .maybeSingle();
-        const pref = (unitRow?.preferred_bank || "").toString().toLowerCase();
-        const unitGw: "ASAAS" | "CORA" = pref === "cora" ? "CORA" : "ASAAS";
-        effectiveGateway = gateway === "CORA" || unitGw === "CORA" ? "CORA" : "ASAAS";
-        if (effectiveGateway !== gateway) {
-          console.warn("[GATEWAY_OVERRIDE]", { form: gateway, unit: unitGw, final: effectiveGateway });
-          setGateway(effectiveGateway);
-        }
-      }
+      const effectiveGateway: "ASAAS" | "CORA" = gateway;
+      console.log("[CONTRACTS_PROVIDER_SELECTED]", { selected: gateway, gatewaySupported, paymentMethod });
 
       let finalResponsibleId = responsibleId;
 
