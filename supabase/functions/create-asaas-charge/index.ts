@@ -16,6 +16,8 @@ interface ChargeInput {
   payment_type?: "MENSALIDADE" | "APOSTILA" | "AVULSA";
   stock_item_id?: string;
   stock_quantity?: number;
+  punctuality_discount?: number;
+  original_value?: number;
 }
 
 Deno.serve(async (req) => {
