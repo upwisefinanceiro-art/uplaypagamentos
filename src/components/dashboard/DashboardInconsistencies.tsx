@@ -277,21 +277,48 @@ const DashboardInconsistencies = ({ unitFilter, units }: Props) => {
                 </Badge>
               )}
             </CardTitle>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={runScan}
-              disabled={scanning}
-              className="h-8 text-xs"
-            >
-              {scanning ? (
-                <Loader2 size={14} className="mr-1 animate-spin" />
-              ) : (
-                <RefreshCw size={14} className="mr-1" />
-              )}
-              {scanning ? "Verificando..." : "Verificar agora"}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={runAutoFix}
+                disabled={autoFixing || scanning}
+                className="h-8 text-xs"
+                title="Corrige em massa cobranças Asaas com desconto desincronizado"
+              >
+                {autoFixing ? (
+                  <Loader2 size={14} className="mr-1 animate-spin" />
+                ) : (
+                  <Wand2 size={14} className="mr-1" />
+                )}
+                {autoFixing ? "Corrigindo..." : "Corrigir automaticamente"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={runScan}
+                disabled={scanning || autoFixing}
+                className="h-8 text-xs"
+              >
+                {scanning ? (
+                  <Loader2 size={14} className="mr-1 animate-spin" />
+                ) : (
+                  <RefreshCw size={14} className="mr-1" />
+                )}
+                {scanning ? "Verificando..." : "Verificar agora"}
+              </Button>
+            </div>
           </div>
+          {autoProgress && (autoFixing || autoProgress.checked > 0) && (
+            <div className="mt-2 text-[11px] text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
+              <span>Verificadas: <strong className="text-foreground">{autoProgress.checked}</strong></span>
+              <span>Corrigidas: <strong className="text-success">{autoProgress.fixed}</strong></span>
+              <span>Já OK: <strong>{autoProgress.already_ok}</strong></span>
+              {autoProgress.skipped > 0 && <span>Ignoradas: <strong>{autoProgress.skipped}</strong></span>}
+              {autoProgress.errors > 0 && <span>Erros: <strong className="text-destructive">{autoProgress.errors}</strong></span>}
+              {autoFixing && <span>Restantes: <strong>{autoProgress.remaining}</strong></span>}
+            </div>
+          )}
         </CardHeader>
         <CardContent className="pt-0">
           {loading ? (
