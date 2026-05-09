@@ -752,6 +752,7 @@ export type Database = {
           original_value: number | null
           paid_at: string | null
           payment_method: string | null
+          payment_provider: string
           payment_type: string
           pix_copy_paste: string | null
           pix_qr_code: string | null
@@ -800,6 +801,7 @@ export type Database = {
           original_value?: number | null
           paid_at?: string | null
           payment_method?: string | null
+          payment_provider?: string
           payment_type?: string
           pix_copy_paste?: string | null
           pix_qr_code?: string | null
@@ -848,6 +850,7 @@ export type Database = {
           original_value?: number | null
           paid_at?: string | null
           payment_method?: string | null
+          payment_provider?: string
           payment_type?: string
           pix_copy_paste?: string | null
           pix_qr_code?: string | null

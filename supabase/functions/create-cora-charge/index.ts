@@ -83,10 +83,21 @@ Deno.serve(async (req) => {
 
     const { data: payment, error: pErr } = await admin
       .from("payments")
-      .select("id, unit_id, responsible_id, contract_id, value, final_value, due_date, description, status, gateway, payment_method, cora_invoice_id")
+      .select("id, unit_id, responsible_id, contract_id, value, final_value, due_date, description, status, gateway, payment_provider, payment_method, cora_invoice_id, asaas_payment_id")
       .eq("id", payment_id)
       .single();
     if (pErr || !payment) return json({ error: "Parcela não encontrada" }, 404);
+
+    // GUARD ESTRITO: só processa parcelas com payment_provider = CORA
+    {
+      const provider = String((payment as any).payment_provider || payment.gateway || "ASAAS").toUpperCase();
+      console.log("[create-cora-charge] PROVIDER_CHECK", { payment_id: payment.id, payment_provider: provider, target_function: "create-cora-charge", attempt_at: new Date().toISOString() });
+      if (provider !== "CORA") {
+        const msg = `Erro ao emitir cobrança pelo Cora: parcela está marcada como ${provider}.`;
+        await recordEmissionError(admin, payment.id, "PROVIDER_MISMATCH", msg);
+        return json({ error: msg }, 400);
+      }
+    }
 
     if (payment.status !== "PENDING") return json({ error: `Parcela já está ${payment.status}` }, 400);
 

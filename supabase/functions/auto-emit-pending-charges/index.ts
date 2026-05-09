@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
     // Busca pendentes sem ID externo
     let q = admin
       .from("payments")
-      .select("id, unit_id, gateway, asaas_payment_id, cora_invoice_id, payment_method")
+      .select("id, unit_id, gateway, payment_provider, asaas_payment_id, cora_invoice_id, payment_method")
       .eq("status", "PENDING")
       .neq("payment_method", "DINHEIRO")
       .or("asaas_payment_id.is.null,cora_invoice_id.is.null")
@@ -80,11 +80,16 @@ Deno.serve(async (req) => {
     const { data: pending, error } = await q;
     if (error) return json({ error: error.message }, 500);
 
-    // Filtra: só o que realmente falta o ID do gateway escolhido
+    // Filtra: só o que realmente falta o ID do gateway escolhido — SEM fallback de banco.
+    // payment_provider é a fonte única da verdade.
     const queue = (pending ?? []).filter((p: any) => {
-      const gw = String(p.gateway || "ASAAS").toUpperCase();
+      const gw = String(p.payment_provider || p.gateway || "").toUpperCase();
+      if (gw !== "ASAAS" && gw !== "CORA") {
+        console.warn("[auto-emit-pending-charges] SKIP — provider ausente", p.id);
+        return false;
+      }
       if (gw === "CORA") return !p.cora_invoice_id;
-      return !p.asaas_payment_id; // ASAAS default
+      return !p.asaas_payment_id;
     });
 
     // Background: roteia para o provedor correto
@@ -95,8 +100,9 @@ Deno.serve(async (req) => {
         : { Authorization: `Bearer ${serviceRoleKey}` };
 
       for (const p of queue) {
-        const gw = String(p.gateway || "ASAAS").toUpperCase();
+        const gw = String(p.payment_provider || p.gateway || "").toUpperCase();
         const fnName = gw === "CORA" ? "create-cora-charge" : "sync-asaas-payment";
+        console.log("[auto-emit-pending-charges] ROUTE", { payment_id: p.id, unit_id: p.unit_id, payment_provider: gw, target_function: fnName, attempt_at: new Date().toISOString() });
         try {
           const r = await admin.functions.invoke(fnName, {
             body: { payment_id: p.id },
