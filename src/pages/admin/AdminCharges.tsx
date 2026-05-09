@@ -648,10 +648,11 @@ const AdminCharges = () => {
   const handleSyncPayment = async (paymentId: string) => {
     setSyncingPaymentId(paymentId);
     try {
-      // Roteia para a função correta conforme gateway da parcela
+      // Roteamento estrito por payment_provider — sem fallback
       const target = payments.find((p) => p.id === paymentId);
-      const gw = (target?.gateway || "").toUpperCase();
+      const gw = String(target?.payment_provider || target?.gateway || "ASAAS").toUpperCase();
       const fn = gw === "CORA" ? "sync-cora-payment" : "sync-asaas-payment";
+      console.log("[ADMIN_SYNC] route", { payment_id: paymentId, payment_provider: gw, target_function: fn, attempt_at: new Date().toISOString() });
       const { data, error } = await supabase.functions.invoke(fn, {
         body: { payment_id: paymentId },
       });
@@ -660,24 +661,23 @@ const AdminCharges = () => {
       if (error) {
         let errorMsg = error.message;
         try {
-          // FunctionsHttpError wraps non-2xx responses — extract JSON body
           if ((error as any).context && typeof (error as any).context.json === "function") {
             const body = await (error as any).context.json();
             errorMsg = body?.error || body?.details?.errors?.[0]?.description || errorMsg;
           }
         } catch { /* ignore parse errors */ }
-        toast({ title: "Erro ao sincronizar", description: errorMsg, variant: "destructive" });
+        const bankLabel = gw === "CORA" ? "Cora" : "Asaas";
+        toast({ title: `Erro ao emitir cobrança pelo ${bankLabel}`, description: errorMsg, variant: "destructive" });
         return;
       }
 
       if (data?.error) {
-        toast({ title: "Erro ao sincronizar", description: data.error, variant: "destructive" });
+        const bankLabel = gw === "CORA" ? "Cora" : "Asaas";
+        toast({ title: `Erro ao emitir cobrança pelo ${bankLabel}`, description: data.error, variant: "destructive" });
         return;
       }
 
-      const target2 = payments.find((p) => p.id === paymentId);
-      const isCora = (target2?.gateway || "").toUpperCase() === "CORA";
-      if (isCora) {
+      if (gw === "CORA") {
         if (data?.after === "PAID") {
           toast({ title: "Pagamento confirmado!", description: "Cora retornou como PAGO." });
         } else {
