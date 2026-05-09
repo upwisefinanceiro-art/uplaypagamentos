@@ -354,11 +354,22 @@ const AdminFinancialPro = () => {
       toast.error("Preencha unidade, descrição e valor");
       return;
     }
+    const subitems = getSubitems(editing.category);
+    if (subitems.length > 0 && !editing.subcategoria) {
+      toast.error("Selecione o item da despesa");
+      return;
+    }
+    if (editing.subcategoria === "Outros" && !editing.descricao_item?.trim()) {
+      toast.error("Descreva o item ('Outros')");
+      return;
+    }
     const payload: any = {
       unit_id: editing.unit_id,
       entry_type: editing.entry_type,
       direction: editing.direction,
       category: editing.category || null,
+      subcategoria: editing.subcategoria || null,
+      descricao_item: editing.descricao_item?.trim() || null,
       description: editing.description,
       amount: Number(editing.amount),
       competence_date: editing.competence_date,
