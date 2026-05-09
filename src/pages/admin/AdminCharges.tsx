@@ -1377,13 +1377,12 @@ const AdminCharges = () => {
                       </button>
                     </div>
 
-                    {/* Emissão dinâmica conforme gateway da parcela */}
+                    {/* Emissão dinâmica conforme payment_provider da parcela — SEM fallback para unidade */}
                     {(() => {
                       if (payment.payment_method === "DINHEIRO") return null;
                       if (payment.status === "PAID" || payment.status === "CANCELLED") return null;
-                      const unit = units.find((u) => u.id === payment.unit_id);
-                      const unitPref = (unit?.preferred_bank || "").toLowerCase();
-                      const gw = (payment.gateway || (unitPref === "cora" ? "CORA" : "ASAAS")).toUpperCase();
+                      const rawProvider = String(payment.payment_provider || payment.gateway || "").toUpperCase();
+                      const gw = rawProvider === "CORA" ? "CORA" : "ASAAS";
                       const hasExternalId = gw === "CORA" ? !!payment.cora_invoice_id : !!payment.asaas_payment_id;
                       const emissionStatus = (payment.emission_status || (hasExternalId ? "EMITTED" : "PENDING")).toUpperCase();
                       const isError = emissionStatus === "ERROR" && !hasExternalId;
