@@ -227,6 +227,8 @@ const DashboardInconsistencies = ({ unitFilter, units }: Props) => {
       setAutoFixing(false);
     }
   };
+
+  const fmt = (v: number | null | undefined) =>
     v == null
       ? "—"
       : v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
