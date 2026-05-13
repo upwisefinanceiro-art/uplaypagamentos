@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
     // Parse body once
-    let parsedBody: { unit_id?: string; scheduled?: boolean; background?: boolean } = {};
+    let parsedBody: { unit_id?: string; scheduled?: boolean; background?: boolean; phase?: "create" | "refresh" | "both" } = {};
     try {
       parsedBody = await req.json();
     } catch { /* no body */ }
@@ -64,6 +64,7 @@ Deno.serve(async (req) => {
     const unitFilter: string | null = parsedBody.unit_id || null;
     const isScheduled = parsedBody.scheduled === true;
     const runInBackground = parsedBody.background === true || isScheduled;
+    const phase: "create" | "refresh" | "both" = parsedBody.phase || "both";
     const authHeader = req.headers.get("Authorization");
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
@@ -175,271 +176,274 @@ Deno.serve(async (req) => {
     let errors = 0;
     const results: Array<{ id: string; action: string; oldStatus?: string; newStatus?: string; error?: string }> = [];
 
-    // ── PHASE 1: Refresh existing payments ──
-    let phase1ErrSamples = 0;
-    for (const payment of (existingPayments || [])) {
-      const unitCfg = unitCache[payment.unit_id];
-      if (!unitCfg) { errors++; continue; }
-
-      // Throttle to avoid Asaas rate-limit (max ~5 req/s safely)
-      await new Promise((r) => setTimeout(r, 180));
-
-      try {
-        let res = await fetch(`${unitCfg.asaas_base_url}/payments/${payment.asaas_payment_id}`, {
-          headers: { access_token: unitCfg.asaas_api_key },
-        });
-
-        // Retry once on 429 (rate-limited) with backoff
-        if (res.status === 429) {
-          await new Promise((r) => setTimeout(r, 2500));
-          res = await fetch(`${unitCfg.asaas_base_url}/payments/${payment.asaas_payment_id}`, {
-            headers: { access_token: unitCfg.asaas_api_key },
-          });
-        }
-
-        if (!res.ok) {
-          errors++;
-          if (phase1ErrSamples < 5) {
-            const txt = await res.text().catch(() => "");
-            console.log(`[sync-all] Phase1 error pid=${payment.id} asaas=${payment.asaas_payment_id} status=${res.status} body=${txt.slice(0, 160)}`);
-            phase1ErrSamples++;
-          }
-          continue;
-        }
-
-        const asaasData = await res.json();
-        const newStatus = resolvePaymentStatus(payment.status, asaasData.status, asaasData.paymentDate);
-
-        const billingTypeMap: Record<string, string> = { PIX: "PIX", BOLETO: "BOLETO", CREDIT_CARD: "CARD" };
-        const resolvedMethod = billingTypeMap[asaasData.billingType] || payment.payment_method;
-
-        const updateData: Record<string, unknown> = {
-          status: newStatus,
-          invoice_url: asaasData.invoiceUrl || undefined,
-          boleto_url: asaasData.bankSlipUrl || undefined,
-          boleto_barcode: asaasData.identificationField || undefined,
-          payment_method: resolvedMethod || undefined,
-          raw_response: asaasData,
-        };
-
-        if (newStatus === "PAID") {
-          if (!payment.paid_at) {
-            updateData.paid_at = asaasData.paymentDate || new Date().toISOString();
-          }
-          const originalValue = Number((payment as any).original_value ?? payment.value);
-          const asaasValue = typeof asaasData.value === "number" ? asaasData.value : null;
-          const realPaidValue = Number(asaasValue ?? originalValue);
-          if (Number.isFinite(realPaidValue) && realPaidValue > 0) {
-            updateData.final_value = realPaidValue;
-          }
-        }
-
-        if (asaasData.billingType === "PIX" && (!payment.pix_qr_code || !payment.pix_copy_paste)) {
-          const pixData = await fetchPixData(unitCfg.asaas_base_url, payment.asaas_payment_id, unitCfg.asaas_api_key);
-          updateData.pix_qr_code = pixData.encodedImage || null;
-          updateData.pix_copy_paste = pixData.payload || null;
-        }
-
-        const cleanUpdate = Object.fromEntries(
-          Object.entries(updateData).filter(([, v]) => v !== undefined)
-        );
-
-        await supabase.from("payments").update(cleanUpdate).eq("id", payment.id);
-
-        if (newStatus !== payment.status) {
-          results.push({ id: payment.id, action: "refreshed", oldStatus: payment.status, newStatus });
-          await supabase.from("webhook_logs").insert({
-            event: "SYNC_ALL_STATUS_CHANGED",
-            asaas_payment_id: payment.asaas_payment_id,
-            local_payment_id: payment.id,
-            unit_id: payment.unit_id,
-            old_status: payment.status,
-            new_status: newStatus,
-            payload: { source: "sync-all-payments", asaas_status: asaasData.status, payment_date: asaasData.paymentDate || null },
-            processed: true,
-          });
-        }
-        synced++;
-      } catch (e) {
-        errors++;
-        if (phase1ErrSamples < 5) {
-          console.log(`[sync-all] Phase1 exception pid=${payment.id}: ${e instanceof Error ? e.message : String(e)}`);
-          phase1ErrSamples++;
-        }
-      }
-    }
-    console.log(`[sync-all] Phase 1 complete: synced=${synced}, errors=${errors}`);
-
-    // ── PHASE 2: Create charges in Asaas for unsent payments ──
-    // Cache responsibles to avoid repeated queries
+    // ── PHASE 2 (FIRST): Create charges in Asaas for unsent payments ──
+    // Roda PRIMEIRO porque é o trabalho crítico e pequeno; Phase 1 pode levar minutos
+    // e até estourar o limite de execução da edge function.
     const responsibleCache: Record<string, { full_name: string; cpf: string; phone: string | null; email: string | null; asaas_customer_id: string | null }> = {};
 
-    for (const payment of (unsentPayments || [])) {
-      const unitCfg = unitCache[payment.unit_id];
-      if (!unitCfg) {
-        errors++;
-        { const _e = "Unidade sem API Key"; console.log(`[sync-all] Phase2 skip pid=${payment.id}: ${_e}`); results.push({ id: payment.id, action: "skipped", error: _e }); }
-        continue;
-      }
-
-      try {
-        // Get responsible
-        if (!responsibleCache[payment.responsible_id]) {
-          const { data: resp } = await supabase
-            .from("profiles")
-            .select("full_name, cpf, phone, email, asaas_customer_id")
-            .eq("id", payment.responsible_id)
-            .single();
-          if (resp) responsibleCache[payment.responsible_id] = resp;
-        }
-
-        const responsible = responsibleCache[payment.responsible_id];
-        if (!responsible || !responsible.cpf) {
+    if (phase === "create" || phase === "both") {
+      for (const payment of (unsentPayments || [])) {
+        const unitCfg = unitCache[payment.unit_id];
+        if (!unitCfg) {
           errors++;
-          { const _e = "Responsável sem CPF"; console.log(`[sync-all] Phase2 skip pid=${payment.id}: ${_e}`); results.push({ id: payment.id, action: "skipped", error: _e }); }
+          const _e = "Unidade sem API Key";
+          console.log(`[sync-all] Phase2 skip pid=${payment.id}: ${_e}`);
+          results.push({ id: payment.id, action: "skipped", error: _e });
           continue;
         }
 
-        const cpfClean = responsible.cpf.replace(/\D/g, "");
-        if (!validateCpf(cpfClean)) {
-          errors++;
-          { const _e = "CPF inválido"; console.log(`[sync-all] Phase2 skip pid=${payment.id}: ${_e}`); results.push({ id: payment.id, action: "skipped", error: _e }); }
-          continue;
-        }
-
-        // Ensure customer exists in Asaas
-        let asaasCustomerId = responsible.asaas_customer_id;
-
-        if (asaasCustomerId) {
-          try {
-            const checkRes = await fetch(`${unitCfg.asaas_base_url}/customers/${asaasCustomerId}`, {
-              headers: { access_token: unitCfg.asaas_api_key },
-            });
-            if (!checkRes.ok) asaasCustomerId = null;
-          } catch {
-            asaasCustomerId = null;
-          }
-        }
-
-        if (!asaasCustomerId) {
-          const customerPayload: Record<string, unknown> = {
-            name: responsible.full_name.trim(),
-            cpfCnpj: cpfClean,
-            email: responsible.email || `${cpfClean}@uplay.app`,
-          };
-          if (responsible.phone) {
-            const phoneClean = responsible.phone.replace(/\D/g, "");
-            if (phoneClean.length >= 10 && phoneClean.length <= 11) {
-              customerPayload.mobilePhone = phoneClean;
-            }
+        try {
+          if (!responsibleCache[payment.responsible_id]) {
+            const { data: resp } = await supabase
+              .from("profiles")
+              .select("full_name, cpf, phone, email, asaas_customer_id")
+              .eq("id", payment.responsible_id)
+              .single();
+            if (resp) responsibleCache[payment.responsible_id] = resp;
           }
 
-          const customerRes = await fetch(`${unitCfg.asaas_base_url}/customers`, {
-            method: "POST",
-            headers: { access_token: unitCfg.asaas_api_key, "Content-Type": "application/json" },
-            body: JSON.stringify(customerPayload),
-          });
-
-          const customerData = await customerRes.json();
-          if (!customerRes.ok) {
+          const responsible = responsibleCache[payment.responsible_id];
+          if (!responsible || !responsible.cpf) {
             errors++;
-            { const _e = `Erro customer: ${customerData?.errors?.[0]?.description || "Desconhecido"}`; console.log(`[sync-all] Phase2 skip pid=${payment.id}: ${_e}`); results.push({ id: payment.id, action: "skipped", error: _e }); }
+            const _e = "Responsável sem CPF";
+            console.log(`[sync-all] Phase2 skip pid=${payment.id}: ${_e}`);
+            results.push({ id: payment.id, action: "skipped", error: _e });
             continue;
           }
 
-          asaasCustomerId = customerData.id;
-          await supabase.from("profiles").update({ asaas_customer_id: asaasCustomerId }).eq("id", payment.responsible_id);
-          // Update cache
-          responsible.asaas_customer_id = asaasCustomerId;
-        }
+          const cpfClean = responsible.cpf.replace(/\D/g, "");
+          if (!validateCpf(cpfClean)) {
+            errors++;
+            const _e = "CPF inválido";
+            console.log(`[sync-all] Phase2 skip pid=${payment.id}: ${_e}`);
+            results.push({ id: payment.id, action: "skipped", error: _e });
+            continue;
+          }
 
-        // Determine billing type
-        const billingTypeMap: Record<string, string> = {
-          PIX: "PIX", BOLETO: "BOLETO", CARD: "CREDIT_CARD", ASAAS: "BOLETO",
-        };
-        const billingType = billingTypeMap[payment.payment_method || "BOLETO"] || "BOLETO";
+          let asaasCustomerId = responsible.asaas_customer_id;
+          if (asaasCustomerId) {
+            try {
+              const checkRes = await fetch(`${unitCfg.asaas_base_url}/customers/${asaasCustomerId}`, {
+                headers: { access_token: unitCfg.asaas_api_key },
+              });
+              if (!checkRes.ok) asaasCustomerId = null;
+              await checkRes.text().catch(() => "");
+            } catch {
+              asaasCustomerId = null;
+            }
+          }
 
-        // Asaas does not accept due dates in the past
-        const todayStr = new Date().toISOString().slice(0, 10);
-        const effectiveDueDate = payment.due_date < todayStr ? todayStr : payment.due_date;
+          if (!asaasCustomerId) {
+            const customerPayload: Record<string, unknown> = {
+              name: responsible.full_name.trim(),
+              cpfCnpj: cpfClean,
+              email: responsible.email || `${cpfClean}@uplay.app`,
+            };
+            if (responsible.phone) {
+              const phoneClean = responsible.phone.replace(/\D/g, "");
+              if (phoneClean.length >= 10 && phoneClean.length <= 11) {
+                customerPayload.mobilePhone = phoneClean;
+              }
+            }
+            const customerRes = await fetch(`${unitCfg.asaas_base_url}/customers`, {
+              method: "POST",
+              headers: { access_token: unitCfg.asaas_api_key, "Content-Type": "application/json" },
+              body: JSON.stringify(customerPayload),
+            });
+            const customerData = await customerRes.json().catch(() => ({}));
+            if (!customerRes.ok) {
+              errors++;
+              const _e = `Erro customer: ${customerData?.errors?.[0]?.description || customerRes.status}`;
+              console.log(`[sync-all] Phase2 skip pid=${payment.id}: ${_e}`);
+              results.push({ id: payment.id, action: "skipped", error: _e });
+              continue;
+            }
+            asaasCustomerId = customerData.id;
+            await supabase.from("profiles").update({ asaas_customer_id: asaasCustomerId }).eq("id", payment.responsible_id);
+            responsible.asaas_customer_id = asaasCustomerId;
+          }
 
-        const punctualityDiscount = Number((payment as any).punctuality_discount ?? 0) || 0;
-        const originalValue = Number((payment as any).original_value ?? payment.value ?? payment.final_value ?? 0);
-        const finalWithDiscount = Number(payment.final_value ?? payment.value ?? originalValue);
-        const hasDiscount = punctualityDiscount > 0 && originalValue > finalWithDiscount;
-
-        const chargePayload: Record<string, unknown> = {
-          customer: asaasCustomerId,
-          billingType,
-          value: hasDiscount ? originalValue : finalWithDiscount || originalValue,
-          dueDate: effectiveDueDate,
-          description: payment.description || "Mensalidade UPLAY",
-        };
-
-        if (hasDiscount) {
-          chargePayload.discount = {
-            value: Number(punctualityDiscount.toFixed(2)),
-            dueDateLimitDays: 0,
-            type: "FIXED",
+          const billingTypeMap: Record<string, string> = {
+            PIX: "PIX", BOLETO: "BOLETO", CARD: "CREDIT_CARD", ASAAS: "BOLETO",
           };
-        }
+          const billingType = billingTypeMap[payment.payment_method || "BOLETO"] || "BOLETO";
 
-        console.log(`[sync-all] Criando cobrança para payment ${payment.id}`, JSON.stringify(chargePayload));
+          const todayStr = new Date().toISOString().slice(0, 10);
+          const effectiveDueDate = payment.due_date < todayStr ? todayStr : payment.due_date;
 
-        const chargeRes = await fetch(`${unitCfg.asaas_base_url}/payments`, {
-          method: "POST",
-          headers: { access_token: unitCfg.asaas_api_key, "Content-Type": "application/json" },
-          body: JSON.stringify(chargePayload),
-        });
+          const punctualityDiscount = Number((payment as any).punctuality_discount ?? 0) || 0;
+          const originalValue = Number((payment as any).original_value ?? payment.value ?? payment.final_value ?? 0);
+          const finalWithDiscount = Number(payment.final_value ?? payment.value ?? originalValue);
+          const hasDiscount = punctualityDiscount > 0 && originalValue > finalWithDiscount;
 
-        const chargeData = await chargeRes.json();
+          const chargePayload: Record<string, unknown> = {
+            customer: asaasCustomerId,
+            billingType,
+            value: hasDiscount ? originalValue : finalWithDiscount || originalValue,
+            dueDate: effectiveDueDate,
+            description: payment.description || "Mensalidade UPLAY",
+          };
 
-        if (!chargeRes.ok) {
+          if (hasDiscount) {
+            chargePayload.discount = {
+              value: Number(punctualityDiscount.toFixed(2)),
+              dueDateLimitDays: 0,
+              type: "FIXED",
+            };
+          }
+
+          console.log(`[sync-all] Criando cobrança para payment ${payment.id}`, JSON.stringify(chargePayload));
+
+          const chargeRes = await fetch(`${unitCfg.asaas_base_url}/payments`, {
+            method: "POST",
+            headers: { access_token: unitCfg.asaas_api_key, "Content-Type": "application/json" },
+            body: JSON.stringify(chargePayload),
+          });
+
+          const chargeData = await chargeRes.json().catch(() => ({}));
+
+          if (!chargeRes.ok) {
+            errors++;
+            const _e = `Erro Asaas: ${chargeData?.errors?.[0]?.description || chargeRes.status}`;
+            console.log(`[sync-all] Phase2 skip pid=${payment.id}: ${_e}`);
+            results.push({ id: payment.id, action: "skipped", error: _e });
+            continue;
+          }
+
+          let pixQrCode: string | null = null;
+          let pixCopyPaste: string | null = null;
+          if (billingType === "PIX" && chargeData.id) {
+            await new Promise(r => setTimeout(r, 2000));
+            const pixData = await fetchPixData(unitCfg.asaas_base_url, chargeData.id, unitCfg.asaas_api_key);
+            pixQrCode = pixData.encodedImage;
+            pixCopyPaste = pixData.payload;
+          }
+
+          const methodMap: Record<string, string> = { PIX: "PIX", BOLETO: "BOLETO", CREDIT_CARD: "CARD" };
+          const resolvedMethod = methodMap[chargeData.billingType] || payment.payment_method;
+
+          const updateData = {
+            asaas_payment_id: chargeData.id,
+            invoice_url: chargeData.invoiceUrl || null,
+            boleto_url: chargeData.bankSlipUrl || null,
+            boleto_barcode: chargeData.identificationField || null,
+            checkout_url: chargeData.invoiceUrl || null,
+            pix_qr_code: pixQrCode,
+            pix_copy_paste: pixCopyPaste,
+            raw_response: chargeData,
+            payment_method: resolvedMethod,
+            status: statusMap[chargeData.status] || payment.status,
+            due_date: chargeData.dueDate || payment.due_date,
+          };
+
+          await supabase.from("payments").update(updateData).eq("id", payment.id);
+
+          created++;
+          results.push({ id: payment.id, action: "created", newStatus: updateData.status });
+          console.log(`[sync-all] Cobrança criada: ${chargeData.id} para payment ${payment.id}`);
+        } catch (err) {
           errors++;
-          { const _e = `Erro Asaas: ${chargeData?.errors?.[0]?.description || "Desconhecido"}`; console.log(`[sync-all] Phase2 skip pid=${payment.id}: ${_e}`); results.push({ id: payment.id, action: "skipped", error: _e }); }
-          continue;
+          const msg = err instanceof Error ? err.message : "Erro desconhecido";
+          console.log(`[sync-all] Phase2 exception pid=${payment.id}: ${msg}`);
+          results.push({ id: payment.id, action: "error", error: msg });
         }
-
-        // Fetch PIX data if applicable
-        let pixQrCode: string | null = null;
-        let pixCopyPaste: string | null = null;
-        if (billingType === "PIX" && chargeData.id) {
-          // Wait 2s for Asaas to process PIX assets
-          await new Promise(r => setTimeout(r, 2000));
-          const pixData = await fetchPixData(unitCfg.asaas_base_url, chargeData.id, unitCfg.asaas_api_key);
-          pixQrCode = pixData.encodedImage;
-          pixCopyPaste = pixData.payload;
-        }
-
-        // Map billing type to payment method
-        const methodMap: Record<string, string> = { PIX: "PIX", BOLETO: "BOLETO", CREDIT_CARD: "CARD" };
-        const resolvedMethod = methodMap[chargeData.billingType] || payment.payment_method;
-
-        const updateData = {
-          asaas_payment_id: chargeData.id,
-          invoice_url: chargeData.invoiceUrl || null,
-          boleto_url: chargeData.bankSlipUrl || null,
-          boleto_barcode: chargeData.identificationField || null,
-          checkout_url: chargeData.invoiceUrl || null,
-          pix_qr_code: pixQrCode,
-          pix_copy_paste: pixCopyPaste,
-          raw_response: chargeData,
-          payment_method: resolvedMethod,
-          status: statusMap[chargeData.status] || payment.status,
-          due_date: chargeData.dueDate || payment.due_date,
-        };
-
-        await supabase.from("payments").update(updateData).eq("id", payment.id);
-
-        created++;
-        results.push({ id: payment.id, action: "created", newStatus: updateData.status });
-        console.log(`[sync-all] Cobrança criada: ${chargeData.id} para payment ${payment.id}`);
-      } catch (err) {
-        errors++;
-        const msg = err instanceof Error ? err.message : "Erro desconhecido";
-        console.log(`[sync-all] Phase2 exception pid=${payment.id}: ${msg}`);
-        results.push({ id: payment.id, action: "error", error: msg });
       }
+      console.log(`[sync-all] Phase 2 (CREATE) complete: created=${created}, errors=${errors}`);
+    }
+
+    // ── PHASE 1 (SECOND): Refresh existing Asaas payments ──
+    let phase1ErrSamples = 0;
+    if (phase === "refresh" || phase === "both") {
+      for (const payment of (existingPayments || [])) {
+        const unitCfg = unitCache[payment.unit_id];
+        if (!unitCfg) { errors++; continue; }
+
+        await new Promise((r) => setTimeout(r, 180));
+
+        try {
+          let res = await fetch(`${unitCfg.asaas_base_url}/payments/${payment.asaas_payment_id}`, {
+            headers: { access_token: unitCfg.asaas_api_key },
+          });
+
+          if (res.status === 429) {
+            await new Promise((r) => setTimeout(r, 2500));
+            res = await fetch(`${unitCfg.asaas_base_url}/payments/${payment.asaas_payment_id}`, {
+              headers: { access_token: unitCfg.asaas_api_key },
+            });
+          }
+
+          if (!res.ok) {
+            errors++;
+            if (phase1ErrSamples < 5) {
+              const txt = await res.text().catch(() => "");
+              console.log(`[sync-all] Phase1 error pid=${payment.id} asaas=${payment.asaas_payment_id} status=${res.status} body=${txt.slice(0, 160)}`);
+              phase1ErrSamples++;
+            }
+            continue;
+          }
+
+          const asaasData = await res.json();
+          const newStatus = resolvePaymentStatus(payment.status, asaasData.status, asaasData.paymentDate);
+
+          const billingTypeMap: Record<string, string> = { PIX: "PIX", BOLETO: "BOLETO", CREDIT_CARD: "CARD" };
+          const resolvedMethod = billingTypeMap[asaasData.billingType] || payment.payment_method;
+
+          const updateData: Record<string, unknown> = {
+            status: newStatus,
+            invoice_url: asaasData.invoiceUrl || undefined,
+            boleto_url: asaasData.bankSlipUrl || undefined,
+            boleto_barcode: asaasData.identificationField || undefined,
+            payment_method: resolvedMethod || undefined,
+            raw_response: asaasData,
+          };
+
+          if (newStatus === "PAID") {
+            if (!payment.paid_at) {
+              updateData.paid_at = asaasData.paymentDate || new Date().toISOString();
+            }
+            const originalValue = Number((payment as any).original_value ?? payment.value);
+            const asaasValue = typeof asaasData.value === "number" ? asaasData.value : null;
+            const realPaidValue = Number(asaasValue ?? originalValue);
+            if (Number.isFinite(realPaidValue) && realPaidValue > 0) {
+              updateData.final_value = realPaidValue;
+            }
+          }
+
+          if (asaasData.billingType === "PIX" && (!payment.pix_qr_code || !payment.pix_copy_paste)) {
+            const pixData = await fetchPixData(unitCfg.asaas_base_url, payment.asaas_payment_id, unitCfg.asaas_api_key);
+            updateData.pix_qr_code = pixData.encodedImage || null;
+            updateData.pix_copy_paste = pixData.payload || null;
+          }
+
+          const cleanUpdate = Object.fromEntries(
+            Object.entries(updateData).filter(([, v]) => v !== undefined)
+          );
+
+          await supabase.from("payments").update(cleanUpdate).eq("id", payment.id);
+
+          if (newStatus !== payment.status) {
+            results.push({ id: payment.id, action: "refreshed", oldStatus: payment.status, newStatus });
+            await supabase.from("webhook_logs").insert({
+              event: "SYNC_ALL_STATUS_CHANGED",
+              asaas_payment_id: payment.asaas_payment_id,
+              local_payment_id: payment.id,
+              unit_id: payment.unit_id,
+              old_status: payment.status,
+              new_status: newStatus,
+              payload: { source: "sync-all-payments", asaas_status: asaasData.status, payment_date: asaasData.paymentDate || null },
+              processed: true,
+            });
+          }
+          synced++;
+        } catch (e) {
+          errors++;
+          if (phase1ErrSamples < 5) {
+            console.log(`[sync-all] Phase1 exception pid=${payment.id}: ${e instanceof Error ? e.message : String(e)}`);
+            phase1ErrSamples++;
+          }
+        }
+      }
+      console.log(`[sync-all] Phase 1 (REFRESH) complete: synced=${synced}, errors=${errors}`);
     }
 
     const totalProcessed = synced + created;
