@@ -107,6 +107,7 @@ Deno.serve(async (req) => {
       console.log("[sync-all-payments] Execução agendada (cron diário)");
     }
 
+    const runSync = async () => {
     // ── PHASE 1: Refresh existing Asaas payments ──
     // Scope: PENDING/OVERDUE always + PAID nos últimos 90 dias (revalidação)
     const ninetyDaysAgo = new Date();
