@@ -278,7 +278,7 @@ Deno.serve(async (req) => {
       const unitCfg = unitCache[payment.unit_id];
       if (!unitCfg) {
         errors++;
-        results.push({ id: payment.id, action: "skipped", error: "Unidade sem API Key" });
+        { const _e = "Unidade sem API Key"; console.log(`[sync-all] Phase2 skip pid=${payment.id}: ${_e}`); results.push({ id: payment.id, action: "skipped", error: _e }); }
         continue;
       }
 
@@ -296,14 +296,14 @@ Deno.serve(async (req) => {
         const responsible = responsibleCache[payment.responsible_id];
         if (!responsible || !responsible.cpf) {
           errors++;
-          results.push({ id: payment.id, action: "skipped", error: "Responsável sem CPF" });
+          { const _e = "Responsável sem CPF"; console.log(`[sync-all] Phase2 skip pid=${payment.id}: ${_e}`); results.push({ id: payment.id, action: "skipped", error: _e }); }
           continue;
         }
 
         const cpfClean = responsible.cpf.replace(/\D/g, "");
         if (!validateCpf(cpfClean)) {
           errors++;
-          results.push({ id: payment.id, action: "skipped", error: "CPF inválido" });
+          { const _e = "CPF inválido"; console.log(`[sync-all] Phase2 skip pid=${payment.id}: ${_e}`); results.push({ id: payment.id, action: "skipped", error: _e }); }
           continue;
         }
 
@@ -343,7 +343,7 @@ Deno.serve(async (req) => {
           const customerData = await customerRes.json();
           if (!customerRes.ok) {
             errors++;
-            results.push({ id: payment.id, action: "skipped", error: `Erro customer: ${customerData?.errors?.[0]?.description || "Desconhecido"}` });
+            { const _e = `Erro customer: ${customerData?.errors?.[0]?.description || "Desconhecido"}`; console.log(`[sync-all] Phase2 skip pid=${payment.id}: ${_e}`); results.push({ id: payment.id, action: "skipped", error: _e }); }
             continue;
           }
 
@@ -396,7 +396,7 @@ Deno.serve(async (req) => {
 
         if (!chargeRes.ok) {
           errors++;
-          results.push({ id: payment.id, action: "skipped", error: `Erro Asaas: ${chargeData?.errors?.[0]?.description || "Desconhecido"}` });
+          { const _e = `Erro Asaas: ${chargeData?.errors?.[0]?.description || "Desconhecido"}`; console.log(`[sync-all] Phase2 skip pid=${payment.id}: ${_e}`); results.push({ id: payment.id, action: "skipped", error: _e }); }
           continue;
         }
 
