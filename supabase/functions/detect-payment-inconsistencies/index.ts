@@ -15,6 +15,30 @@ function respond(body: Record<string, unknown>, status = 200) {
 
 const PAID_STATUSES = new Set(["PAID", "RECEIVED", "CONFIRMED"]);
 
+function asMoney(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Number(parsed.toFixed(2)) : null;
+}
+
+function resolveExpectedAsaasValue(payment: Record<string, unknown>, asaasData: Record<string, unknown>) {
+  const systemValue = asMoney(payment.value) ?? 0;
+  const originalValue = asMoney(payment.original_value) ?? systemValue;
+  const finalValue = asMoney(payment.final_value) ?? systemValue;
+  const discountValue = asMoney(payment.punctuality_discount) ?? 0;
+  const asaasDiscount = asMoney((asaasData.discount as Record<string, unknown> | null)?.value) ?? 0;
+  const isPaid = PAID_STATUSES.has(String(payment.status));
+
+  if (isPaid) {
+    return finalValue;
+  }
+
+  if (discountValue > 0 && originalValue > finalValue) {
+    return asaasDiscount > 0 ? originalValue : finalValue;
+  }
+
+  return originalValue;
+}
+
 function mapAsaasStatus(status?: string | null): string | null {
   if (!status) return null;
   const map: Record<string, string> = {
@@ -98,7 +122,7 @@ Deno.serve(async (req) => {
       const { data: pendingPayments } = await supabase
         .from("payments")
         .select(
-          "id, unit_id, responsible_id, asaas_payment_id, status, value, final_value, due_date, paid_at, original_value",
+          "id, unit_id, responsible_id, asaas_payment_id, status, value, final_value, due_date, paid_at, original_value, punctuality_discount",
         )
         .eq("unit_id", unit.id)
         .in("status", ["PENDING", "OVERDUE"]);
@@ -106,7 +130,7 @@ Deno.serve(async (req) => {
       const { data: paidPayments } = await supabase
         .from("payments")
         .select(
-          "id, unit_id, responsible_id, asaas_payment_id, status, value, final_value, due_date, paid_at, original_value",
+          "id, unit_id, responsible_id, asaas_payment_id, status, value, final_value, due_date, paid_at, original_value, punctuality_discount",
         )
         .eq("unit_id", unit.id)
         .in("status", ["PAID", "RECEIVED", "CONFIRMED"])
@@ -279,10 +303,11 @@ Deno.serve(async (req) => {
             });
           }
 
-          // 3) Valor diferente (compara com original_value se houver, senão value)
-          const refValue =
-            (payment as { original_value?: number | null }).original_value ??
-            payment.value;
+          // 3) Valor diferente
+          // Pendente: se o Asaas tem desconto de pontualidade configurado, o valor bruto esperado é original_value.
+          // Legado sem discount no Asaas ainda é aceito quando value/final_value já representa o valor com desconto.
+          // Pago: compara contra final_value/valor pago real, porque o cliente pode ter usado o desconto.
+          const refValue = resolveExpectedAsaasValue(payment, asaasData);
           if (
             asaasValue !== null &&
             refValue !== null &&
@@ -305,7 +330,13 @@ Deno.serve(async (req) => {
               asaas_due_date: asaasDueDate,
               system_paid_at: payment.paid_at,
               asaas_paid_at: asaasPaidAt,
-              details: { diff: Number(refValue) - Number(asaasValue) },
+              details: {
+                diff: Number(refValue) - Number(asaasValue),
+                original_value: payment.original_value ?? null,
+                final_value: payment.final_value ?? null,
+                punctuality_discount: payment.punctuality_discount ?? null,
+                asaas_discount: asMoney(asaasData?.discount?.value) ?? null,
+              },
             });
           }
 
