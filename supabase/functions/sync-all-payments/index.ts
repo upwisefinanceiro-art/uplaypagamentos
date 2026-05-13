@@ -176,21 +176,40 @@ Deno.serve(async (req) => {
     const results: Array<{ id: string; action: string; oldStatus?: string; newStatus?: string; error?: string }> = [];
 
     // ── PHASE 1: Refresh existing payments ──
+    let phase1ErrSamples = 0;
     for (const payment of (existingPayments || [])) {
       const unitCfg = unitCache[payment.unit_id];
       if (!unitCfg) { errors++; continue; }
 
+      // Throttle to avoid Asaas rate-limit (max ~5 req/s safely)
+      await new Promise((r) => setTimeout(r, 180));
+
       try {
-        const res = await fetch(`${unitCfg.asaas_base_url}/payments/${payment.asaas_payment_id}`, {
+        let res = await fetch(`${unitCfg.asaas_base_url}/payments/${payment.asaas_payment_id}`, {
           headers: { access_token: unitCfg.asaas_api_key },
         });
 
-        if (!res.ok) { errors++; continue; }
+        // Retry once on 429 (rate-limited) with backoff
+        if (res.status === 429) {
+          await new Promise((r) => setTimeout(r, 2500));
+          res = await fetch(`${unitCfg.asaas_base_url}/payments/${payment.asaas_payment_id}`, {
+            headers: { access_token: unitCfg.asaas_api_key },
+          });
+        }
+
+        if (!res.ok) {
+          errors++;
+          if (phase1ErrSamples < 5) {
+            const txt = await res.text().catch(() => "");
+            console.log(`[sync-all] Phase1 error pid=${payment.id} asaas=${payment.asaas_payment_id} status=${res.status} body=${txt.slice(0, 160)}`);
+            phase1ErrSamples++;
+          }
+          continue;
+        }
 
         const asaasData = await res.json();
         const newStatus = resolvePaymentStatus(payment.status, asaasData.status, asaasData.paymentDate);
 
-        // Map billing type to payment method
         const billingTypeMap: Record<string, string> = { PIX: "PIX", BOLETO: "BOLETO", CREDIT_CARD: "CARD" };
         const resolvedMethod = billingTypeMap[asaasData.billingType] || payment.payment_method;
 
@@ -207,8 +226,6 @@ Deno.serve(async (req) => {
           if (!payment.paid_at) {
             updateData.paid_at = asaasData.paymentDate || new Date().toISOString();
           }
-          // ── VALOR BRUTO ── usa Asaas.value (cobrança). netValue (líquido)
-          // é despesa interna e jamais é exibido ao cliente.
           const originalValue = Number((payment as any).original_value ?? payment.value);
           const asaasValue = typeof asaasData.value === "number" ? asaasData.value : null;
           const realPaidValue = Number(asaasValue ?? originalValue);
@@ -217,7 +234,6 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Fetch PIX if needed
         if (asaasData.billingType === "PIX" && (!payment.pix_qr_code || !payment.pix_copy_paste)) {
           const pixData = await fetchPixData(unitCfg.asaas_base_url, payment.asaas_payment_id, unitCfg.asaas_api_key);
           updateData.pix_qr_code = pixData.encodedImage || null;
@@ -232,7 +248,6 @@ Deno.serve(async (req) => {
 
         if (newStatus !== payment.status) {
           results.push({ id: payment.id, action: "refreshed", oldStatus: payment.status, newStatus });
-          // Log status change for audit
           await supabase.from("webhook_logs").insert({
             event: "SYNC_ALL_STATUS_CHANGED",
             asaas_payment_id: payment.asaas_payment_id,
@@ -245,10 +260,15 @@ Deno.serve(async (req) => {
           });
         }
         synced++;
-      } catch {
+      } catch (e) {
         errors++;
+        if (phase1ErrSamples < 5) {
+          console.log(`[sync-all] Phase1 exception pid=${payment.id}: ${e instanceof Error ? e.message : String(e)}`);
+          phase1ErrSamples++;
+        }
       }
     }
+    console.log(`[sync-all] Phase 1 complete: synced=${synced}, errors=${errors}`);
 
     // ── PHASE 2: Create charges in Asaas for unsent payments ──
     // Cache responsibles to avoid repeated queries
