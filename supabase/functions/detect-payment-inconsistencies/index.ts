@@ -15,6 +15,30 @@ function respond(body: Record<string, unknown>, status = 200) {
 
 const PAID_STATUSES = new Set(["PAID", "RECEIVED", "CONFIRMED"]);
 
+function asMoney(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Number(parsed.toFixed(2)) : null;
+}
+
+function resolveExpectedAsaasValue(payment: Record<string, unknown>, asaasData: Record<string, unknown>) {
+  const systemValue = asMoney(payment.value) ?? 0;
+  const originalValue = asMoney(payment.original_value) ?? systemValue;
+  const finalValue = asMoney(payment.final_value) ?? systemValue;
+  const discountValue = asMoney(payment.punctuality_discount) ?? 0;
+  const asaasDiscount = asMoney((asaasData.discount as Record<string, unknown> | null)?.value) ?? 0;
+  const isPaid = PAID_STATUSES.has(String(payment.status));
+
+  if (isPaid) {
+    return finalValue;
+  }
+
+  if (discountValue > 0 && originalValue > finalValue) {
+    return asaasDiscount > 0 ? originalValue : finalValue;
+  }
+
+  return originalValue;
+}
+
 function mapAsaasStatus(status?: string | null): string | null {
   if (!status) return null;
   const map: Record<string, string> = {
@@ -98,7 +122,7 @@ Deno.serve(async (req) => {
       const { data: pendingPayments } = await supabase
         .from("payments")
         .select(
-          "id, unit_id, responsible_id, asaas_payment_id, status, value, final_value, due_date, paid_at, original_value",
+          "id, unit_id, responsible_id, asaas_payment_id, status, value, final_value, due_date, paid_at, original_value, punctuality_discount",
         )
         .eq("unit_id", unit.id)
         .in("status", ["PENDING", "OVERDUE"]);
@@ -106,7 +130,7 @@ Deno.serve(async (req) => {
       const { data: paidPayments } = await supabase
         .from("payments")
         .select(
-          "id, unit_id, responsible_id, asaas_payment_id, status, value, final_value, due_date, paid_at, original_value",
+          "id, unit_id, responsible_id, asaas_payment_id, status, value, final_value, due_date, paid_at, original_value, punctuality_discount",
         )
         .eq("unit_id", unit.id)
         .in("status", ["PAID", "RECEIVED", "CONFIRMED"])
