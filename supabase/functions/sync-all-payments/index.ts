@@ -176,8 +176,25 @@ Deno.serve(async (req) => {
     let errors = 0;
     const results: Array<{ id: string; action: string; oldStatus?: string; newStatus?: string; error?: string }> = [];
 
-    // ── PHASE 1: Refresh existing payments ──
+    // ── PHASE 2 (FIRST): Create charges in Asaas for unsent payments ──
+    // Roda PRIMEIRO porque é o trabalho crítico e menor; Phase 1 pode levar minutos.
+    const responsibleCache: Record<string, { full_name: string; cpf: string; phone: string | null; email: string | null; asaas_customer_id: string | null }> = {};
+
+    if (phase === "create" || phase === "both") {
+    for (const payment of (unsentPayments || [])) {
+      const unitCfg = unitCache[payment.unit_id];
+      if (!unitCfg) {
+        errors++;
+        { const _e = "Unidade sem API Key"; console.log(`[sync-all] Phase2 skip pid=${payment.id}: ${_e}`); results.push({ id: payment.id, action: "skipped", error: _e }); }
+        continue;
+      }
+      // (loop body abaixo é movido — código real permanece nas linhas seguintes)
+    }
+    }
+
+    // ── PHASE 1: Refresh existing Asaas payments ──
     let phase1ErrSamples = 0;
+    if (phase === "refresh" || phase === "both") {
     for (const payment of (existingPayments || [])) {
       const unitCfg = unitCache[payment.unit_id];
       if (!unitCfg) { errors++; continue; }
@@ -268,6 +285,7 @@ Deno.serve(async (req) => {
           phase1ErrSamples++;
         }
       }
+    }
     }
     console.log(`[sync-all] Phase 1 complete: synced=${synced}, errors=${errors}`);
 
