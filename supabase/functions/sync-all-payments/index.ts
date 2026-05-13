@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
     // Parse body once
-    let parsedBody: { unit_id?: string; scheduled?: boolean; background?: boolean } = {};
+    let parsedBody: { unit_id?: string; scheduled?: boolean; background?: boolean; phase?: "create" | "refresh" | "both" } = {};
     try {
       parsedBody = await req.json();
     } catch { /* no body */ }
@@ -64,6 +64,7 @@ Deno.serve(async (req) => {
     const unitFilter: string | null = parsedBody.unit_id || null;
     const isScheduled = parsedBody.scheduled === true;
     const runInBackground = parsedBody.background === true || isScheduled;
+    const phase: "create" | "refresh" | "both" = parsedBody.phase || "both";
     const authHeader = req.headers.get("Authorization");
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
