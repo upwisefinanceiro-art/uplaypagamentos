@@ -119,22 +119,25 @@ Deno.serve(async (req) => {
       totals.units_scanned += 1;
 
       // 2) Cobranças do escopo: pendentes/atrasadas + pagas últimos 30 dias
+      // IMPORTANTE: ignora cobranças roteadas para CORA (não devem sincronizar com Asaas)
       const { data: pendingPayments } = await supabase
         .from("payments")
         .select(
-          "id, unit_id, responsible_id, asaas_payment_id, status, value, final_value, due_date, paid_at, original_value, punctuality_discount",
+          "id, unit_id, responsible_id, asaas_payment_id, status, value, final_value, due_date, paid_at, original_value, punctuality_discount, payment_provider",
         )
         .eq("unit_id", unit.id)
-        .in("status", ["PENDING", "OVERDUE"]);
+        .in("status", ["PENDING", "OVERDUE"])
+        .neq("payment_provider", "CORA");
 
       const { data: paidPayments } = await supabase
         .from("payments")
         .select(
-          "id, unit_id, responsible_id, asaas_payment_id, status, value, final_value, due_date, paid_at, original_value, punctuality_discount",
+          "id, unit_id, responsible_id, asaas_payment_id, status, value, final_value, due_date, paid_at, original_value, punctuality_discount, payment_provider",
         )
         .eq("unit_id", unit.id)
         .in("status", ["PAID", "RECEIVED", "CONFIRMED"])
-        .gte("paid_at", sinceIso);
+        .gte("paid_at", sinceIso)
+        .neq("payment_provider", "CORA");
 
       const payments = [...(pendingPayments ?? []), ...(paidPayments ?? [])];
       totals.payments_checked += payments.length;
