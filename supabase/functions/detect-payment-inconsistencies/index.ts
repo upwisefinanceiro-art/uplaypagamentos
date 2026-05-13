@@ -303,10 +303,11 @@ Deno.serve(async (req) => {
             });
           }
 
-          // 3) Valor diferente (compara com original_value se houver, senão value)
-          const refValue =
-            (payment as { original_value?: number | null }).original_value ??
-            payment.value;
+          // 3) Valor diferente
+          // Pendente: se o Asaas tem desconto de pontualidade configurado, o valor bruto esperado é original_value.
+          // Legado sem discount no Asaas ainda é aceito quando value/final_value já representa o valor com desconto.
+          // Pago: compara contra final_value/valor pago real, porque o cliente pode ter usado o desconto.
+          const refValue = resolveExpectedAsaasValue(payment, asaasData);
           if (
             asaasValue !== null &&
             refValue !== null &&
@@ -329,7 +330,13 @@ Deno.serve(async (req) => {
               asaas_due_date: asaasDueDate,
               system_paid_at: payment.paid_at,
               asaas_paid_at: asaasPaidAt,
-              details: { diff: Number(refValue) - Number(asaasValue) },
+              details: {
+                diff: Number(refValue) - Number(asaasValue),
+                original_value: payment.original_value ?? null,
+                final_value: payment.final_value ?? null,
+                punctuality_discount: payment.punctuality_discount ?? null,
+                asaas_discount: asMoney(asaasData?.discount?.value) ?? null,
+              },
             });
           }
 
