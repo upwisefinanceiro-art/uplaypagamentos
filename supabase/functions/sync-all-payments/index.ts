@@ -135,7 +135,7 @@ Deno.serve(async (req) => {
     // ESTRITO: somente parcelas com payment_provider = ASAAS (ou gateway = ASAAS via espelho).
     let createQuery = supabase
       .from("payments")
-      .select("id, responsible_id, unit_id, status, value, final_value, due_date, description, payment_method, payment_type, installment_number, payment_provider, gateway")
+      .select("id, responsible_id, unit_id, status, value, original_value, final_value, punctuality_discount, due_date, description, payment_method, payment_type, installment_number, payment_provider, gateway")
       .is("asaas_payment_id", null)
       .in("status", ["PENDING", "OVERDUE"])
       .neq("payment_method", "DINHEIRO");
@@ -363,13 +363,26 @@ Deno.serve(async (req) => {
         const todayStr = new Date().toISOString().slice(0, 10);
         const effectiveDueDate = payment.due_date < todayStr ? todayStr : payment.due_date;
 
-        const chargePayload = {
+        const punctualityDiscount = Number((payment as any).punctuality_discount ?? 0) || 0;
+        const originalValue = Number((payment as any).original_value ?? payment.value ?? payment.final_value ?? 0);
+        const finalWithDiscount = Number(payment.final_value ?? payment.value ?? originalValue);
+        const hasDiscount = punctualityDiscount > 0 && originalValue > finalWithDiscount;
+
+        const chargePayload: Record<string, unknown> = {
           customer: asaasCustomerId,
           billingType,
-          value: Number(payment.final_value ?? payment.value),
+          value: hasDiscount ? originalValue : finalWithDiscount || originalValue,
           dueDate: effectiveDueDate,
           description: payment.description || "Mensalidade UPLAY",
         };
+
+        if (hasDiscount) {
+          chargePayload.discount = {
+            value: Number(punctualityDiscount.toFixed(2)),
+            dueDateLimitDays: 0,
+            type: "FIXED",
+          };
+        }
 
         console.log(`[sync-all] Criando cobrança para payment ${payment.id}`, JSON.stringify(chargePayload));
 
