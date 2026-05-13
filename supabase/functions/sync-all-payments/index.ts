@@ -56,13 +56,14 @@ Deno.serve(async (req) => {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
     // Parse body once
-    let parsedBody: { unit_id?: string; scheduled?: boolean } = {};
+    let parsedBody: { unit_id?: string; scheduled?: boolean; background?: boolean } = {};
     try {
       parsedBody = await req.json();
     } catch { /* no body */ }
 
     const unitFilter: string | null = parsedBody.unit_id || null;
     const isScheduled = parsedBody.scheduled === true;
+    const runInBackground = parsedBody.background === true || isScheduled;
     const authHeader = req.headers.get("Authorization");
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
@@ -106,6 +107,7 @@ Deno.serve(async (req) => {
       console.log("[sync-all-payments] Execução agendada (cron diário)");
     }
 
+    const runSync = async () => {
     // ── PHASE 1: Refresh existing Asaas payments ──
     // Scope: PENDING/OVERDUE always + PAID nos últimos 90 dias (revalidação)
     const ninetyDaysAgo = new Date();
@@ -413,13 +415,28 @@ Deno.serve(async (req) => {
       totalProcessed === 0 && errors === 0 ? "Nenhum pagamento pendente para processar" : null,
     ].filter(Boolean).join(", ");
 
+      console.log("[sync-all-payments] DONE", { synced, created, errors, message });
+      return { synced, created, errors, results, message };
+    };
+
+    if (runInBackground) {
+      // @ts-ignore - EdgeRuntime is provided by the Supabase runtime
+      EdgeRuntime.waitUntil(runSync().catch((e) => console.error("[sync-all-payments] background error", e)));
+      return new Response(JSON.stringify({
+        success: true,
+        background: true,
+        message: "Sincronização iniciada em segundo plano. Acompanhe o progresso pelos logs.",
+      }), {
+        status: 202,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const result = await runSync();
     return new Response(JSON.stringify({
       success: true,
-      synced,
-      created,
-      errors,
-      changed: results,
-      message,
+      ...result,
+      changed: result.results,
     }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
