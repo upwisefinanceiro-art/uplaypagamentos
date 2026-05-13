@@ -436,7 +436,9 @@ Deno.serve(async (req) => {
         console.log(`[sync-all] Cobrança criada: ${chargeData.id} para payment ${payment.id}`);
       } catch (err) {
         errors++;
-        results.push({ id: payment.id, action: "error", error: err instanceof Error ? err.message : "Erro desconhecido" });
+        const msg = err instanceof Error ? err.message : "Erro desconhecido";
+        console.log(`[sync-all] Phase2 exception pid=${payment.id}: ${msg}`);
+        results.push({ id: payment.id, action: "error", error: msg });
       }
     }
 
