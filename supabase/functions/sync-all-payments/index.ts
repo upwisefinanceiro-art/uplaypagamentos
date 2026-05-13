@@ -415,13 +415,28 @@ Deno.serve(async (req) => {
       totalProcessed === 0 && errors === 0 ? "Nenhum pagamento pendente para processar" : null,
     ].filter(Boolean).join(", ");
 
+      console.log("[sync-all-payments] DONE", { synced, created, errors, message });
+      return { synced, created, errors, results, message };
+    };
+
+    if (runInBackground) {
+      // @ts-ignore - EdgeRuntime is provided by the Supabase runtime
+      EdgeRuntime.waitUntil(runSync().catch((e) => console.error("[sync-all-payments] background error", e)));
+      return new Response(JSON.stringify({
+        success: true,
+        background: true,
+        message: "Sincronização iniciada em segundo plano. Acompanhe o progresso pelos logs.",
+      }), {
+        status: 202,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const result = await runSync();
     return new Response(JSON.stringify({
       success: true,
-      synced,
-      created,
-      errors,
-      changed: results,
-      message,
+      ...result,
+      changed: result.results,
     }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
