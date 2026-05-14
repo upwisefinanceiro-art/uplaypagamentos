@@ -21,6 +21,7 @@ const eventStatusMap: Record<string, string> = {
   PAYMENT_OVERDUE: "OVERDUE",
   PAYMENT_DELETED: "CANCELLED",
   PAYMENT_REFUNDED: "CANCELLED",
+  PAYMENT_RESTORED: "PENDING",
 };
 
 function resolvePaymentStatus(params: {
@@ -92,6 +93,27 @@ Deno.serve(async (req) => {
 
     const event = body.event;
     const payment = body.payment;
+    const eventId: string | undefined = body.id || body.event_id;
+
+    // IDEMPOTÊNCIA: ignora se já processamos este event_id
+    if (eventId) {
+      const { error: idemErr } = await supabase
+        .from("webhook_events")
+        .insert({
+          provider: "ASAAS",
+          event_id: String(eventId),
+          event_type: event || "UNKNOWN",
+          asaas_payment_id: payment?.id ?? null,
+          payload: body,
+        });
+      if (idemErr && (idemErr.code === "23505" || /duplicate/i.test(idemErr.message))) {
+        console.log("Webhook duplicado ignorado:", eventId);
+        return new Response(JSON.stringify({ received: true, duplicate: true }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
 
     if (!event || !payment?.id) {
       await logWebhook(supabase, {
@@ -113,6 +135,7 @@ Deno.serve(async (req) => {
       "PAYMENT_OVERDUE",
       "PAYMENT_DELETED",
       "PAYMENT_REFUNDED",
+      "PAYMENT_RESTORED",
       "PAYMENT_UPDATED",
       "PAYMENT_CREATED",
     ];
