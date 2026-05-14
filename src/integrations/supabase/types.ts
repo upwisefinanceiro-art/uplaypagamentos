@@ -1291,6 +1291,45 @@ export type Database = {
           },
         ]
       }
+      stock_baixa_warnings: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          payment_id: string
+          payment_type: string | null
+          reason: string
+          resolved_at: string | null
+          resolved_by: string | null
+          responsible_id: string | null
+          unit_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          payment_id: string
+          payment_type?: string | null
+          reason?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          responsible_id?: string | null
+          unit_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          payment_id?: string
+          payment_type?: string | null
+          reason?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          responsible_id?: string | null
+          unit_id?: string
+        }
+        Relationships: []
+      }
       stock_items: {
         Row: {
           active: boolean
@@ -1703,6 +1742,39 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      webhook_events: {
+        Row: {
+          asaas_payment_id: string | null
+          event_id: string
+          event_type: string
+          id: string
+          payload: Json | null
+          processed_at: string
+          provider: string
+          unit_id: string | null
+        }
+        Insert: {
+          asaas_payment_id?: string | null
+          event_id: string
+          event_type: string
+          id?: string
+          payload?: Json | null
+          processed_at?: string
+          provider?: string
+          unit_id?: string | null
+        }
+        Update: {
+          asaas_payment_id?: string | null
+          event_id?: string
+          event_type?: string
+          id?: string
+          payload?: Json | null
+          processed_at?: string
+          provider?: string
+          unit_id?: string | null
         }
         Relationships: []
       }
