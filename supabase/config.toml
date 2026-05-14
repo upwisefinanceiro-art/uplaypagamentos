@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.cora-auto-sync]
 verify_jwt = false
+
+[functions.asaas-webhook]
+verify_jwt = false
+
+[functions.register-asaas-webhooks]
+verify_jwt = false
