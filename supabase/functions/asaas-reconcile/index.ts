@@ -415,6 +415,8 @@ async function cancelDuplicate(admin: AdminClient, payment: any, a: AsaasPayment
     return;
   }
 
+  payment.status = "CANCELLED";
+  payment._auto_cancelled = true;
   stats.local_duplicates_cancelled++;
   report.push({ type: "AUTO_CANCEL_DUPLICATE", unit: unit.name, payment_id: payment.id, asaas_payment_id: payment.asaas_payment_id, responsible: responsibleName, message: `Duplicidade cancelada no sistema${asaasCancelled ? " e no Asaas" : ""}; histórico preservado.` });
   await logPaymentSync(admin, { payment_id: payment.id, unit_id: payment.unit_id, responsible_id: payment.responsible_id, asaas_payment_id: payment.asaas_payment_id, action: "AUTO_CANCEL_DUPLICATE", success: true, response_payload: { asaas_cancelled: asaasCancelled } });
@@ -732,7 +734,7 @@ Deno.serve(async (req) => {
       if (emitMissing) {
         let createdInThisRun = 0;
         const freshNoAsaas = localPayments
-          .filter((p) => !p.asaas_payment_id && p.status === "PENDING" && String(p.payment_provider || p.gateway || "ASAAS").toUpperCase() === "ASAAS")
+          .filter((p) => !p._auto_cancelled && !p.asaas_payment_id && p.status === "PENDING" && String(p.payment_provider || p.gateway || "ASAAS").toUpperCase() === "ASAAS")
           .sort((a, b) => String(a.due_date).localeCompare(String(b.due_date)));
 
         for (const p of freshNoAsaas) {
