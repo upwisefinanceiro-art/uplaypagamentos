@@ -297,6 +297,10 @@ Deno.serve(async (req) => {
         type: "FIXED",
       };
     }
+    // Idempotência server-side: externalReference = id local (Asaas usa para reconciliação)
+    if (body._local_payment_id) {
+      asaasPayload.externalReference = body._local_payment_id;
+    }
 
     console.log("[create-asaas-charge] payload Asaas", JSON.stringify({
       responsible_id,
