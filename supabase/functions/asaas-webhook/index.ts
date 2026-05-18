@@ -272,29 +272,31 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Validate webhook token if unit has one configured
+    // Validate webhook token: se a unit tem token configurado, header é OBRIGATÓRIO
     const webhookToken = req.headers.get("asaas-access-token");
-    if (webhookToken) {
+    {
       const { data: unit } = await supabase
         .from("units")
         .select("asaas_webhook_token")
         .eq("id", localPayment.unit_id)
         .single();
 
-      if (unit?.asaas_webhook_token && unit.asaas_webhook_token !== webhookToken) {
-        await logWebhook(supabase, {
-          event,
-          asaas_payment_id: asaasPaymentId,
-          local_payment_id: localPayment.id,
-          unit_id: localPayment.unit_id,
-          payload: body,
-          processed: false,
-          error_message: "Invalid webhook token",
-        });
-        return new Response(JSON.stringify({ error: "Invalid token" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      if (unit?.asaas_webhook_token) {
+        if (!webhookToken || unit.asaas_webhook_token !== webhookToken) {
+          await logWebhook(supabase, {
+            event,
+            asaas_payment_id: asaasPaymentId,
+            local_payment_id: localPayment.id,
+            unit_id: localPayment.unit_id,
+            payload: body,
+            processed: false,
+            error_message: webhookToken ? "Invalid webhook token" : "Missing webhook token (unit requires one)",
+          });
+          return new Response(JSON.stringify({ error: "Invalid token" }), {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
       }
     }
 
