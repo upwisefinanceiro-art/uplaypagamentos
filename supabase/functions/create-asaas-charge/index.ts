@@ -65,18 +65,37 @@ Deno.serve(async (req) => {
     }
 
     // GUARD ESTRITO: parcela local deve ter payment_provider = ASAAS
+    // + IDEMPOTÊNCIA: se a parcela local já tem asaas_payment_id, não recria; devolve a existente
     if (body._local_payment_id) {
       const { data: localPay } = await supabaseAdmin
         .from("payments")
-        .select("payment_provider, gateway")
+        .select("id, payment_provider, gateway, asaas_payment_id, invoice_url, boleto_url, checkout_url, pix_qr_code, pix_copy_paste, status")
         .eq("id", body._local_payment_id)
         .maybeSingle();
       const provider = String(localPay?.payment_provider || localPay?.gateway || "ASAAS").toUpperCase();
-      console.log("[create-asaas-charge] PROVIDER_CHECK", { payment_id: body._local_payment_id, payment_provider: provider, target_function: "create-asaas-charge", attempt_at: new Date().toISOString() });
+      console.log("[create-asaas-charge] PROVIDER_CHECK", { payment_id: body._local_payment_id, payment_provider: provider, has_asaas_id: Boolean(localPay?.asaas_payment_id), attempt_at: new Date().toISOString() });
       if (provider !== "ASAAS") {
         console.warn("[create-asaas-charge] BLOQUEADO: payment_provider != ASAAS", body._local_payment_id, provider);
         return new Response(JSON.stringify({ error: `Erro ao emitir cobrança pelo Asaas: parcela está marcada como ${provider}.` }), {
           status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // Já existe cobrança Asaas vinculada → devolve a existente (idempotente)
+      if (localPay?.asaas_payment_id) {
+        console.log("[create-asaas-charge] IDEMPOTENTE: parcela já possui asaas_payment_id, devolvendo existente", localPay.asaas_payment_id);
+        return new Response(JSON.stringify({
+          payment_id: localPay.id,
+          asaas_charge_id: localPay.asaas_payment_id,
+          status: localPay.status,
+          invoice_url: localPay.invoice_url,
+          pix_qr_code: localPay.pix_qr_code,
+          pix_copy_paste: localPay.pix_copy_paste,
+          boleto_url: localPay.boleto_url,
+          checkout_url: localPay.checkout_url,
+          already_existed: true,
+        }), {
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
