@@ -173,11 +173,52 @@ export default function AdminAuditoriaAsaas() {
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} /> Atualizar
           </Button>
           <Button onClick={forceReconcile} disabled={reconciling}>
-            {reconciling ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-            Forçar reconciliação agora
+            {reconciling ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wrench className="h-4 w-4 mr-2" />}
+            Corrigir automaticamente
           </Button>
         </div>
       </div>
+
+      {reconciling && (
+        <Card>
+          <CardContent className="p-4 flex items-center gap-3 text-sm">
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            <span>{reconcileStep ?? "Executando correção automática…"}</span>
+          </CardContent>
+        </Card>
+      )}
+
+      {lastResult && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-emerald-500" /> Relatório da última correção automática
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+              <div><div className="text-xs text-muted-foreground">Baixas aplicadas</div><div className="text-xl font-bold">{lastResult.paid_synced ?? 0}</div></div>
+              <div><div className="text-xs text-muted-foreground">Cobranças criadas</div><div className="text-xl font-bold">{lastResult.missing_charges_created ?? 0}</div></div>
+              <div><div className="text-xs text-muted-foreground">Duplicidades canceladas</div><div className="text-xl font-bold">{lastResult.local_duplicates_cancelled ?? 0}</div></div>
+              <div><div className="text-xs text-muted-foreground">Erros restantes</div><div className="text-xl font-bold">{lastResult.errors_remaining ?? lastResult.errors ?? 0}</div></div>
+              <div><div className="text-xs text-muted-foreground">Vínculos reparados</div><div className="text-xl font-bold">{lastResult.missing_links_repaired ?? 0}</div></div>
+              <div><div className="text-xs text-muted-foreground">Canceladas no Asaas</div><div className="text-xl font-bold">{lastResult.asaas_duplicates_cancelled ?? 0}</div></div>
+              <div><div className="text-xs text-muted-foreground">Órfãs registradas</div><div className="text-xl font-bold">{lastResult.orphans_logged ?? 0}</div></div>
+              <div><div className="text-xs text-muted-foreground">Clientes duplicados</div><div className="text-xl font-bold">{lastResult.customer_duplicates_detected ?? 0}</div></div>
+            </div>
+            {(lastResult.report?.length ?? 0) > 0 && (
+              <div className="space-y-2 max-h-72 overflow-y-auto text-sm">
+                {lastResult.report!.slice(0, 80).map((item, idx) => (
+                  <div key={`${item.type}-${idx}`} className="border rounded-md p-2">
+                    <div className="font-medium">{item.type}{item.unit ? ` · ${item.unit}` : ""}</div>
+                    <div className="text-muted-foreground">{item.responsible ? `${item.responsible} — ` : ""}{item.message}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card><CardContent className="p-4">
