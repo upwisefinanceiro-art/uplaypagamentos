@@ -106,6 +106,7 @@ const App = () => {
                 <Route path="boletos-uplay" element={<AdminUplayBilling />} />
                 <Route path="planos-saas" element={<AdminSaasPlans />} />
                 <Route path="backup" element={<AdminBackup />} />
+                <Route path="auditoria-asaas" element={<AdminAuditoriaAsaas />} />
                 <Route path="alterar-senha" element={<AppChangePassword />} />
               </Route>
 
