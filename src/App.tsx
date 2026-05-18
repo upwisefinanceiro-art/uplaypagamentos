@@ -35,6 +35,7 @@ import AdminBackup from "./pages/admin/AdminBackup";
 import AdminAsaasFees from "./pages/admin/AdminAsaasFees";
 import AdminCoraFees from "./pages/admin/AdminCoraFees";
 import AdminFinancialPro from "./pages/admin/AdminFinancialPro";
+import AdminAuditoriaAsaas from "./pages/admin/AdminAuditoriaAsaas";
 import SuperAdminLayout from "./components/layouts/SuperAdminLayout";
 import SuperDashboard from "./pages/super/SuperDashboard";
 import SuperCompanies from "./pages/super/SuperCompanies";
