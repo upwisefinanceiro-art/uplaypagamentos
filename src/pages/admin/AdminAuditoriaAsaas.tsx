@@ -4,7 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, RefreshCw, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Loader2, RefreshCw, AlertTriangle, CheckCircle2, Wrench } from "lucide-react";
 
 type Incon = {
   id: string;
@@ -32,6 +32,24 @@ type WebhookLog = {
   created_at: string;
 };
 
+type ReconcileResult = {
+  units_processed?: number;
+  asaas_charges_fetched?: number;
+  local_payments_scanned?: number;
+  duplicate_groups_found?: number;
+  local_duplicates_cancelled?: number;
+  asaas_duplicates_cancelled?: number;
+  paid_synced?: number;
+  missing_links_repaired?: number;
+  missing_charges_created?: number;
+  orphans_logged?: number;
+  customer_duplicates_detected?: number;
+  webhook_failures_marked_for_review?: number;
+  errors?: number;
+  errors_remaining?: number;
+  report?: Array<{ type: string; unit?: string; responsible?: string | null; message: string }>;
+};
+
 const severityColor: Record<string, string> = {
   HIGH: "destructive",
   MEDIUM: "default",
@@ -52,6 +70,8 @@ export default function AdminAuditoriaAsaas() {
   const [inconsistencies, setInconsistencies] = useState<Incon[]>([]);
   const [webhookFails, setWebhookFails] = useState<WebhookLog[]>([]);
   const [reconciling, setReconciling] = useState(false);
+  const [reconcileStep, setReconcileStep] = useState<string | null>(null);
+  const [lastResult, setLastResult] = useState<ReconcileResult | null>(null);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
@@ -80,19 +100,23 @@ export default function AdminAuditoriaAsaas() {
 
   async function forceReconcile() {
     setReconciling(true);
+    setReconcileStep("Varrendo parcelas locais e cobranças do Asaas dos últimos 120 dias…");
     try {
       const { data, error } = await supabase.functions.invoke("asaas-reconcile", {
-        body: { days_back: 14 },
+        body: { days_back: 120, repair_duplicates: true, emit_missing: true, max_create: 500 },
       });
       if (error) throw error;
+      setReconcileStep("Atualizando auditoria e webhooks falhos…");
+      setLastResult(data as ReconcileResult);
       toast({
-        title: "Reconciliação concluída",
-        description: `${data?.units_processed ?? 0} unidades · ${data?.paid_synced ?? 0} pagos sincronizados · ${data?.orphans_logged ?? 0} órfãs no Asaas detectadas`,
+        title: "Correção automática concluída",
+        description: `${data?.paid_synced ?? 0} baixas · ${data?.missing_charges_created ?? 0} cobranças criadas · ${data?.local_duplicates_cancelled ?? 0} duplicidades canceladas`,
       });
       await fetchData();
     } catch (e) {
       toast({ title: "Falha na reconciliação", description: String((e as Error)?.message ?? e), variant: "destructive" });
     } finally {
+      setReconcileStep(null);
       setReconciling(false);
     }
   }
