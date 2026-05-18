@@ -35,6 +35,7 @@ import AdminBackup from "./pages/admin/AdminBackup";
 import AdminAsaasFees from "./pages/admin/AdminAsaasFees";
 import AdminCoraFees from "./pages/admin/AdminCoraFees";
 import AdminFinancialPro from "./pages/admin/AdminFinancialPro";
+import AdminAuditoriaAsaas from "./pages/admin/AdminAuditoriaAsaas";
 import SuperAdminLayout from "./components/layouts/SuperAdminLayout";
 import SuperDashboard from "./pages/super/SuperDashboard";
 import SuperCompanies from "./pages/super/SuperCompanies";
@@ -105,6 +106,7 @@ const App = () => {
                 <Route path="boletos-uplay" element={<AdminUplayBilling />} />
                 <Route path="planos-saas" element={<AdminSaasPlans />} />
                 <Route path="backup" element={<AdminBackup />} />
+                <Route path="auditoria-asaas" element={<AdminAuditoriaAsaas />} />
                 <Route path="alterar-senha" element={<AppChangePassword />} />
               </Route>
 

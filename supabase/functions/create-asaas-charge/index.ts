@@ -65,18 +65,37 @@ Deno.serve(async (req) => {
     }
 
     // GUARD ESTRITO: parcela local deve ter payment_provider = ASAAS
+    // + IDEMPOTÊNCIA: se a parcela local já tem asaas_payment_id, não recria; devolve a existente
     if (body._local_payment_id) {
       const { data: localPay } = await supabaseAdmin
         .from("payments")
-        .select("payment_provider, gateway")
+        .select("id, payment_provider, gateway, asaas_payment_id, invoice_url, boleto_url, checkout_url, pix_qr_code, pix_copy_paste, status")
         .eq("id", body._local_payment_id)
         .maybeSingle();
       const provider = String(localPay?.payment_provider || localPay?.gateway || "ASAAS").toUpperCase();
-      console.log("[create-asaas-charge] PROVIDER_CHECK", { payment_id: body._local_payment_id, payment_provider: provider, target_function: "create-asaas-charge", attempt_at: new Date().toISOString() });
+      console.log("[create-asaas-charge] PROVIDER_CHECK", { payment_id: body._local_payment_id, payment_provider: provider, has_asaas_id: Boolean(localPay?.asaas_payment_id), attempt_at: new Date().toISOString() });
       if (provider !== "ASAAS") {
         console.warn("[create-asaas-charge] BLOQUEADO: payment_provider != ASAAS", body._local_payment_id, provider);
         return new Response(JSON.stringify({ error: `Erro ao emitir cobrança pelo Asaas: parcela está marcada como ${provider}.` }), {
           status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // Já existe cobrança Asaas vinculada → devolve a existente (idempotente)
+      if (localPay?.asaas_payment_id) {
+        console.log("[create-asaas-charge] IDEMPOTENTE: parcela já possui asaas_payment_id, devolvendo existente", localPay.asaas_payment_id);
+        return new Response(JSON.stringify({
+          payment_id: localPay.id,
+          asaas_charge_id: localPay.asaas_payment_id,
+          status: localPay.status,
+          invoice_url: localPay.invoice_url,
+          pix_qr_code: localPay.pix_qr_code,
+          pix_copy_paste: localPay.pix_copy_paste,
+          boleto_url: localPay.boleto_url,
+          checkout_url: localPay.checkout_url,
+          already_existed: true,
+        }), {
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -278,6 +297,10 @@ Deno.serve(async (req) => {
         type: "FIXED",
       };
     }
+    // Idempotência server-side: externalReference = id local (Asaas usa para reconciliação)
+    if (body._local_payment_id) {
+      asaasPayload.externalReference = body._local_payment_id;
+    }
 
     console.log("[create-asaas-charge] payload Asaas", JSON.stringify({
       responsible_id,
@@ -332,39 +355,90 @@ Deno.serve(async (req) => {
       checkoutUrl = chargeData.invoiceUrl || null;
     }
 
-    const { data: payment, error: insertErr } = await supabaseAdmin
-      .from("payments")
-      .insert({
-        unit_id: unitId,
-        contract_id: contract_id || null,
-        responsible_id,
-        student_id: student_id || null,
-        installment_number: 1,
-        due_date,
-        value: hasDiscount ? originalValueNum : value,
-        original_value: hasDiscount ? originalValueNum : value,
-        final_value: value,
-        punctuality_discount: discountValue,
-        payment_provider: "ASAAS",
-        description: description || "Mensalidade UPLAY",
-        payment_type: payment_type || (contract_id ? "MENSALIDADE" : "AVULSA"),
-        status: "PENDING",
-        asaas_payment_id: chargeData.id,
-        pix_qr_code: pixQrCode,
-        pix_copy_paste: pixCopyPaste,
-        boleto_url: boletoUrl,
-        invoice_url: invoiceUrl,
-        checkout_url: checkoutUrl,
-        payment_method: billing_type,
-        raw_response: chargeData,
-        stock_item_id: stock_item_id || null,
-        stock_quantity: stock_quantity || 1,
-      })
-      .select("id")
-      .single();
+    // Se veio _local_payment_id, ATUALIZA a parcela existente (não cria duplicata).
+    // Caso contrário, INSERT normal (fluxo de cobrança avulsa).
+    let payment: { id: string } | null = null;
+    let insertErr: { message: string } | null = null;
 
-    if (insertErr) {
-      return new Response(JSON.stringify({ error: "Cobrança criada no Asaas mas erro ao salvar no banco", details: insertErr.message }), {
+    if (body._local_payment_id) {
+      const { data: updated, error: updErr } = await supabaseAdmin
+        .from("payments")
+        .update({
+          payment_provider: "ASAAS",
+          asaas_payment_id: chargeData.id,
+          pix_qr_code: pixQrCode,
+          pix_copy_paste: pixCopyPaste,
+          boleto_url: boletoUrl,
+          invoice_url: invoiceUrl,
+          checkout_url: checkoutUrl,
+          payment_method: billing_type,
+          raw_response: chargeData,
+          emission_status: "EMITTED",
+          emission_last_attempt_at: new Date().toISOString(),
+        })
+        .eq("id", body._local_payment_id)
+        .is("asaas_payment_id", null) // guard: só atualiza se ainda não tem (anti race)
+        .select("id")
+        .maybeSingle();
+      payment = updated as { id: string } | null;
+      insertErr = updErr ? { message: updErr.message } : null;
+
+      // Se o update não bateu (race: outra chamada já gravou), buscar o existente e devolver
+      if (!payment && !updErr) {
+        const { data: existing } = await supabaseAdmin
+          .from("payments")
+          .select("id, asaas_payment_id")
+          .eq("id", body._local_payment_id)
+          .maybeSingle();
+        if (existing?.asaas_payment_id && existing.asaas_payment_id !== chargeData.id) {
+          // Outra requisição venceu a corrida → cancelar a nossa cobrança duplicada no Asaas
+          console.warn("[create-asaas-charge] RACE: parcela já tinha asaas_payment_id; cancelando duplicada", chargeData.id);
+          try {
+            await fetch(`${baseUrl}/payments/${chargeData.id}`, {
+              method: "DELETE",
+              headers: { access_token: unit.asaas_api_key },
+            });
+          } catch (e) { console.warn("Falha ao cancelar duplicada:", e); }
+        }
+        payment = existing as { id: string } | null;
+      }
+    } else {
+      const { data: inserted, error: insErr } = await supabaseAdmin
+        .from("payments")
+        .insert({
+          unit_id: unitId,
+          contract_id: contract_id || null,
+          responsible_id,
+          student_id: student_id || null,
+          installment_number: 1,
+          due_date,
+          value: hasDiscount ? originalValueNum : value,
+          original_value: hasDiscount ? originalValueNum : value,
+          final_value: value,
+          punctuality_discount: discountValue,
+          payment_provider: "ASAAS",
+          description: description || "Mensalidade UPLAY",
+          payment_type: payment_type || (contract_id ? "MENSALIDADE" : "AVULSA"),
+          status: "PENDING",
+          asaas_payment_id: chargeData.id,
+          pix_qr_code: pixQrCode,
+          pix_copy_paste: pixCopyPaste,
+          boleto_url: boletoUrl,
+          invoice_url: invoiceUrl,
+          checkout_url: checkoutUrl,
+          payment_method: billing_type,
+          raw_response: chargeData,
+          stock_item_id: stock_item_id || null,
+          stock_quantity: stock_quantity || 1,
+        })
+        .select("id")
+        .single();
+      payment = inserted as { id: string } | null;
+      insertErr = insErr ? { message: insErr.message } : null;
+    }
+
+    if (insertErr || !payment) {
+      return new Response(JSON.stringify({ error: "Cobrança criada no Asaas mas erro ao salvar no banco", details: insertErr?.message || "no row" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

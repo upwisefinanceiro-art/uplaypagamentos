@@ -1,85 +1,70 @@
-## Reconciliação automática Asaas × Sistema (desconto de pontualidade)
 
-Objetivo: corrigir em massa cobranças Asaas antigas que foram criadas com `value` já descontado, sem `discount` separado, sem precisar tratar uma a uma.
+# Auditoria Asaas — Diagnóstico e Plano de Correção
 
-### 1. Banco de dados (migration)
+## 1. Diagnóstico (varredura já executada no banco e nas edge functions)
 
-Adicionar em `public.payments`:
+### O que está OK
+- **Idempotência por `asaas_payment_id`**: 3.306 registros com `asaas_payment_id` → 3.306 IDs distintos. Zero colisão. O webhook não está duplicando linhas pelo mesmo evento.
+- **Idempotência de evento**: `webhook_events.event_id` tem unique constraint e o `asaas-webhook` insere antes de processar (retorna `duplicate:true` no 23505). Eventos repetidos do Asaas já são ignorados.
+- **Guard “PAID nunca volta”**: `resolvePaymentStatus` mantém status `PAID` mesmo se Asaas reenviar `PENDING/OVERDUE`. Confirmado em `asaas-webhook/index.ts` linhas 39-41.
+- **Webhook recebendo eventos**: 1.148 sucessos / 350 falhas em 30 dias, último evento processado há minutos.
+- **Os "Payment not found locally" recentes (163 em 30d / 18 em 7d)** são `PAYMENT_DELETED` das 26 cobranças que apagamos hoje da Daisy — comportamento esperado, **não é bug**.
 
-- `sync_status TEXT NOT NULL DEFAULT 'OK'` — valores: `OK`, `DIVERGENT`, `FIXING`, `FIXED`, `ERROR`
-- `sync_error TEXT`
-- `sync_last_check TIMESTAMPTZ`
-- `sync_last_fix TIMESTAMPTZ`
-- `sync_fixed_by UUID`
-- `sync_attempts INT NOT NULL DEFAULT 0`
-- `corrected_automatically BOOLEAN NOT NULL DEFAULT false`
+### Problemas reais encontrados
+1. **76 grupos de parcelas duplicadas** no banco com mesmo `(responsible_id, due_date, value)`. A maioria já está paga (cliente foi cobrado 2-3x no Asaas — caso Bruno R$139,90 jul-out/2025, Daisy R$229,90 mai-out/2025, etc.).
+2. **26 pagamentos sem `contract_id`** (órfãos vindos de importações antigas do Asaas).
+3. **Sem trava transacional em `create-asaas-charge`**: dois cliques rápidos no botão "Gerar cobrança" da mesma parcela podem criar duas cobranças no Asaas (a função apenas faz `INSERT` em payments sem checar `asaas_payment_id` existente da mesma parcela).
+4. **Validação fraca do webhook token**: `asaas-webhook` só valida se o header vier; se o Asaas não mandar, aceita qualquer chamada. Risco de spoofing.
+5. **Sem unique constraint** que impeça duplicidade de parcelas. Toda proteção é a nível de aplicação (e está furada — ver #3).
+6. **Sem reconciliação automática agendada** entre o que existe no Asaas e o que existe localmente (a função `sync-all-payments` existe mas é manual).
 
-Nova tabela `public.payment_sync_logs` (auditoria detalhada):
-- `payment_id`, `asaas_payment_id`, `responsible_id`, `unit_id`
-- `old_value`, `new_value`, `old_discount`, `new_discount`
-- `action` (`UPDATE_ASAAS` | `CANCEL_AND_RECREATE` | `MARK_OK` | `ERROR`)
-- `request_payload jsonb`, `response_payload jsonb`
-- `success boolean`, `error_message text`
-- `performed_by uuid`, `created_at`
+## 2. Correções
 
-RLS: mesmas políticas de `payments` (Super/Admin Master/Admin Unidade por unidade).
+### Etapa A — Banco (migration)
+- `UNIQUE (asaas_payment_id)` em `payments` (já é único de fato, vamos garantir formalmente).
+- Index parcial `UNIQUE (contract_id, installment_number)` para parcelas regulares (impede a mesma parcela do mesmo contrato existir 2x).
+- Limpeza segura das 76 duplicatas de parcelas:
+  - Quando o grupo tem cópias **PAID + PENDING/OVERDUE**: manter a PAID, apagar a outra (e cancelar no Asaas se ainda estiver aberta).
+  - Quando o grupo tem 2+ PAID: manter a mais antiga, registrar as outras em `payment_inconsistencies` para revisão manual (não excluir — pode haver dinheiro real recebido em duplicidade que precisa ser estornado pelo financeiro).
+- Tentar vincular os 26 pagamentos sem `contract_id` (best-effort por responsável + descrição), registrando o que não casar em `payment_inconsistencies`.
 
-### 2. Edge Function: `reconcile-asaas-discounts`
+### Etapa B — `create-asaas-charge` (idempotência na criação)
+- Antes do `POST /payments` no Asaas, dar `SELECT ... FOR UPDATE` no payment local; se já tiver `asaas_payment_id`, devolver o existente (não recria).
+- Travar via `external_reference` enviado ao Asaas igual ao `payment.id` local — se vier 200 mas a requisição duplicar, a segunda recupera o mesmo registro.
 
-Nova função Deno. Recebe `{ unit_id?, payment_ids?, dry_run?, batch_size? }`.
+### Etapa C — `asaas-webhook` (endurecer)
+- Tornar a validação do token **obrigatória** quando a unit tiver um token configurado (rejeitar se header ausente).
+- Mensurar tempo de processamento e logar.
 
-Fluxo por cobrança elegível (filtro):
-- `payment_provider = 'ASAAS'`
-- `status IN ('PENDING','OVERDUE','RECEIVED_PENDING_CONFIRMATION')`
-- `asaas_payment_id IS NOT NULL`
-- `punctuality_discount > 0` e `original_value IS NOT NULL`
+### Etapa D — Reconciliação automática
+- Nova edge function `asaas-reconcile` que para cada unit:
+  1. Lista cobranças no Asaas dos últimos N dias (`GET /payments?dateCreated[ge]=...`).
+  2. Para cada uma sem correspondente local, cria a inconsistência em `payment_inconsistencies` (não cria payment automaticamente — evita "fantasmas").
+  3. Para cada `payment` local sem `asaas_payment_id` há mais de 1h, dispara `sync-asaas-payment`.
+- Agendar via `pg_cron` 4x ao dia (06:00, 13:00, 17:00, 22:00 BRT, conforme pedido do usuário em mensagem anterior).
 
-Para cada uma:
-1. `GET /payments/{id}` no Asaas (chave da unidade).
-2. Comparar:
-   - esperado: `value = original_value`, `discount.value = punctuality_discount`, `discount.type = FIXED`, `discount.dueDateLimitDays = 0`
-   - se já bate → marca `sync_status='OK'`, `sync_last_check=now()`.
-3. Se divergente e cobrança não paga/cancelada no Asaas:
-   - Tentar `POST /payments/{id}` (update) com payload:
-     ```json
-     { "value": original_value, "discount": { "value": discount, "dueDateLimitDays": 0, "type": "FIXED" } }
-     ```
-   - Se 200 → `sync_status='FIXED'`, `corrected_automatically=true`, log `UPDATE_ASAAS`.
-   - Se Asaas recusar (ex.: já visualizada/parcial) → `DELETE /payments/{id}` + chamar `sync-asaas-payment` (que já cria com discount correto). Atualiza `asaas_payment_id` no payment. Log `CANCEL_AND_RECREATE`.
-4. Erros são capturados por item, registrados em `payment_sync_logs` e setam `sync_status='ERROR'`, `sync_error=msg`. Não interrompe o lote.
+### Etapa E — Painel de auditoria (somente leitura, ADMIN_MASTER)
+- Nova página `/admin/auditoria-asaas` listando:
+  - Inconsistências abertas (`payment_inconsistencies`).
+  - Últimos webhooks falhos (`webhook_logs`).
+  - Botão "Forçar reconciliação agora" (chama `asaas-reconcile`).
+  - Botão "Reenviar para Asaas" por payment.
 
-Controle de lote:
-- `batch_size` default 25.
-- `await sleep(150ms)` entre chamadas (rate limit Asaas).
-- Usa `EdgeRuntime.waitUntil` para processamento assíncrono e responde com `job_id` lógico (apenas o totals iniciais + assíncrono).
+## 3. O que **não** vou fazer agora (e por quê)
+- **Apagar automaticamente cobranças PAID duplicadas**: pode existir dinheiro real recebido em duplicidade. Vou apenas marcar para revisão manual da Daisy/financeiro.
+- **Cancelar em massa cobranças PENDING duplicadas no Asaas** sem confirmação por unit — risco alto. O painel da Etapa E permitirá ação manual auditada.
+- **Testes automatizados completos**: o pedido inclui ~10 cenários de teste. Cria-se em uma segunda iteração depois das correções acima validadas.
 
-Versão síncrona simples para começar: processa até `batch_size` por chamada e retorna `{ checked, fixed, divergent, errors, remaining }`. O frontend chama em loop até `remaining === 0`.
+## 4. Ordem de execução
+1. Migration (Etapa A) — precisa de aprovação no Lovable.
+2. Edit em `create-asaas-charge` + `asaas-webhook` (Etapas B + C).
+3. Criar `asaas-reconcile` + cron (Etapa D).
+4. Página `/admin/auditoria-asaas` (Etapa E).
 
-### 3. Frontend: `DashboardInconsistencies.tsx`
+## 5. Detalhes técnicos
+- `webhook_events(provider, event_id)` já tem unique → mantém.
+- `payment_inconsistencies` já existe e tem RLS → reaproveitar.
+- `cora-webhook` e fluxo Cora não estão no escopo (problema é Asaas).
+- `payments.external_reference` (campo enviado ao Asaas) será setado como `payment.id` local em todas as criações novas.
 
-Adicionar botão "Corrigir automaticamente" ao lado de "Verificar agora".
-
-Comportamento:
-- Mostra `Dialog` com progresso: `Verificadas X / Total · Corrigidas: Y · Erros: Z`.
-- Loop: chama `reconcile-asaas-discounts` com `batch_size: 25` até `remaining === 0`.
-- Ao final: toast com total, recarrega `fetchIssues()` e dispara `detect-payment-inconsistencies` para limpar a lista.
-
-Adicionar contadores no card (badges): `Divergentes`, `Corrigidas`, `Erros` (com base em `sync_status` consultado ao montar).
-
-### 4. Segurança
-
-- Edge function valida JWT do chamador, exige role `SUPER_ADMIN`, `ADMIN_MASTER` ou `ADMIN_UNIDADE`.
-- Filtro garante que **nunca** processa `RECEIVED`, `CONFIRMED`, `PAID`, `REFUNDED`, `CANCELLED`.
-- Antes de cada update, re-checa status no Asaas; se já pago, aborta sem alterar.
-
-### 5. Arquivos
-
-- `supabase/migrations/<ts>_payment_sync_status.sql`
-- `supabase/functions/reconcile-asaas-discounts/index.ts` (novo)
-- `src/components/dashboard/DashboardInconsistencies.tsx` (botão + dialog progresso)
-
-### Confirmações antes de prosseguir
-
-1. Posso adicionar os 7 campos em `payments` + criar `payment_sync_logs`?
-2. Estratégia "tentar UPDATE → fallback DELETE+CREATE" está OK? (a alternativa segura é só UPDATE, e cobranças que falharem ficam marcadas como ERROR para revisão manual.)
-3. Executar em lotes de 25 chamando do navegador é aceitável, ou prefere agendar via cron diário?
+Posso prosseguir com a Etapa A (migration) primeiro?

@@ -42,6 +42,7 @@ const menuItems = [
   { path: "/admin/cobrancas-saas", icon: CreditCard, label: "Cobranças SaaS", roles: ["ADMIN_MASTER"] },
   { path: "/admin/planos-saas", icon: Package, label: "Planos SaaS", roles: ["ADMIN_MASTER"] },
   { path: "/admin/backup", icon: Database, label: "Backup", roles: ["ADMIN_MASTER"] },
+  { path: "/admin/auditoria-asaas", icon: ShieldCheck, label: "Auditoria Asaas", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
 ];
 
 const AdminLayout = () => {
