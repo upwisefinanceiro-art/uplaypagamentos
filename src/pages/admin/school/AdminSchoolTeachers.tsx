@@ -267,27 +267,28 @@ export default function AdminSchoolTeachers() {
     sendingRef.current = t.id;
     setSendingId(t.id);
     try {
-      // Cria/garante acesso automaticamente
-      if (!t.profile_id) {
-        const { data: accessRes, error: accessErr } = await supabase.functions.invoke(
-          "create-teacher-user",
-          {
-            body: {
-              teacher_id: t.id,
-              email: t.email,
-              full_name: t.full_name,
-              phone: t.phone,
-              password: DEFAULT_PASSWORD,
-            },
+      // Sempre garante que o acesso esteja sincronizado (email + senha padrão)
+      const { data: accessRes, error: accessErr } = await supabase.functions.invoke(
+        "create-teacher-user",
+        {
+          body: {
+            teacher_id: t.id,
+            email: t.email,
+            full_name: t.full_name,
+            phone: t.phone,
+            password: DEFAULT_PASSWORD,
           },
-        );
-        const errMsg = (accessRes as { error?: string })?.error || accessErr?.message;
-        if (errMsg) {
-          toast({ title: "Falha ao criar acesso", description: errMsg, variant: "destructive" });
-          return;
-        }
-        toast({ title: "Acesso criado", description: "Login gerado com senha padrão 12345678." });
+        },
+      );
+      const errMsg = (accessRes as { error?: string })?.error || accessErr?.message;
+      if (errMsg) {
+        toast({ title: "Falha ao criar acesso", description: errMsg, variant: "destructive" });
+        return;
       }
+      toast({
+        title: t.profile_id ? "Acesso atualizado" : "Acesso criado",
+        description: "Login sincronizado com senha padrão 12345678.",
+      });
 
       const message = buildAppAccessMessage({
         fullName: t.full_name,
