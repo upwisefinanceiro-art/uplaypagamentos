@@ -529,19 +529,27 @@ export default function AdminSchoolCalendar() {
                 <div className="flex flex-col gap-0.5 overflow-hidden">
                   {dayLessons.slice(0, 3).map((l) => {
                     const teacher = teachers.find((t) => t.id === l.teacher_id);
+                    const cls = classes.find((c) => c.id === l.class_id);
+                    const unit = units.find((u) => u.id === l.unit_id);
                     const s = new Date(l.starts_at);
+                    const e = new Date(l.ends_at);
                     return (
                       <div
                         key={l.id}
                         className={`truncate rounded px-1 py-0.5 border ${STATUS_COLOR[l.status] ?? ""}`}
-                        title={`${teacher?.full_name ?? ""} — ${STATUS_LABEL[l.status]}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
+                        title={`${fmtHHMM(s)}-${fmtHHMM(e)} • ${cls?.name ?? "Sem turma"} • ${teacher?.full_name ?? ""} • ${unit?.name ?? ""}`}
+                        onClick={(ev) => {
+                          ev.stopPropagation();
                           deleteLesson(l.id);
                         }}
                       >
-                        {String(s.getHours()).padStart(2, "0")}:{String(s.getMinutes()).padStart(2, "0")}{" "}
-                        {teacher?.full_name?.split(" ")[0] ?? ""}
+                        <div className="font-semibold leading-tight">
+                          {fmtHHMM(s)}–{fmtHHMM(e)}
+                        </div>
+                        <div className="truncate leading-tight">{cls?.name ?? "Sem turma"}</div>
+                        <div className="truncate leading-tight opacity-80">
+                          {teacher?.full_name?.split(" ").slice(0, 2).join(" ") ?? ""}
+                        </div>
                       </div>
                     );
                   })}
