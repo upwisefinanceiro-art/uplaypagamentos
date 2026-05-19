@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, GraduationCap, KeyRound, ShieldCheck, Smartphone, Loader2 } from "lucide-react";
+import { buildAppAccessMessage } from "@/lib/app-access-message";
 
 interface Teacher {
   id: string;
@@ -254,14 +255,12 @@ export default function AdminSchoolTeachers() {
         toast({ title: "Acesso criado", description: "Login gerado com senha padrão 12345678." });
       }
 
-      const message =
-        `Olá, ${t.full_name}.\n\n` +
-        `Seu acesso ao aplicativo Upplay foi liberado.\n\n` +
-        `Login: ${t.email}\n` +
-        `Senha inicial: ${DEFAULT_PASSWORD}\n\n` +
-        `No aplicativo você poderá visualizar:\n` +
-        `• Calendário\n• Aulas\n• Horários\n• Pagamentos\n• Agenda\n\n` +
-        `Após o primeiro acesso, recomendamos alterar sua senha.`;
+      const message = buildAppAccessMessage({
+        fullName: t.full_name,
+        email: t.email,
+        unitId: t.unit_id,
+        login: t.email,
+      });
       const phone = (t.phone ?? "").replace(/\D/g, "");
       if (phone) {
         const intl = phone.length <= 11 ? `55${phone}` : phone;
