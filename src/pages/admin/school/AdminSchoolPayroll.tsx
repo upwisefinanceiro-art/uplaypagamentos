@@ -118,7 +118,8 @@ export default function AdminSchoolPayroll() {
   const { user } = useAuth();
   const { units, loading: unitsLoading } = useSchoolAccess();
   const [unitId, setUnitId] = useState<string>("");
-  const [month, setMonth] = useState<string>(currentMonth());
+  // Início do ciclo da folha (data ISO yyyy-mm-dd). Default = ciclo atual com closingDay=20
+  const [cycleStart, setCycleStart] = useState<string>(() => computeCycleStart(20));
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [closures, setClosures] = useState<Closure[]>([]);
   const [payments, setPayments] = useState<TeacherPayment[]>([]);
