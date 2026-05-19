@@ -59,30 +59,39 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (!teacher) return jsonResponse({ error: "Professor não encontrado" }, 404);
 
-    // Reutiliza usuário existente pelo e-mail. Primeiro tenta via profile (mais rápido e robusto),
-    // depois faz fallback para paginação completa do auth admin.
+    // Reutiliza usuário existente. Prioridade:
+    // 1) profile_id já vinculado ao professor (mesmo que o e-mail tenha mudado)
+    // 2) profile com o mesmo e-mail
+    // 3) fallback: paginação completa do auth admin
     let userId: string | null = null;
 
-    const { data: existingProfile } = await admin
-      .from("profiles")
-      .select("id")
-      .eq("email", normalizedEmail)
-      .maybeSingle();
-    if (existingProfile?.id) {
-      userId = existingProfile.id as string;
-    } else {
-      const perPage = 1000;
-      for (let page = 1; page <= 50 && !userId; page++) {
-        const { data: list, error: listErr } = await admin.auth.admin.listUsers({ page, perPage });
-        if (listErr) {
-          console.error("[create-teacher-user] listUsers error", listErr);
-          break;
+    if (teacher.profile_id) {
+      userId = teacher.profile_id as string;
+      console.info("[create-teacher-user] reaproveitando profile_id vinculado", { userId });
+    }
+
+    if (!userId) {
+      const { data: existingProfile } = await admin
+        .from("profiles")
+        .select("id")
+        .eq("email", normalizedEmail)
+        .maybeSingle();
+      if (existingProfile?.id) {
+        userId = existingProfile.id as string;
+      } else {
+        const perPage = 1000;
+        for (let page = 1; page <= 50 && !userId; page++) {
+          const { data: list, error: listErr } = await admin.auth.admin.listUsers({ page, perPage });
+          if (listErr) {
+            console.error("[create-teacher-user] listUsers error", listErr);
+            break;
+          }
+          const match = list?.users?.find(
+            (u: { email?: string }) => u.email?.toLowerCase() === normalizedEmail,
+          );
+          if (match) { userId = match.id; break; }
+          if (!list?.users?.length || list.users.length < perPage) break;
         }
-        const match = list?.users?.find(
-          (u: { email?: string }) => u.email?.toLowerCase() === normalizedEmail,
-        );
-        if (match) { userId = match.id; break; }
-        if (!list?.users?.length || list.users.length < perPage) break;
       }
     }
 
