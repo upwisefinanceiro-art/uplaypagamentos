@@ -222,7 +222,7 @@ export default function AdminSchoolPayroll() {
 
   useEffect(() => {
     load();
-  }, [unitId, month]);
+  }, [unitId, cycleStart]);
 
   const generate = async (teacherId: string) => {
     setBusy(teacherId);
