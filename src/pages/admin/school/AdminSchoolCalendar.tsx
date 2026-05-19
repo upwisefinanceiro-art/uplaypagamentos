@@ -320,7 +320,53 @@ export default function AdminSchoolCalendar() {
       toast({ title: "Nada a gerar", description: "Verifique os dias da semana e a data final", variant: "destructive" });
       return;
     }
+
+    // Conflict detection: check overlap for same teacher on the same day
     setSaving(true);
+    const dayStarts = rows.map((r) => r.starts_at);
+    const minDay = new Date(Math.min(...dayStarts.map((s) => new Date(s).getTime())));
+    const maxDay = new Date(Math.max(...dayStarts.map((s) => new Date(s).getTime())));
+    minDay.setHours(0, 0, 0, 0);
+    maxDay.setHours(23, 59, 59, 999);
+    const { data: existing } = await supabase
+      .from("school_lessons")
+      .select("starts_at,ends_at")
+      .eq("teacher_id", form.teacher_id)
+      .neq("status", "CANCELED")
+      .gte("starts_at", minDay.toISOString())
+      .lte("starts_at", maxDay.toISOString());
+
+    const conflicts: string[] = [];
+    for (const r of rows) {
+      const rs = new Date(r.starts_at).getTime();
+      const re = new Date(r.ends_at).getTime();
+      // overlap within the same set being created
+      for (const r2 of rows) {
+        if (r2 === r) continue;
+        const r2s = new Date(r2.starts_at).getTime();
+        const r2e = new Date(r2.ends_at).getTime();
+        if (sameDay(new Date(rs), new Date(r2s)) && rs < r2e && re > r2s) {
+          conflicts.push(new Date(rs).toLocaleString("pt-BR"));
+        }
+      }
+      for (const e of existing ?? []) {
+        const es = new Date(e.starts_at).getTime();
+        const ee = new Date(e.ends_at).getTime();
+        if (rs < ee && re > es) {
+          conflicts.push(new Date(rs).toLocaleString("pt-BR"));
+        }
+      }
+    }
+    if (conflicts.length > 0) {
+      setSaving(false);
+      toast({
+        title: "Conflito de horário",
+        description: `O professor já tem aula em: ${[...new Set(conflicts)].slice(0, 3).join(", ")}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     const { error } = await supabase.from("school_lessons").insert(rows);
     setSaving(false);
     if (error) {
