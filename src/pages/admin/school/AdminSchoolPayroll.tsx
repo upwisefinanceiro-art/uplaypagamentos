@@ -344,6 +344,83 @@ export default function AdminSchoolPayroll() {
     load();
   };
 
+  const openConfig = () => {
+    setConfigForm({
+      closing: String(unitConfig?.payroll_closing_day ?? 20),
+      payment: String(unitConfig?.payroll_payment_day ?? 25),
+    });
+    setConfigOpen(true);
+  };
+
+  const saveConfig = async () => {
+    if (!unitId) return;
+    const closing = Math.min(Math.max(parseInt(configForm.closing) || 20, 1), 28);
+    const payment = Math.min(Math.max(parseInt(configForm.payment) || 25, 1), 28);
+    setBusy("config");
+    const { error } = await supabase
+      .from("units")
+      .update({ payroll_closing_day: closing, payroll_payment_day: payment })
+      .eq("id", unitId);
+    setBusy(null);
+    if (error) return toast({ title: "Erro", description: error.message, variant: "destructive" });
+    toast({ title: "Configuração salva", description: `Fechamento dia ${closing} · Pagamento dia ${payment}` });
+    setConfigOpen(false);
+    load();
+  };
+
+  // Adiantamentos / pagamentos avulsos do professor no mês (não-FOLHA)
+  const advancesByTeacher = useMemo(() => {
+    const m: Record<string, number> = {};
+    payments
+      .filter((p) => p.status === "PAGO" && p.payment_type !== "FOLHA_MENSAL")
+      .forEach((p) => {
+        m[p.teacher_id] = (m[p.teacher_id] || 0) + Number(p.amount);
+      });
+    return m;
+  }, [payments]);
+
+  const generateReport = (c: Closure) => {
+    const teacher = teachers.find((t) => t.id === c.teacher_id);
+    const teacherPayments = payments.filter(
+      (p) => p.teacher_id === c.teacher_id && p.status === "PAGO",
+    );
+    const advances = teacherPayments
+      .filter((p) => p.payment_type !== "FOLHA_MENSAL")
+      .reduce((s, p) => s + Number(p.amount), 0);
+    const folha = teacherPayments
+      .filter((p) => p.payment_type === "FOLHA_MENSAL")
+      .reduce((s, p) => s + Number(p.amount), 0);
+    const remaining = Math.max(Number(c.total_value) - Number(c.paid_amount || 0), 0);
+    const lines = [
+      `RELATÓRIO DE FOLHA - ${teacher?.full_name ?? "-"}`,
+      `Competência: ${fmtMonth(c.reference_month)}`,
+      `Unidade: ${unitConfig?.name ?? "-"}`,
+      ``,
+      `Hora-aula: ${fmtBRL(Number(teacher?.hourly_rate ?? 0))}`,
+      `Aulas validadas: ${c.lessons_count}`,
+      `Total de horas: ${Number(c.total_hours).toFixed(2)}h`,
+      `Total bruto: ${fmtBRL(Number(c.total_value))}`,
+      ``,
+      `Adiantamentos/avulsos: ${fmtBRL(advances)}`,
+      `Pagamento de folha: ${fmtBRL(folha)}`,
+      `Total já pago: ${fmtBRL(Number(c.paid_amount || 0))}`,
+      ``,
+      `VALOR FINAL A PAGAR: ${fmtBRL(remaining)}`,
+      ``,
+      `Vencimento: ${fmtDate(c.due_date)}`,
+      `Pagamento previsto: ${fmtDate(c.scheduled_payment_date)}`,
+      `Status: ${c.status}`,
+    ].join("\n");
+
+    const blob = new Blob([lines], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `folha-${teacher?.full_name?.replace(/\s+/g, "_") ?? "professor"}-${c.reference_month}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (!unitsLoading && !units.length) {
     return (
       <Card className="p-8 text-center max-w-md mx-auto">
