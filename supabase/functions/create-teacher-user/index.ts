@@ -128,9 +128,12 @@ Deno.serve(async (req) => {
       unit_id: teacher.unit_id,
       active: true,
       must_change_password: true,
-      cpf: "",
+      cpf: currentProfile?.cpf ?? "",
     }, { onConflict: "id" });
-    if (profErr) return jsonResponse({ error: profErr.message }, 400);
+    if (profErr) {
+      console.error("[create-teacher-user] profile upsert error", profErr);
+      return jsonResponse({ error: profErr.message }, 400);
+    }
 
     // Role PROFESSOR
     await admin
