@@ -1,0 +1,363 @@
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useSchoolAccess, SchoolUnit } from "@/hooks/useSchoolAccess";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "@/hooks/use-toast";
+import { Plus, Pencil, Trash2, GraduationCap } from "lucide-react";
+
+interface Teacher {
+  id: string;
+  unit_id: string;
+  company_id: string;
+  full_name: string;
+  cpf: string | null;
+  email: string | null;
+  phone: string | null;
+  hourly_rate: number;
+  pix_key: string | null;
+  payment_type: string | null;
+  subjects: string[];
+  notes: string | null;
+  active: boolean;
+}
+
+const emptyForm = {
+  full_name: "",
+  cpf: "",
+  email: "",
+  phone: "",
+  hourly_rate: "0",
+  pix_key: "",
+  payment_type: "PIX",
+  subjects: "",
+  notes: "",
+  active: true,
+  unit_id: "",
+};
+
+export default function AdminSchoolTeachers() {
+  const { hasRole } = useAuth();
+  const { units, loading: unitsLoading } = useSchoolAccess();
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [unitFilter, setUnitFilter] = useState<string>("ALL");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<Teacher | null>(null);
+  const [form, setForm] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
+
+  const fetchTeachers = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("school_teachers")
+      .select("*")
+      .order("full_name");
+    if (error) {
+      toast({ title: "Erro ao carregar professores", description: error.message, variant: "destructive" });
+      setTeachers([]);
+    } else {
+      setTeachers((data ?? []) as Teacher[]);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchTeachers();
+  }, []);
+
+  const filtered = useMemo(() => {
+    if (unitFilter === "ALL") return teachers;
+    return teachers.filter((t) => t.unit_id === unitFilter);
+  }, [teachers, unitFilter]);
+
+  const openNew = () => {
+    setEditing(null);
+    setForm({ ...emptyForm, unit_id: units[0]?.id ?? "" });
+    setDialogOpen(true);
+  };
+
+  const openEdit = (t: Teacher) => {
+    setEditing(t);
+    setForm({
+      full_name: t.full_name,
+      cpf: t.cpf ?? "",
+      email: t.email ?? "",
+      phone: t.phone ?? "",
+      hourly_rate: String(t.hourly_rate ?? 0),
+      pix_key: t.pix_key ?? "",
+      payment_type: t.payment_type ?? "PIX",
+      subjects: (t.subjects ?? []).join(", "),
+      notes: t.notes ?? "",
+      active: t.active,
+      unit_id: t.unit_id,
+    });
+    setDialogOpen(true);
+  };
+
+  const save = async () => {
+    if (!form.full_name.trim()) {
+      toast({ title: "Nome obrigatório", variant: "destructive" });
+      return;
+    }
+    if (!form.unit_id) {
+      toast({ title: "Selecione a unidade", variant: "destructive" });
+      return;
+    }
+    const unit = units.find((u) => u.id === form.unit_id);
+    if (!unit) {
+      toast({ title: "Unidade inválida", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    const payload = {
+      unit_id: form.unit_id,
+      company_id: unit.company_id,
+      full_name: form.full_name.trim(),
+      cpf: form.cpf.trim() || null,
+      email: form.email.trim() || null,
+      phone: form.phone.trim() || null,
+      hourly_rate: Number(String(form.hourly_rate).replace(",", ".")) || 0,
+      pix_key: form.pix_key.trim() || null,
+      payment_type: form.payment_type || null,
+      subjects: form.subjects
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+      notes: form.notes.trim() || null,
+      active: form.active,
+    };
+    const { error } = editing
+      ? await supabase.from("school_teachers").update(payload).eq("id", editing.id)
+      : await supabase.from("school_teachers").insert(payload);
+    setSaving(false);
+    if (error) {
+      toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: editing ? "Professor atualizado" : "Professor cadastrado" });
+    setDialogOpen(false);
+    fetchTeachers();
+  };
+
+  const remove = async (t: Teacher) => {
+    if (!confirm(`Excluir ${t.full_name}?`)) return;
+    const { error } = await supabase.from("school_teachers").delete().eq("id", t.id);
+    if (error) {
+      toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Professor excluído" });
+    fetchTeachers();
+  };
+
+  if (unitsLoading) {
+    return <div className="p-6 text-muted-foreground">Carregando...</div>;
+  }
+
+  if (units.length === 0) {
+    return (
+      <Card className="p-6">
+        <div className="flex items-center gap-3 text-muted-foreground">
+          <GraduationCap />
+          <div>
+            <p className="font-medium text-foreground">Módulo Escolar não habilitado</p>
+            <p className="text-sm">Nenhuma unidade sua tem o módulo escolar ativo.</p>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-xl font-bold">Professores</h1>
+          <p className="text-sm text-muted-foreground">Gestão de professores do módulo escolar</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {units.length > 1 && (
+            <Select value={unitFilter} onValueChange={setUnitFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Unidade" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Todas as unidades</SelectItem>
+                {units.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Button onClick={openNew}>
+            <Plus className="w-4 h-4 mr-1" /> Novo professor
+          </Button>
+        </div>
+      </div>
+
+      <Card>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nome</TableHead>
+              <TableHead>Unidade</TableHead>
+              <TableHead>Hora-aula</TableHead>
+              <TableHead>Disciplinas</TableHead>
+              <TableHead>Contato</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="w-[120px]">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center text-muted-foreground">
+                  Carregando...
+                </TableCell>
+              </TableRow>
+            ) : filtered.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center text-muted-foreground">
+                  Nenhum professor cadastrado.
+                </TableCell>
+              </TableRow>
+            ) : (
+              filtered.map((t) => (
+                <TableRow key={t.id}>
+                  <TableCell className="font-medium">{t.full_name}</TableCell>
+                  <TableCell>{units.find((u) => u.id === t.unit_id)?.name ?? "—"}</TableCell>
+                  <TableCell>R$ {Number(t.hourly_rate).toFixed(2)}</TableCell>
+                  <TableCell className="max-w-[200px] truncate">{(t.subjects ?? []).join(", ") || "—"}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {t.email ?? "—"}
+                    {t.phone ? <><br />{t.phone}</> : null}
+                  </TableCell>
+                  <TableCell>
+                    {t.active ? <Badge>Ativo</Badge> : <Badge variant="secondary">Inativo</Badge>}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button size="icon" variant="ghost" onClick={() => openEdit(t)}>
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" onClick={() => remove(t)}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </Card>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Editar professor" : "Novo professor"}</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="md:col-span-2">
+              <Label>Nome completo *</Label>
+              <Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
+            </div>
+            <div>
+              <Label>Unidade *</Label>
+              <Select value={form.unit_id} onValueChange={(v) => setForm({ ...form, unit_id: v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {units.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Valor hora-aula (R$) *</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={form.hourly_rate}
+                onChange={(e) => setForm({ ...form, hourly_rate: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>CPF</Label>
+              <Input value={form.cpf} onChange={(e) => setForm({ ...form, cpf: e.target.value })} />
+            </div>
+            <div>
+              <Label>Telefone</Label>
+              <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+            </div>
+            <div className="md:col-span-2">
+              <Label>E-mail</Label>
+              <Input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>Tipo de pagamento</Label>
+              <Select value={form.payment_type} onValueChange={(v) => setForm({ ...form, payment_type: v })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PIX">PIX</SelectItem>
+                  <SelectItem value="TRANSFERENCIA">Transferência</SelectItem>
+                  <SelectItem value="DINHEIRO">Dinheiro</SelectItem>
+                  <SelectItem value="OUTRO">Outro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Chave PIX</Label>
+              <Input value={form.pix_key} onChange={(e) => setForm({ ...form, pix_key: e.target.value })} />
+            </div>
+            <div className="md:col-span-2">
+              <Label>Disciplinas (separe por vírgula)</Label>
+              <Input
+                value={form.subjects}
+                onChange={(e) => setForm({ ...form, subjects: e.target.value })}
+                placeholder="Inglês, Conversação"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <Label>Observações internas</Label>
+              <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={form.active} onCheckedChange={(v) => setForm({ ...form, active: v })} />
+              <Label>Ativo</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={save} disabled={saving}>
+              {saving ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
