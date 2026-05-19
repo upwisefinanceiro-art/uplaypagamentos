@@ -1,0 +1,1 @@
+UPDATE public.units SET school_module_enabled = true WHERE id = 'e339ec3d-c27f-4676-9078-cd52dab7eede';
