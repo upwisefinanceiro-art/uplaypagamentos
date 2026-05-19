@@ -612,3 +612,136 @@ export default function AdminSchoolCalendar() {
     </div>
   );
 }
+
+interface ClassComboboxProps {
+  value: string;
+  classes: SchoolClass[];
+  disabled?: boolean;
+  onChange: (id: string) => void;
+  onCreate: (name: string) => void | Promise<void>;
+  onRename: (id: string, name: string) => void | Promise<void>;
+}
+
+function ClassCombobox({ value, classes, disabled, onChange, onCreate, onRename }: ClassComboboxProps) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
+
+  const selected = classes.find((c) => c.id === value);
+  const label = value === "NONE" || !value ? "— Sem turma —" : selected?.name ?? "— Sem turma —";
+
+  const term = search.trim().toLowerCase();
+  const filtered = classes.filter((c) => c.name.toLowerCase().includes(term));
+  const exact = classes.some((c) => c.name.trim().toLowerCase() === term);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          disabled={disabled}
+          className="w-full justify-between font-normal"
+        >
+          <span className="truncate">{label}</span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command shouldFilter={false}>
+          <CommandInput placeholder="Buscar ou criar turma..." value={search} onValueChange={setSearch} />
+          <CommandList>
+            <CommandEmpty>Nenhuma turma encontrada</CommandEmpty>
+            <CommandGroup>
+              <CommandItem
+                value="__none"
+                onSelect={() => {
+                  onChange("NONE");
+                  setOpen(false);
+                }}
+              >
+                <Check className={`mr-2 h-4 w-4 ${value === "NONE" || !value ? "opacity-100" : "opacity-0"}`} />
+                — Sem turma —
+              </CommandItem>
+              {filtered.map((c) => (
+                <div key={c.id} className="flex items-center gap-1 px-1">
+                  {editingId === c.id ? (
+                    <div className="flex items-center gap-1 flex-1 py-1">
+                      <Input
+                        autoFocus
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            onRename(c.id, editingName);
+                            setEditingId(null);
+                          } else if (e.key === "Escape") {
+                            setEditingId(null);
+                          }
+                        }}
+                        className="h-8"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => {
+                          onRename(c.id, editingName);
+                          setEditingId(null);
+                        }}
+                      >
+                        OK
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <CommandItem
+                        value={c.id}
+                        onSelect={() => {
+                          onChange(c.id);
+                          setOpen(false);
+                        }}
+                        className="flex-1"
+                      >
+                        <Check className={`mr-2 h-4 w-4 ${value === c.id ? "opacity-100" : "opacity-0"}`} />
+                        {c.name}
+                      </CommandItem>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingId(c.id);
+                          setEditingName(c.name);
+                        }}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              ))}
+              {term && !exact && (
+                <CommandItem
+                  value="__create"
+                  onSelect={async () => {
+                    await onCreate(search);
+                    setSearch("");
+                    setOpen(false);
+                  }}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Criar "{search.trim()}"
+                </CommandItem>
+              )}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
