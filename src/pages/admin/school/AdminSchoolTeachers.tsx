@@ -121,6 +121,15 @@ export default function AdminSchoolTeachers() {
       toast({ title: "Selecione a unidade", variant: "destructive" });
       return;
     }
+    const wantsAccess = form.create_access;
+    if (wantsAccess && !form.email.trim()) {
+      toast({ title: "E-mail obrigatório para criar acesso ao app", variant: "destructive" });
+      return;
+    }
+    if (wantsAccess && (form.initial_password ?? "").length < 6) {
+      toast({ title: "Senha inicial deve ter ao menos 6 caracteres", variant: "destructive" });
+      return;
+    }
     const unit = units.find((u) => u.id === form.unit_id);
     if (!unit) {
       toast({ title: "Unidade inválida", variant: "destructive" });
@@ -132,30 +141,105 @@ export default function AdminSchoolTeachers() {
       company_id: unit.company_id,
       full_name: form.full_name.trim(),
       cpf: form.cpf.trim() || null,
-      email: form.email.trim() || null,
+      email: form.email.trim().toLowerCase() || null,
       phone: form.phone.trim() || null,
       hourly_rate: Number(String(form.hourly_rate).replace(",", ".")) || 0,
       pix_key: form.pix_key.trim() || null,
       payment_type: form.payment_type || null,
-      subjects: form.subjects
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
+      subjects: form.subjects.split(",").map((s) => s.trim()).filter(Boolean),
       notes: form.notes.trim() || null,
       active: form.active,
     };
-    const { error } = editing
-      ? await supabase.from("school_teachers").update(payload).eq("id", editing.id)
-      : await supabase.from("school_teachers").insert(payload);
-    setSaving(false);
-    if (error) {
-      toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
-      return;
+
+    let teacherId = editing?.id ?? null;
+    if (editing) {
+      const { error } = await supabase.from("school_teachers").update(payload).eq("id", editing.id);
+      if (error) {
+        setSaving(false);
+        toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
+        return;
+      }
+    } else {
+      const { data, error } = await supabase
+        .from("school_teachers")
+        .insert(payload)
+        .select("id")
+        .maybeSingle();
+      if (error || !data) {
+        setSaving(false);
+        toast({ title: "Erro ao salvar", description: error?.message, variant: "destructive" });
+        return;
+      }
+      teacherId = data.id;
     }
+
+    // Cria/atualiza acesso ao app
+    if (wantsAccess && teacherId && payload.email) {
+      const { data: accessRes, error: accessErr } = await supabase.functions.invoke(
+        "create-teacher-user",
+        {
+          body: {
+            teacher_id: teacherId,
+            email: payload.email,
+            full_name: payload.full_name,
+            phone: payload.phone,
+            password: form.initial_password,
+          },
+        },
+      );
+      if (accessErr || (accessRes && (accessRes as { error?: string }).error)) {
+        setSaving(false);
+        toast({
+          title: "Professor salvo, mas falhou ao criar acesso",
+          description:
+            (accessRes as { error?: string })?.error || accessErr?.message || "Erro desconhecido",
+          variant: "destructive",
+        });
+        fetchTeachers();
+        return;
+      }
+    }
+
+    setSaving(false);
     toast({ title: editing ? "Professor atualizado" : "Professor cadastrado" });
     setDialogOpen(false);
     fetchTeachers();
   };
+
+  const sendAccess = (t: Teacher) => {
+    if (!t.email) {
+      toast({ title: "Cadastre um e-mail para o professor", variant: "destructive" });
+      return;
+    }
+    if (!t.profile_id) {
+      toast({
+        title: "Acesso ainda não criado",
+        description: "Edite o professor e marque 'Criar acesso ao app'.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const message =
+      `Olá, ${t.full_name}.\n\n` +
+      `Seu acesso ao aplicativo Upplay foi liberado.\n\n` +
+      `Login: ${t.email}\n` +
+      `Senha inicial: ${DEFAULT_PASSWORD}\n\n` +
+      `Baixe o aplicativo e acompanhe:\n` +
+      `• Calendário de aulas\n• Horários\n• Agenda\n• Pagamentos\n• Aulas confirmadas\n\n` +
+      `Após o primeiro acesso, recomendamos alterar sua senha.`;
+    const phone = (t.phone ?? "").replace(/\D/g, "");
+    if (phone) {
+      const intl = phone.length <= 11 ? `55${phone}` : phone;
+      window.open(`https://wa.me/${intl}?text=${encodeURIComponent(message)}`, "_blank");
+    } else {
+      navigator.clipboard?.writeText(message);
+      toast({
+        title: "Telefone não cadastrado",
+        description: "Mensagem de acesso copiada para a área de transferência.",
+      });
+    }
+  };
+
 
   const remove = async (t: Teacher) => {
     if (!confirm(`Excluir ${t.full_name}?`)) return;
