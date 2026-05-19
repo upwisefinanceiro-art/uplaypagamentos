@@ -1463,14 +1463,17 @@ export type Database = {
         Row: {
           company_id: string
           created_at: string
+          due_date: string | null
           generated_at: string
           generated_by: string | null
           id: string
           lessons_count: number
           notes: string | null
+          paid_amount: number
           paid_at: string | null
           payment_proof_url: string | null
           reference_month: string
+          scheduled_payment_date: string | null
           status: string
           teacher_id: string
           total_hours: number
@@ -1481,14 +1484,17 @@ export type Database = {
         Insert: {
           company_id: string
           created_at?: string
+          due_date?: string | null
           generated_at?: string
           generated_by?: string | null
           id?: string
           lessons_count?: number
           notes?: string | null
+          paid_amount?: number
           paid_at?: string | null
           payment_proof_url?: string | null
           reference_month: string
+          scheduled_payment_date?: string | null
           status?: string
           teacher_id: string
           total_hours?: number
@@ -1499,14 +1505,17 @@ export type Database = {
         Update: {
           company_id?: string
           created_at?: string
+          due_date?: string | null
           generated_at?: string
           generated_by?: string | null
           id?: string
           lessons_count?: number
           notes?: string | null
+          paid_amount?: number
           paid_at?: string | null
           payment_proof_url?: string | null
           reference_month?: string
+          scheduled_payment_date?: string | null
           status?: string
           teacher_id?: string
           total_hours?: number
@@ -1515,6 +1524,71 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      school_teacher_payments: {
+        Row: {
+          amount: number
+          closure_id: string | null
+          company_id: string
+          competence_month: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          notes: string | null
+          payment_date: string
+          payment_proof_url: string | null
+          payment_type: string
+          status: string
+          teacher_id: string
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          closure_id?: string | null
+          company_id: string
+          competence_month?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_proof_url?: string | null
+          payment_type: string
+          status?: string
+          teacher_id: string
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          closure_id?: string | null
+          company_id?: string
+          competence_month?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_proof_url?: string | null
+          payment_type?: string
+          status?: string
+          teacher_id?: string
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_teacher_payments_closure_id_fkey"
+            columns: ["closure_id"]
+            isOneToOne: false
+            referencedRelation: "school_payroll_closures"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       school_teachers: {
         Row: {
@@ -2226,6 +2300,10 @@ export type Database = {
       }
       mark_school_payroll_paid: {
         Args: { _closure_id: string; _notes?: string; _proof_url?: string }
+        Returns: undefined
+      }
+      recalc_school_payroll_closure: {
+        Args: { _closure_id: string }
         Returns: undefined
       }
       resolve_auth_email: { Args: { _login: string }; Returns: string }
