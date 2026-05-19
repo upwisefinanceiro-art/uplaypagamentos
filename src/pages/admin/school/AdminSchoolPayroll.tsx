@@ -88,6 +88,13 @@ function fmtMonth(d: string) {
   return new Date(d + "T00:00:00").toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 }
 
+interface UnitConfig {
+  id: string;
+  name: string;
+  payroll_closing_day: number;
+  payroll_payment_day: number;
+}
+
 export default function AdminSchoolPayroll() {
   const { user } = useAuth();
   const { units, loading: unitsLoading } = useSchoolAccess();
@@ -99,6 +106,7 @@ export default function AdminSchoolPayroll() {
   const [agg, setAgg] = useState<Record<string, AggLesson>>({});
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [unitConfig, setUnitConfig] = useState<UnitConfig | null>(null);
 
   // Pay-closure dialog
   const [payOpen, setPayOpen] = useState<Closure | null>(null);
@@ -107,6 +115,10 @@ export default function AdminSchoolPayroll() {
   // Schedule dialog
   const [scheduleOpen, setScheduleOpen] = useState<Closure | null>(null);
   const [scheduleForm, setScheduleForm] = useState({ due_date: "", scheduled_payment_date: "" });
+
+  // Unit config dialog
+  const [configOpen, setConfigOpen] = useState(false);
+  const [configForm, setConfigForm] = useState({ closing: "20", payment: "25" });
 
   // New payment dialog (avulso/adiantamento/etc)
   const [newPayOpen, setNewPayOpen] = useState(false);
