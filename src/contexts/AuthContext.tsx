@@ -13,7 +13,9 @@ interface Profile {
   phone: string | null;
   unit_id: string | null;
   active: boolean;
+  must_change_password?: boolean;
 }
+
 
 interface AuthContextType {
   user: User | null;

@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, GraduationCap } from "lucide-react";
+import { Plus, Pencil, Trash2, GraduationCap, KeyRound, Send, ShieldCheck } from "lucide-react";
 
 interface Teacher {
   id: string;
@@ -28,7 +28,10 @@ interface Teacher {
   subjects: string[];
   notes: string | null;
   active: boolean;
+  profile_id: string | null;
 }
+
+const DEFAULT_PASSWORD = "12345678";
 
 const emptyForm = {
   full_name: "",
@@ -42,7 +45,10 @@ const emptyForm = {
   notes: "",
   active: true,
   unit_id: "",
+  create_access: true,
+  initial_password: DEFAULT_PASSWORD,
 };
+
 
 export default function AdminSchoolTeachers() {
   const { hasRole } = useAuth();
@@ -99,9 +105,12 @@ export default function AdminSchoolTeachers() {
       notes: t.notes ?? "",
       active: t.active,
       unit_id: t.unit_id,
+      create_access: !t.profile_id,
+      initial_password: DEFAULT_PASSWORD,
     });
     setDialogOpen(true);
   };
+
 
   const save = async () => {
     if (!form.full_name.trim()) {
@@ -110,6 +119,15 @@ export default function AdminSchoolTeachers() {
     }
     if (!form.unit_id) {
       toast({ title: "Selecione a unidade", variant: "destructive" });
+      return;
+    }
+    const wantsAccess = form.create_access;
+    if (wantsAccess && !form.email.trim()) {
+      toast({ title: "E-mail obrigatório para criar acesso ao app", variant: "destructive" });
+      return;
+    }
+    if (wantsAccess && (form.initial_password ?? "").length < 6) {
+      toast({ title: "Senha inicial deve ter ao menos 6 caracteres", variant: "destructive" });
       return;
     }
     const unit = units.find((u) => u.id === form.unit_id);
@@ -123,30 +141,105 @@ export default function AdminSchoolTeachers() {
       company_id: unit.company_id,
       full_name: form.full_name.trim(),
       cpf: form.cpf.trim() || null,
-      email: form.email.trim() || null,
+      email: form.email.trim().toLowerCase() || null,
       phone: form.phone.trim() || null,
       hourly_rate: Number(String(form.hourly_rate).replace(",", ".")) || 0,
       pix_key: form.pix_key.trim() || null,
       payment_type: form.payment_type || null,
-      subjects: form.subjects
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
+      subjects: form.subjects.split(",").map((s) => s.trim()).filter(Boolean),
       notes: form.notes.trim() || null,
       active: form.active,
     };
-    const { error } = editing
-      ? await supabase.from("school_teachers").update(payload).eq("id", editing.id)
-      : await supabase.from("school_teachers").insert(payload);
-    setSaving(false);
-    if (error) {
-      toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
-      return;
+
+    let teacherId = editing?.id ?? null;
+    if (editing) {
+      const { error } = await supabase.from("school_teachers").update(payload).eq("id", editing.id);
+      if (error) {
+        setSaving(false);
+        toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
+        return;
+      }
+    } else {
+      const { data, error } = await supabase
+        .from("school_teachers")
+        .insert(payload)
+        .select("id")
+        .maybeSingle();
+      if (error || !data) {
+        setSaving(false);
+        toast({ title: "Erro ao salvar", description: error?.message, variant: "destructive" });
+        return;
+      }
+      teacherId = data.id;
     }
+
+    // Cria/atualiza acesso ao app
+    if (wantsAccess && teacherId && payload.email) {
+      const { data: accessRes, error: accessErr } = await supabase.functions.invoke(
+        "create-teacher-user",
+        {
+          body: {
+            teacher_id: teacherId,
+            email: payload.email,
+            full_name: payload.full_name,
+            phone: payload.phone,
+            password: form.initial_password,
+          },
+        },
+      );
+      if (accessErr || (accessRes && (accessRes as { error?: string }).error)) {
+        setSaving(false);
+        toast({
+          title: "Professor salvo, mas falhou ao criar acesso",
+          description:
+            (accessRes as { error?: string })?.error || accessErr?.message || "Erro desconhecido",
+          variant: "destructive",
+        });
+        fetchTeachers();
+        return;
+      }
+    }
+
+    setSaving(false);
     toast({ title: editing ? "Professor atualizado" : "Professor cadastrado" });
     setDialogOpen(false);
     fetchTeachers();
   };
+
+  const sendAccess = (t: Teacher) => {
+    if (!t.email) {
+      toast({ title: "Cadastre um e-mail para o professor", variant: "destructive" });
+      return;
+    }
+    if (!t.profile_id) {
+      toast({
+        title: "Acesso ainda não criado",
+        description: "Edite o professor e marque 'Criar acesso ao app'.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const message =
+      `Olá, ${t.full_name}.\n\n` +
+      `Seu acesso ao aplicativo Upplay foi liberado.\n\n` +
+      `Login: ${t.email}\n` +
+      `Senha inicial: ${DEFAULT_PASSWORD}\n\n` +
+      `Baixe o aplicativo e acompanhe:\n` +
+      `• Calendário de aulas\n• Horários\n• Agenda\n• Pagamentos\n• Aulas confirmadas\n\n` +
+      `Após o primeiro acesso, recomendamos alterar sua senha.`;
+    const phone = (t.phone ?? "").replace(/\D/g, "");
+    if (phone) {
+      const intl = phone.length <= 11 ? `55${phone}` : phone;
+      window.open(`https://wa.me/${intl}?text=${encodeURIComponent(message)}`, "_blank");
+    } else {
+      navigator.clipboard?.writeText(message);
+      toast({
+        title: "Telefone não cadastrado",
+        description: "Mensagem de acesso copiada para a área de transferência.",
+      });
+    }
+  };
+
 
   const remove = async (t: Teacher) => {
     if (!confirm(`Excluir ${t.full_name}?`)) return;
@@ -216,7 +309,7 @@ export default function AdminSchoolTeachers() {
               <TableHead>Disciplinas</TableHead>
               <TableHead>Contato</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="w-[120px]">Ações</TableHead>
+              <TableHead className="w-[160px]">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -244,10 +337,27 @@ export default function AdminSchoolTeachers() {
                     {t.phone ? <><br />{t.phone}</> : null}
                   </TableCell>
                   <TableCell>
-                    {t.active ? <Badge>Ativo</Badge> : <Badge variant="secondary">Inativo</Badge>}
+                    <div className="flex flex-col gap-1">
+                      {t.active ? <Badge>Ativo</Badge> : <Badge variant="secondary">Inativo</Badge>}
+                      {t.profile_id ? (
+                        <Badge variant="outline" className="gap-1">
+                          <ShieldCheck className="w-3 h-3" /> App
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-muted-foreground">Sem acesso</Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title="Enviar acesso ao professor"
+                        onClick={() => sendAccess(t)}
+                      >
+                        <Send className="w-4 h-4" />
+                      </Button>
                       <Button size="icon" variant="ghost" onClick={() => openEdit(t)}>
                         <Pencil className="w-4 h-4" />
                       </Button>
@@ -256,6 +366,7 @@ export default function AdminSchoolTeachers() {
                       </Button>
                     </div>
                   </TableCell>
+
                 </TableRow>
               ))
             )}
@@ -347,7 +458,46 @@ export default function AdminSchoolTeachers() {
               <Switch checked={form.active} onCheckedChange={(v) => setForm({ ...form, active: v })} />
               <Label>Ativo</Label>
             </div>
+
+            <div className="md:col-span-2 mt-2 rounded-lg border border-border bg-muted/30 p-3 space-y-3">
+              <div className="flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-primary" />
+                <p className="text-sm font-medium">Acesso ao aplicativo Upplay</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={form.create_access}
+                  onCheckedChange={(v) => setForm({ ...form, create_access: v })}
+                  disabled={!!editing?.profile_id}
+                />
+                <Label className="text-sm">
+                  {editing?.profile_id
+                    ? "Acesso já criado — atualize a senha abaixo se quiser redefinir"
+                    : "Criar acesso automático após salvar"}
+                </Label>
+              </div>
+              {(form.create_access || editing?.profile_id) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <Label>Senha inicial</Label>
+                    <Input
+                      type="text"
+                      value={form.initial_password}
+                      onChange={(e) => setForm({ ...form, initial_password: e.target.value })}
+                      placeholder={DEFAULT_PASSWORD}
+                    />
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Padrão: <strong>{DEFAULT_PASSWORD}</strong>. O professor será obrigado a trocar no primeiro acesso.
+                    </p>
+                  </div>
+                  <div className="flex items-end text-xs text-muted-foreground">
+                    Login do professor: <span className="font-mono ml-1">{form.email || "informe o e-mail"}</span>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               Cancelar

@@ -1,24 +1,36 @@
-import { useState } from "react";
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { CalendarDays, Wallet, LogOut, Menu, GraduationCap } from "lucide-react";
+import { CalendarDays, Wallet, LogOut, Menu, GraduationCap, KeyRound } from "lucide-react";
 
 const menu = [
   { path: "/professor", end: true, icon: CalendarDays, label: "Minhas Aulas" },
   { path: "/professor/folha", icon: Wallet, label: "Folha de Pagamento" },
+  { path: "/professor/alterar-senha", icon: KeyRound, label: "Alterar Senha" },
 ];
 
 export default function TeacherLayout() {
   const { profile, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (
+      profile?.must_change_password &&
+      !location.pathname.endsWith("/alterar-senha")
+    ) {
+      navigate("/professor/alterar-senha", { replace: true });
+    }
+  }, [profile?.must_change_password, location.pathname, navigate]);
 
   const handleLogout = async () => {
     await signOut();
     navigate("/login", { replace: true });
   };
+
 
   const Nav = ({ onNav }: { onNav?: () => void }) => (
     <nav className="flex flex-col gap-1 p-3">
