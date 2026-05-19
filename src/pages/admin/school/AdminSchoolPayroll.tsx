@@ -148,7 +148,7 @@ export default function AdminSchoolPayroll() {
     if (!unitId) return;
     setLoading(true);
     try {
-      const [tRes, cRes, lRes, pRes] = await Promise.all([
+      const [tRes, cRes, lRes, pRes, uRes] = await Promise.all([
         supabase
           .from("school_teachers")
           .select("id,full_name,unit_id,company_id,hourly_rate,pix_key")
@@ -174,10 +174,16 @@ export default function AdminSchoolPayroll() {
           .gte("payment_date", monthStart)
           .lt("payment_date", monthEnd)
           .order("payment_date", { ascending: false }),
+        supabase
+          .from("units")
+          .select("id,name,payroll_closing_day,payroll_payment_day")
+          .eq("id", unitId)
+          .maybeSingle(),
       ]);
       setTeachers((tRes.data ?? []) as Teacher[]);
       setClosures((cRes.data ?? []) as Closure[]);
       setPayments((pRes.data ?? []) as TeacherPayment[]);
+      if (uRes.data) setUnitConfig(uRes.data as UnitConfig);
       const map: Record<string, AggLesson> = {};
       (lRes.data ?? []).forEach((l: any) => {
         const a = (map[l.teacher_id] ||= { teacher_id: l.teacher_id, count: 0, hours: 0, value: 0 });
