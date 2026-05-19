@@ -822,6 +822,49 @@ export default function AdminSchoolPayroll() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Unit payroll config dialog */}
+      <Dialog open={configOpen} onOpenChange={setConfigOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Configuração da folha automática</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Todo dia configurado de fechamento, o sistema soma automaticamente as aulas
+              validadas do mês e gera o fechamento de cada professor.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Dia do fechamento *</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={28}
+                  value={configForm.closing}
+                  onChange={(e) => setConfigForm({ ...configForm, closing: e.target.value })}
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">Ex: 20</p>
+              </div>
+              <div>
+                <Label>Dia do pagamento *</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={28}
+                  value={configForm.payment}
+                  onChange={(e) => setConfigForm({ ...configForm, payment: e.target.value })}
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">Ex: 25</p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfigOpen(false)}>Cancelar</Button>
+            <Button onClick={saveConfig} disabled={busy === "config"}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
