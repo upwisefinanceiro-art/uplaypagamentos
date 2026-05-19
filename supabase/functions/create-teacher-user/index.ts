@@ -59,21 +59,45 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (!teacher) return jsonResponse({ error: "Professor não encontrado" }, 404);
 
-    // Reutiliza usuário existente pelo e-mail, se houver
-    const { data: existing } = await admin.auth.admin.listUsers();
-    const existingUser = existing?.users?.find(
-      (u: { email?: string }) => u.email?.toLowerCase() === normalizedEmail,
-    );
+    // Reutiliza usuário existente pelo e-mail. Primeiro tenta via profile (mais rápido e robusto),
+    // depois faz fallback para paginação completa do auth admin.
+    let userId: string | null = null;
 
-    let userId: string;
-    if (existingUser) {
-      userId = existingUser.id;
-      await admin.auth.admin.updateUserById(userId, {
+    const { data: existingProfile } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("email", normalizedEmail)
+      .maybeSingle();
+    if (existingProfile?.id) {
+      userId = existingProfile.id as string;
+    } else {
+      const perPage = 1000;
+      for (let page = 1; page <= 50 && !userId; page++) {
+        const { data: list, error: listErr } = await admin.auth.admin.listUsers({ page, perPage });
+        if (listErr) {
+          console.error("[create-teacher-user] listUsers error", listErr);
+          break;
+        }
+        const match = list?.users?.find(
+          (u: { email?: string }) => u.email?.toLowerCase() === normalizedEmail,
+        );
+        if (match) { userId = match.id; break; }
+        if (!list?.users?.length || list.users.length < perPage) break;
+      }
+    }
+
+    if (userId) {
+      const { error: updErr } = await admin.auth.admin.updateUserById(userId, {
         password: finalPassword,
+        email: normalizedEmail,
         email_confirm: true,
         ban_duration: "none",
         user_metadata: { full_name: String(full_name).trim() },
       });
+      if (updErr) {
+        console.error("[create-teacher-user] updateUser error", updErr);
+        return jsonResponse({ error: updErr.message }, 400);
+      }
     } else {
       const { data: created, error: createErr } = await admin.auth.admin.createUser({
         email: normalizedEmail,
@@ -82,12 +106,20 @@ Deno.serve(async (req) => {
         user_metadata: { full_name: String(full_name).trim() },
       });
       if (createErr || !created?.user) {
+        console.error("[create-teacher-user] createUser error", createErr);
         return jsonResponse({ error: createErr?.message || "Erro ao criar usuário" }, 400);
       }
       userId = created.user.id;
     }
 
-    // Upsert profile com flag de troca de senha
+    // Carrega profile atual (se houver) para preservar cpf e demais dados
+    const { data: currentProfile } = await admin
+      .from("profiles")
+      .select("cpf")
+      .eq("id", userId)
+      .maybeSingle();
+
+    // Upsert profile com flag de troca de senha (preserva CPF existente)
     const { error: profErr } = await admin.from("profiles").upsert({
       id: userId,
       full_name: String(full_name).trim(),
