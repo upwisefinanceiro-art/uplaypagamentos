@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, GraduationCap } from "lucide-react";
+import { Plus, Pencil, Trash2, GraduationCap, KeyRound, Send, ShieldCheck } from "lucide-react";
 
 interface Teacher {
   id: string;
@@ -28,7 +28,10 @@ interface Teacher {
   subjects: string[];
   notes: string | null;
   active: boolean;
+  profile_id: string | null;
 }
+
+const DEFAULT_PASSWORD = "12345678";
 
 const emptyForm = {
   full_name: "",
@@ -42,7 +45,10 @@ const emptyForm = {
   notes: "",
   active: true,
   unit_id: "",
+  create_access: true,
+  initial_password: DEFAULT_PASSWORD,
 };
+
 
 export default function AdminSchoolTeachers() {
   const { hasRole } = useAuth();
