@@ -557,6 +557,29 @@ export default function AdminSchoolTeachers() {
                         )}
                         {t.profile_id ? "Reenviar app" : "Enviar app"}
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="gap-1.5"
+                        title="Validar/sincronizar acesso sem abrir WhatsApp"
+                        onClick={() => validateAccess(t)}
+                        disabled={validatingId === t.id || !t.email}
+                      >
+                        {validatingId === t.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-3.5 h-3.5" />
+                        )}
+                        Validar
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title="Ver logs de acesso"
+                        onClick={() => setLogsOpenId(t.id)}
+                      >
+                        <FileText className="w-4 h-4" />
+                      </Button>
                       <Button size="icon" variant="ghost" onClick={() => openEdit(t)}>
                         <Pencil className="w-4 h-4" />
                       </Button>
