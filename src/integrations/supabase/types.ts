@@ -995,6 +995,7 @@ export type Database = {
           email: string | null
           full_name: string
           id: string
+          must_change_password: boolean
           neighborhood: string | null
           phone: string | null
           rg: string | null
@@ -1016,6 +1017,7 @@ export type Database = {
           email?: string | null
           full_name: string
           id: string
+          must_change_password?: boolean
           neighborhood?: string | null
           phone?: string | null
           rg?: string | null
@@ -1037,6 +1039,7 @@ export type Database = {
           email?: string | null
           full_name?: string
           id?: string
+          must_change_password?: boolean
           neighborhood?: string | null
           phone?: string | null
           rg?: string | null
