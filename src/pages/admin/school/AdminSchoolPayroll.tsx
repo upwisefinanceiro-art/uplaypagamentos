@@ -638,6 +638,11 @@ export default function AdminSchoolPayroll() {
                             <span className="text-muted-foreground">Bruto:</span>{" "}
                             <b>{fmtBRL(closureValue)}</b> · Pago: <b className="text-emerald-600">{fmtBRL(paid)}</b>
                             {" "}{statusBadge(c.status)}
+                            {c.finance_entry_id && (
+                              <Badge variant="outline" className="ml-1 bg-emerald-500/10 text-emerald-700 border-emerald-200">
+                                ✓ Lançado no Financeiro
+                              </Badge>
+                            )}
                             {diverged && <span className="text-amber-600 ml-2">⚠ desatualizado</span>}
                           </p>
                           <p className="text-sm mt-1">
