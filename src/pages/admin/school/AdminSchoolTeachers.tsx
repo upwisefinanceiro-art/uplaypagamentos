@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSchoolAccess, SchoolUnit } from "@/hooks/useSchoolAccess";
@@ -34,6 +34,31 @@ interface Teacher {
 }
 
 const DEFAULT_PASSWORD = "12345678";
+const WHATSAPP_TAB_TARGET = "uplay_teacher_app_whatsapp";
+
+const resolveWhatsAppPhone = (rawPhone: string | null | undefined) => {
+  const digits = (rawPhone ?? "").replace(/\D/g, "");
+  const national = digits.startsWith("55") ? digits.slice(2) : digits;
+  const isValid = national.length >= 10 && national.length <= 11;
+
+  return {
+    raw: rawPhone ?? "",
+    digits,
+    national,
+    international: isValid ? `55${national}` : "",
+    isValid,
+  };
+};
+
+const buildWhatsAppTeacherUrl = (phone: string, message: string) => {
+  const cleanMessage = message.replace(/\r\n/g, "\n").replace(/[ \t]+\n/g, "\n").trim();
+  const encodedMessage = encodeURIComponent(cleanMessage);
+  return {
+    url: `https://wa.me/${phone}?text=${encodedMessage}`,
+    cleanMessage,
+    encodedLength: encodedMessage.length,
+  };
+};
 
 const emptyForm = {
   full_name: "",
@@ -63,6 +88,7 @@ export default function AdminSchoolTeachers() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const sendingRef = useRef<string | null>(null);
 
   const fetchTeachers = async () => {
     setLoading(true);
@@ -223,6 +249,13 @@ export default function AdminSchoolTeachers() {
   };
 
   const sendAccess = async (t: Teacher) => {
+    if (sendingRef.current) {
+      console.warn("[teacher-whatsapp] envio ignorado: execução já em andamento", {
+        currentTeacherId: sendingRef.current,
+        requestedTeacherId: t.id,
+      });
+      return;
+    }
     if (!t.email) {
       toast({
         title: "Cadastre um e-mail para o professor",
@@ -231,6 +264,7 @@ export default function AdminSchoolTeachers() {
       });
       return;
     }
+    sendingRef.current = t.id;
     setSendingId(t.id);
     try {
       // Cria/garante acesso automaticamente
@@ -261,19 +295,50 @@ export default function AdminSchoolTeachers() {
         unitId: t.unit_id,
         login: t.email,
       });
-      const phone = (t.phone ?? "").replace(/\D/g, "");
-      if (phone) {
-        const intl = phone.length <= 11 ? `55${phone}` : phone;
-        window.open(`https://wa.me/${intl}?text=${encodeURIComponent(message)}`, "_blank");
+      const phone = resolveWhatsAppPhone(t.phone);
+      if (phone.isValid) {
+        try {
+          const whatsapp = buildWhatsAppTeacherUrl(phone.international, message);
+          console.info("[teacher-whatsapp] abrindo WhatsApp", {
+            teacherId: t.id,
+            phoneRaw: phone.raw,
+            phoneUsed: phone.international,
+            urlBase: `https://wa.me/${phone.international}`,
+            hasTextParam: true,
+            messageLength: whatsapp.cleanMessage.length,
+            encodedLength: whatsapp.encodedLength,
+          });
+          const opened = window.open(whatsapp.url, WHATSAPP_TAB_TARGET);
+          opened?.focus();
+          if (opened) opened.opener = null;
+        } catch (encodeError) {
+          console.error("[teacher-whatsapp] falha ao montar URL/encode", {
+            teacherId: t.id,
+            phoneUsed: phone.international,
+            error: encodeError,
+          });
+          await navigator.clipboard?.writeText(message);
+          toast({
+            title: "Erro ao abrir WhatsApp",
+            description: "A mensagem foi copiada para envio manual.",
+            variant: "destructive",
+          });
+        }
       } else {
+        console.warn("[teacher-whatsapp] telefone inválido ou ausente", {
+          teacherId: t.id,
+          phoneRaw: phone.raw,
+          digits: phone.digits,
+        });
         await navigator.clipboard?.writeText(message);
         toast({
-          title: "Telefone não cadastrado",
-          description: "Mensagem de acesso copiada para a área de transferência.",
+          title: "Telefone inválido ou não cadastrado",
+          description: "Mensagem de acesso copiada para envio manual.",
         });
       }
       fetchTeachers();
     } finally {
+      sendingRef.current = null;
       setSendingId(null);
     }
   };
