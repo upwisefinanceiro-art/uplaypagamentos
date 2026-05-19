@@ -36,6 +36,9 @@ import AdminAsaasFees from "./pages/admin/AdminAsaasFees";
 import AdminCoraFees from "./pages/admin/AdminCoraFees";
 import AdminFinancialPro from "./pages/admin/AdminFinancialPro";
 import AdminAuditoriaAsaas from "./pages/admin/AdminAuditoriaAsaas";
+import AdminSchoolTeachers from "./pages/admin/school/AdminSchoolTeachers";
+import AdminSchoolClasses from "./pages/admin/school/AdminSchoolClasses";
+import AdminSchoolCalendar from "./pages/admin/school/AdminSchoolCalendar";
 import SuperAdminLayout from "./components/layouts/SuperAdminLayout";
 import SuperDashboard from "./pages/super/SuperDashboard";
 import SuperCompanies from "./pages/super/SuperCompanies";
@@ -107,6 +110,9 @@ const App = () => {
                 <Route path="planos-saas" element={<AdminSaasPlans />} />
                 <Route path="backup" element={<AdminBackup />} />
                 <Route path="auditoria-asaas" element={<AdminAuditoriaAsaas />} />
+                <Route path="escola/professores" element={<AdminSchoolTeachers />} />
+                <Route path="escola/turmas" element={<AdminSchoolClasses />} />
+                <Route path="escola/calendario" element={<AdminSchoolCalendar />} />
                 <Route path="alterar-senha" element={<AppChangePassword />} />
               </Route>
 

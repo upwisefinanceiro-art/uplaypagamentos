@@ -19,12 +19,15 @@ import {
   Activity,
   Banknote,
   Landmark,
+  CalendarDays,
+  Users2,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSchoolAccess } from "@/hooks/useSchoolAccess";
 import CompanyBlockedOverlay from "@/components/admin/CompanyBlockedOverlay";
 
-const menuItems = [
+const baseMenuItems = [
   { path: "/admin", icon: LayoutDashboard, label: "Dashboard", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
   { path: "/admin/empresa", icon: Building2, label: "Minha Empresa", roles: ["ADMIN_MASTER"] },
   { path: "/admin/administradores", icon: ShieldCheck, label: "Administradores", roles: ["ADMIN_MASTER"] },
@@ -45,6 +48,12 @@ const menuItems = [
   { path: "/admin/auditoria-asaas", icon: ShieldCheck, label: "Auditoria Asaas", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
 ];
 
+const schoolMenuItems = [
+  { path: "/admin/escola/calendario", icon: CalendarDays, label: "Calendário Escolar", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
+  { path: "/admin/escola/professores", icon: Users2, label: "Professores", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
+  { path: "/admin/escola/turmas", icon: GraduationCap, label: "Turmas", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
+];
+
 const AdminLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -52,8 +61,10 @@ const AdminLayout = () => {
   const { hasRole, signOut } = useAuth();
 
   const userRole = hasRole("ADMIN_MASTER") ? "ADMIN_MASTER" : "ADMIN_UNIDADE";
+  const { hasAccess: hasSchoolAccess } = useSchoolAccess();
 
-  const filteredMenu = menuItems.filter((item) => item.roles.includes(userRole));
+  const allItems = [...baseMenuItems, ...(hasSchoolAccess ? schoolMenuItems : [])];
+  const filteredMenu = allItems.filter((item) => item.roles.includes(userRole));
 
   const isActive = (path: string) => {
     if (path === "/admin") return location.pathname === "/admin";
