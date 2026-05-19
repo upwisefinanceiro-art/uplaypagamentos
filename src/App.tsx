@@ -131,6 +131,8 @@ const App = () => {
               }>
                 <Route index element={<TeacherLessons />} />
                 <Route path="folha" element={<TeacherPayroll />} />
+                <Route path="alterar-senha" element={<AppChangePassword />} />
+
               </Route>
 
               {/* Painel Super Admin */}
