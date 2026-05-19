@@ -182,20 +182,20 @@ export default function AdminSchoolPayroll() {
           .from("school_payroll_closures")
           .select("*")
           .eq("unit_id", unitId)
-          .eq("reference_month", monthStart),
+          .eq("reference_month", cycleStart),
         supabase
           .from("school_lessons")
           .select("teacher_id,duration_hours,computed_value")
           .eq("unit_id", unitId)
           .eq("status", "VALIDATED")
-          .gte("starts_at", monthStart)
-          .lt("starts_at", monthEnd),
+          .gte("starts_at", cycleStart)
+          .lt("starts_at", cycleEnd),
         supabase
           .from("school_teacher_payments")
           .select("*")
           .eq("unit_id", unitId)
-          .gte("payment_date", monthStart)
-          .lt("payment_date", monthEnd)
+          .gte("payment_date", cycleStart)
+          .lt("payment_date", cycleEnd)
           .order("payment_date", { ascending: false }),
         supabase
           .from("units")
@@ -228,7 +228,7 @@ export default function AdminSchoolPayroll() {
     setBusy(teacherId);
     const { error } = await supabase.rpc("generate_school_payroll_closure", {
       _teacher_id: teacherId,
-      _reference_month: monthStart,
+      _reference_month: cycleStart,
     });
     setBusy(null);
     if (error) return toast({ title: "Erro", description: error.message, variant: "destructive" });
@@ -244,7 +244,7 @@ export default function AdminSchoolPayroll() {
       if (!a || a.count === 0) continue;
       const { error } = await supabase.rpc("generate_school_payroll_closure", {
         _teacher_id: t.id,
-        _reference_month: monthStart,
+        _reference_month: cycleStart,
       });
       if (!error) ok++;
     }
@@ -278,7 +278,7 @@ export default function AdminSchoolPayroll() {
       amount,
       payment_date: payForm.payment_date,
       competence_month: payOpen.reference_month,
-      description: `Pagamento folha ${fmtMonth(payOpen.reference_month)}`,
+      description: `Pagamento folha ${fmtCycle(payOpen.reference_month)}`,
       notes: payForm.notes || null,
       payment_proof_url: payForm.proof || null,
       status: "PAGO",
@@ -345,7 +345,7 @@ export default function AdminSchoolPayroll() {
       payment_type: newPayForm.payment_type,
       amount,
       payment_date: newPayForm.payment_date,
-      competence_month: monthStart,
+      competence_month: cycleStart,
       description: newPayForm.description || TYPE_LABEL[newPayForm.payment_type],
       notes: newPayForm.notes || null,
       payment_proof_url: newPayForm.proof || null,
@@ -416,7 +416,7 @@ export default function AdminSchoolPayroll() {
     const remaining = Math.max(Number(c.total_value) - Number(c.paid_amount || 0), 0);
     const lines = [
       `RELATÓRIO DE FOLHA - ${teacher?.full_name ?? "-"}`,
-      `Competência: ${fmtMonth(c.reference_month)}`,
+      `Competência: ${fmtCycle(c.reference_month)}`,
       `Unidade: ${unitConfig?.name ?? "-"}`,
       ``,
       `Hora-aula: ${fmtBRL(Number(teacher?.hourly_rate ?? 0))}`,
