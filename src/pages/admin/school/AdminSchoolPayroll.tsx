@@ -557,6 +557,9 @@ export default function AdminSchoolPayroll() {
                 const paid = c ? Number(c.paid_amount || 0) : 0;
                 const remaining = Math.max(closureValue - paid, 0);
                 const diverged = c && closureValue.toFixed(2) !== a.value.toFixed(2);
+                const advances = advancesByTeacher[t.id] || 0;
+                const previewBruto = c ? closureValue : a.value;
+                const previewFinal = Math.max(previewBruto - advances - (c ? Number(c.paid_amount || 0) - advances : 0), 0);
 
                 return (
                   <div key={t.id} className="p-4 flex flex-col md:flex-row md:items-center gap-3">
@@ -566,25 +569,41 @@ export default function AdminSchoolPayroll() {
                         PIX: {t.pix_key || "—"} · Hora: {fmtBRL(Number(t.hourly_rate))}
                       </p>
                     </div>
-                    <div className="text-sm min-w-[260px]">
+                    <div className="text-sm min-w-[300px]">
                       <p>
                         <span className="text-muted-foreground">Aulas validadas:</span>{" "}
                         <b>{a.count}</b> · {a.hours.toFixed(2)}h ·{" "}
                         <b>{fmtBRL(a.value)}</b>
                       </p>
-                      {c && (
+                      {advances > 0 && (
+                        <p className="text-xs mt-0.5">
+                          <span className="text-muted-foreground">Adiantamentos/avulsos:</span>{" "}
+                          <b className="text-blue-600">-{fmtBRL(advances)}</b>
+                        </p>
+                      )}
+                      {c ? (
                         <>
                           <p className="text-xs mt-1">
-                            <span className="text-muted-foreground">Fechamento:</span>{" "}
-                            <b>{fmtBRL(closureValue)}</b> · Pago: <b className="text-emerald-600">{fmtBRL(paid)}</b> ·{" "}
-                            Saldo: <b className="text-amber-600">{fmtBRL(remaining)}</b>{" "}
-                            {statusBadge(c.status)}
+                            <span className="text-muted-foreground">Bruto:</span>{" "}
+                            <b>{fmtBRL(closureValue)}</b> · Pago: <b className="text-emerald-600">{fmtBRL(paid)}</b>
+                            {" "}{statusBadge(c.status)}
                             {diverged && <span className="text-amber-600 ml-2">⚠ desatualizado</span>}
+                          </p>
+                          <p className="text-sm mt-1">
+                            <span className="text-muted-foreground">Valor final a pagar:</span>{" "}
+                            <b className="text-amber-600 text-base">{fmtBRL(remaining)}</b>
                           </p>
                           <p className="text-[11px] text-muted-foreground mt-0.5">
                             Vencimento: {fmtDate(c.due_date)} · Pagamento previsto: {fmtDate(c.scheduled_payment_date)}
                           </p>
                         </>
+                      ) : (
+                        a.count > 0 && (
+                          <p className="text-xs mt-1 text-muted-foreground">
+                            Previsão final a pagar:{" "}
+                            <b className="text-amber-600">{fmtBRL(Math.max(a.value - advances, 0))}</b>
+                          </p>
+                        )
                       )}
                     </div>
                     <div className="flex gap-2 flex-wrap justify-end">
@@ -596,6 +615,11 @@ export default function AdminSchoolPayroll() {
                       {c && (
                         <Button size="sm" variant="outline" onClick={() => openSchedule(c)}>
                           <Calendar className="h-4 w-4 mr-1" /> Datas
+                        </Button>
+                      )}
+                      {c && (
+                        <Button size="sm" variant="outline" onClick={() => generateReport(c)} title="Relatório">
+                          <FileText className="h-4 w-4" />
                         </Button>
                       )}
                       {c && remaining > 0 && (
