@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
-import { Wallet, RefreshCcw, CheckCircle2, AlertCircle, Plus, Trash2, Calendar } from "lucide-react";
+import { Wallet, RefreshCcw, CheckCircle2, AlertCircle, Plus, Trash2, Calendar, Settings, FileText } from "lucide-react";
 
 interface Teacher {
   id: string;
@@ -88,6 +88,13 @@ function fmtMonth(d: string) {
   return new Date(d + "T00:00:00").toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 }
 
+interface UnitConfig {
+  id: string;
+  name: string;
+  payroll_closing_day: number;
+  payroll_payment_day: number;
+}
+
 export default function AdminSchoolPayroll() {
   const { user } = useAuth();
   const { units, loading: unitsLoading } = useSchoolAccess();
@@ -99,6 +106,7 @@ export default function AdminSchoolPayroll() {
   const [agg, setAgg] = useState<Record<string, AggLesson>>({});
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [unitConfig, setUnitConfig] = useState<UnitConfig | null>(null);
 
   // Pay-closure dialog
   const [payOpen, setPayOpen] = useState<Closure | null>(null);
@@ -107,6 +115,10 @@ export default function AdminSchoolPayroll() {
   // Schedule dialog
   const [scheduleOpen, setScheduleOpen] = useState<Closure | null>(null);
   const [scheduleForm, setScheduleForm] = useState({ due_date: "", scheduled_payment_date: "" });
+
+  // Unit config dialog
+  const [configOpen, setConfigOpen] = useState(false);
+  const [configForm, setConfigForm] = useState({ closing: "20", payment: "25" });
 
   // New payment dialog (avulso/adiantamento/etc)
   const [newPayOpen, setNewPayOpen] = useState(false);
@@ -136,7 +148,7 @@ export default function AdminSchoolPayroll() {
     if (!unitId) return;
     setLoading(true);
     try {
-      const [tRes, cRes, lRes, pRes] = await Promise.all([
+      const [tRes, cRes, lRes, pRes, uRes] = await Promise.all([
         supabase
           .from("school_teachers")
           .select("id,full_name,unit_id,company_id,hourly_rate,pix_key")
@@ -162,10 +174,16 @@ export default function AdminSchoolPayroll() {
           .gte("payment_date", monthStart)
           .lt("payment_date", monthEnd)
           .order("payment_date", { ascending: false }),
+        supabase
+          .from("units")
+          .select("id,name,payroll_closing_day,payroll_payment_day")
+          .eq("id", unitId)
+          .maybeSingle(),
       ]);
       setTeachers((tRes.data ?? []) as Teacher[]);
       setClosures((cRes.data ?? []) as Closure[]);
       setPayments((pRes.data ?? []) as TeacherPayment[]);
+      if (uRes.data) setUnitConfig(uRes.data as UnitConfig);
       const map: Record<string, AggLesson> = {};
       (lRes.data ?? []).forEach((l: any) => {
         const a = (map[l.teacher_id] ||= { teacher_id: l.teacher_id, count: 0, hours: 0, value: 0 });
@@ -326,6 +344,83 @@ export default function AdminSchoolPayroll() {
     load();
   };
 
+  const openConfig = () => {
+    setConfigForm({
+      closing: String(unitConfig?.payroll_closing_day ?? 20),
+      payment: String(unitConfig?.payroll_payment_day ?? 25),
+    });
+    setConfigOpen(true);
+  };
+
+  const saveConfig = async () => {
+    if (!unitId) return;
+    const closing = Math.min(Math.max(parseInt(configForm.closing) || 20, 1), 28);
+    const payment = Math.min(Math.max(parseInt(configForm.payment) || 25, 1), 28);
+    setBusy("config");
+    const { error } = await supabase
+      .from("units")
+      .update({ payroll_closing_day: closing, payroll_payment_day: payment })
+      .eq("id", unitId);
+    setBusy(null);
+    if (error) return toast({ title: "Erro", description: error.message, variant: "destructive" });
+    toast({ title: "Configuração salva", description: `Fechamento dia ${closing} · Pagamento dia ${payment}` });
+    setConfigOpen(false);
+    load();
+  };
+
+  // Adiantamentos / pagamentos avulsos do professor no mês (não-FOLHA)
+  const advancesByTeacher = useMemo(() => {
+    const m: Record<string, number> = {};
+    payments
+      .filter((p) => p.status === "PAGO" && p.payment_type !== "FOLHA_MENSAL")
+      .forEach((p) => {
+        m[p.teacher_id] = (m[p.teacher_id] || 0) + Number(p.amount);
+      });
+    return m;
+  }, [payments]);
+
+  const generateReport = (c: Closure) => {
+    const teacher = teachers.find((t) => t.id === c.teacher_id);
+    const teacherPayments = payments.filter(
+      (p) => p.teacher_id === c.teacher_id && p.status === "PAGO",
+    );
+    const advances = teacherPayments
+      .filter((p) => p.payment_type !== "FOLHA_MENSAL")
+      .reduce((s, p) => s + Number(p.amount), 0);
+    const folha = teacherPayments
+      .filter((p) => p.payment_type === "FOLHA_MENSAL")
+      .reduce((s, p) => s + Number(p.amount), 0);
+    const remaining = Math.max(Number(c.total_value) - Number(c.paid_amount || 0), 0);
+    const lines = [
+      `RELATÓRIO DE FOLHA - ${teacher?.full_name ?? "-"}`,
+      `Competência: ${fmtMonth(c.reference_month)}`,
+      `Unidade: ${unitConfig?.name ?? "-"}`,
+      ``,
+      `Hora-aula: ${fmtBRL(Number(teacher?.hourly_rate ?? 0))}`,
+      `Aulas validadas: ${c.lessons_count}`,
+      `Total de horas: ${Number(c.total_hours).toFixed(2)}h`,
+      `Total bruto: ${fmtBRL(Number(c.total_value))}`,
+      ``,
+      `Adiantamentos/avulsos: ${fmtBRL(advances)}`,
+      `Pagamento de folha: ${fmtBRL(folha)}`,
+      `Total já pago: ${fmtBRL(Number(c.paid_amount || 0))}`,
+      ``,
+      `VALOR FINAL A PAGAR: ${fmtBRL(remaining)}`,
+      ``,
+      `Vencimento: ${fmtDate(c.due_date)}`,
+      `Pagamento previsto: ${fmtDate(c.scheduled_payment_date)}`,
+      `Status: ${c.status}`,
+    ].join("\n");
+
+    const blob = new Blob([lines], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `folha-${teacher?.full_name?.replace(/\s+/g, "_") ?? "professor"}-${c.reference_month}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (!unitsLoading && !units.length) {
     return (
       <Card className="p-8 text-center max-w-md mx-auto">
@@ -385,6 +480,13 @@ export default function AdminSchoolPayroll() {
           <p className="text-sm text-muted-foreground">
             Fechamento mensal, adiantamentos, bônus e pagamentos avulsos por professor.
           </p>
+          {unitConfig && (
+            <p className="text-xs text-muted-foreground mt-1">
+              <Calendar className="h-3 w-3 inline mr-1" />
+              Fechamento automático todo dia <b>{unitConfig.payroll_closing_day}</b> ·
+              {" "}Pagamento dia <b>{unitConfig.payroll_payment_day}</b>
+            </p>
+          )}
         </div>
         <div className="flex items-end gap-2 flex-wrap">
           {units.length > 1 && (
@@ -405,6 +507,9 @@ export default function AdminSchoolPayroll() {
             <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
           </div>
           <Button variant="outline" onClick={load}><RefreshCcw className="h-4 w-4" /></Button>
+          <Button variant="outline" onClick={openConfig} title="Configurar fechamento">
+            <Settings className="h-4 w-4" />
+          </Button>
           <Button onClick={() => openNewPayment()}>
             <Plus className="h-4 w-4 mr-1" /> Novo pagamento
           </Button>
@@ -452,6 +557,7 @@ export default function AdminSchoolPayroll() {
                 const paid = c ? Number(c.paid_amount || 0) : 0;
                 const remaining = Math.max(closureValue - paid, 0);
                 const diverged = c && closureValue.toFixed(2) !== a.value.toFixed(2);
+                const advances = advancesByTeacher[t.id] || 0;
 
                 return (
                   <div key={t.id} className="p-4 flex flex-col md:flex-row md:items-center gap-3">
@@ -461,25 +567,41 @@ export default function AdminSchoolPayroll() {
                         PIX: {t.pix_key || "—"} · Hora: {fmtBRL(Number(t.hourly_rate))}
                       </p>
                     </div>
-                    <div className="text-sm min-w-[260px]">
+                    <div className="text-sm min-w-[300px]">
                       <p>
                         <span className="text-muted-foreground">Aulas validadas:</span>{" "}
                         <b>{a.count}</b> · {a.hours.toFixed(2)}h ·{" "}
                         <b>{fmtBRL(a.value)}</b>
                       </p>
-                      {c && (
+                      {advances > 0 && (
+                        <p className="text-xs mt-0.5">
+                          <span className="text-muted-foreground">Adiantamentos/avulsos:</span>{" "}
+                          <b className="text-blue-600">-{fmtBRL(advances)}</b>
+                        </p>
+                      )}
+                      {c ? (
                         <>
                           <p className="text-xs mt-1">
-                            <span className="text-muted-foreground">Fechamento:</span>{" "}
-                            <b>{fmtBRL(closureValue)}</b> · Pago: <b className="text-emerald-600">{fmtBRL(paid)}</b> ·{" "}
-                            Saldo: <b className="text-amber-600">{fmtBRL(remaining)}</b>{" "}
-                            {statusBadge(c.status)}
+                            <span className="text-muted-foreground">Bruto:</span>{" "}
+                            <b>{fmtBRL(closureValue)}</b> · Pago: <b className="text-emerald-600">{fmtBRL(paid)}</b>
+                            {" "}{statusBadge(c.status)}
                             {diverged && <span className="text-amber-600 ml-2">⚠ desatualizado</span>}
+                          </p>
+                          <p className="text-sm mt-1">
+                            <span className="text-muted-foreground">Valor final a pagar:</span>{" "}
+                            <b className="text-amber-600 text-base">{fmtBRL(remaining)}</b>
                           </p>
                           <p className="text-[11px] text-muted-foreground mt-0.5">
                             Vencimento: {fmtDate(c.due_date)} · Pagamento previsto: {fmtDate(c.scheduled_payment_date)}
                           </p>
                         </>
+                      ) : (
+                        a.count > 0 && (
+                          <p className="text-xs mt-1 text-muted-foreground">
+                            Previsão final a pagar:{" "}
+                            <b className="text-amber-600">{fmtBRL(Math.max(a.value - advances, 0))}</b>
+                          </p>
+                        )
                       )}
                     </div>
                     <div className="flex gap-2 flex-wrap justify-end">
@@ -491,6 +613,11 @@ export default function AdminSchoolPayroll() {
                       {c && (
                         <Button size="sm" variant="outline" onClick={() => openSchedule(c)}>
                           <Calendar className="h-4 w-4 mr-1" /> Datas
+                        </Button>
+                      )}
+                      {c && (
+                        <Button size="sm" variant="outline" onClick={() => generateReport(c)} title="Relatório">
+                          <FileText className="h-4 w-4" />
                         </Button>
                       )}
                       {c && remaining > 0 && (
@@ -690,6 +817,49 @@ export default function AdminSchoolPayroll() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setNewPayOpen(false)}>Cancelar</Button>
             <Button onClick={saveNewPayment} disabled={busy === "new"}>Registrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Unit payroll config dialog */}
+      <Dialog open={configOpen} onOpenChange={setConfigOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Configuração da folha automática</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Todo dia configurado de fechamento, o sistema soma automaticamente as aulas
+              validadas do mês e gera o fechamento de cada professor.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Dia do fechamento *</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={28}
+                  value={configForm.closing}
+                  onChange={(e) => setConfigForm({ ...configForm, closing: e.target.value })}
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">Ex: 20</p>
+              </div>
+              <div>
+                <Label>Dia do pagamento *</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={28}
+                  value={configForm.payment}
+                  onChange={(e) => setConfigForm({ ...configForm, payment: e.target.value })}
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">Ex: 25</p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfigOpen(false)}>Cancelar</Button>
+            <Button onClick={saveConfig} disabled={busy === "config"}>Salvar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

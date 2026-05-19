@@ -1918,6 +1918,8 @@ export type Database = {
           id: string
           name: string
           partnership_plan: string
+          payroll_closing_day: number
+          payroll_payment_day: number
           phone: string | null
           preferred_bank: string
           razao_social: string | null
@@ -1958,6 +1960,8 @@ export type Database = {
           id?: string
           name: string
           partnership_plan?: string
+          payroll_closing_day?: number
+          payroll_payment_day?: number
           phone?: string | null
           preferred_bank?: string
           razao_social?: string | null
@@ -1998,6 +2002,8 @@ export type Database = {
           id?: string
           name?: string
           partnership_plan?: string
+          payroll_closing_day?: number
+          payroll_payment_day?: number
           phone?: string | null
           preferred_bank?: string
           razao_social?: string | null
@@ -2277,6 +2283,7 @@ export type Database = {
       }
     }
     Functions: {
+      auto_generate_payroll_closures: { Args: never; Returns: Json }
       find_duplicate_cpf: {
         Args: { _cpf: string; _exclude_id?: string }
         Returns: {
