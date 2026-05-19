@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, GraduationCap, KeyRound, ShieldCheck, Smartphone, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, GraduationCap, KeyRound, ShieldCheck, Smartphone, Loader2, RefreshCw, FileText } from "lucide-react";
 import { buildAppAccessMessage } from "@/lib/app-access-message";
 
 interface Teacher {
@@ -104,8 +104,86 @@ export default function AdminSchoolTeachers() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [validatingId, setValidatingId] = useState<string | null>(null);
   const [accessStatus, setAccessStatus] = useState<Record<string, TeacherAccessStatus>>({});
+  const [accessLogs, setAccessLogs] = useState<Record<string, { at: string; status: TeacherAccessStatus; message: string; data?: TeacherAccessResponse }[]>>({});
+  const [logsOpenId, setLogsOpenId] = useState<string | null>(null);
   const sendingRef = useRef<string | null>(null);
+
+  const appendLog = (teacherId: string, status: TeacherAccessStatus, message: string, data?: TeacherAccessResponse) => {
+    setAccessLogs((prev) => {
+      const list = prev[teacherId] ?? [];
+      return { ...prev, [teacherId]: [{ at: new Date().toISOString(), status, message, data }, ...list].slice(0, 20) };
+    });
+  };
+
+  const syncTeacherAccess = async (t: Teacher): Promise<TeacherAccessResponse | null> => {
+    const { data: accessRes, error: accessErr } = await supabase.functions.invoke(
+      "create-teacher-user",
+      {
+        body: {
+          teacher_id: t.id,
+          email: t.email,
+          full_name: t.full_name,
+          phone: t.phone,
+          password: DEFAULT_PASSWORD,
+        },
+      },
+    );
+    const accessData = accessRes as TeacherAccessResponse | null;
+    const errMsg = accessData?.error || accessErr?.message;
+    if (errMsg) {
+      const status: TeacherAccessStatus = errMsg.toLowerCase().includes("auth") ? "AUTH_INVALID" : "SYNC_ERROR";
+      setAccessStatus((prev) => ({ ...prev, [t.id]: status }));
+      appendLog(t.id, status, errMsg, accessData ?? undefined);
+      toast({ title: "Falha ao validar acesso", description: errMsg, variant: "destructive" });
+      return null;
+    }
+    const status: TeacherAccessStatus = accessData?.login_valid ? "LOGIN_FUNCTIONAL" : "ACCESS_SYNCED";
+    setAccessStatus((prev) => ({ ...prev, [t.id]: status }));
+    appendLog(
+      t.id,
+      status,
+      accessData?.login_valid
+        ? "Login validado automaticamente com senha padrão."
+        : "Acesso sincronizado (login não validado).",
+      accessData ?? undefined,
+    );
+    console.info("[teacher-access] acesso sincronizado", {
+      teacherId: t.id,
+      authId: accessData?.auth_id ?? accessData?.user_id,
+      profileId: accessData?.profile_id,
+      email: accessData?.email ?? t.email,
+      status: accessData?.status,
+      reason: accessData?.reason,
+      rebuilt: accessData?.rebuilt,
+      loginValid: accessData?.login_valid,
+      syncedAt: accessData?.synced_at,
+    });
+    return accessData;
+  };
+
+  const validateAccess = async (t: Teacher) => {
+    if (!t.email) {
+      toast({ title: "Cadastre um e-mail para o professor", variant: "destructive" });
+      return;
+    }
+    setValidatingId(t.id);
+    try {
+      const data = await syncTeacherAccess(t);
+      if (data) {
+        toast({
+          title: data.login_valid ? "Login funcional ✓" : "Acesso sincronizado",
+          description: data.login_valid
+            ? "Validado automaticamente com a senha padrão 12345678."
+            : "Dados sincronizados, login ainda não confirmado.",
+        });
+        fetchTeachers();
+      }
+    } finally {
+      setValidatingId(null);
+    }
+  };
 
   const fetchTeachers = async () => {
     setLoading(true);
@@ -284,43 +362,14 @@ export default function AdminSchoolTeachers() {
     sendingRef.current = t.id;
     setSendingId(t.id);
     try {
-      // Sempre garante que o acesso esteja sincronizado (email + senha padrão)
-      const { data: accessRes, error: accessErr } = await supabase.functions.invoke(
-        "create-teacher-user",
-        {
-          body: {
-            teacher_id: t.id,
-            email: t.email,
-            full_name: t.full_name,
-            phone: t.phone,
-            password: DEFAULT_PASSWORD,
-          },
-        },
-      );
-      const accessData = accessRes as TeacherAccessResponse | null;
-      const errMsg = accessData?.error || accessErr?.message;
-      if (errMsg) {
-        setAccessStatus((prev) => ({ ...prev, [t.id]: errMsg.toLowerCase().includes("auth") ? "AUTH_INVALID" : "SYNC_ERROR" }));
-        toast({ title: "Falha ao criar acesso", description: errMsg, variant: "destructive" });
-        return;
-      }
-      setAccessStatus((prev) => ({
-        ...prev,
-        [t.id]: accessData?.login_valid ? "LOGIN_FUNCTIONAL" : "ACCESS_SYNCED",
-      }));
-      console.info("[teacher-access] acesso sincronizado", {
-        teacherId: t.id,
-        authId: accessData?.auth_id ?? accessData?.user_id,
-        profileId: accessData?.profile_id,
-        email: accessData?.email ?? t.email,
-        status: accessData?.status,
-        reason: accessData?.reason,
-        rebuilt: accessData?.rebuilt,
-        syncedAt: accessData?.synced_at,
-      });
+      const accessData = await syncTeacherAccess(t);
+      if (!accessData) return;
+
       toast({
-        title: accessData?.status_label ?? (t.profile_id ? "Acesso atualizado" : "Acesso criado"),
-        description: "Login validado com senha padrão 12345678.",
+        title: accessData.status_label ?? (accessData.login_valid ? "Login funcional ✓" : "Acesso sincronizado"),
+        description: accessData.login_valid
+          ? "Login validado automaticamente. Abrindo WhatsApp..."
+          : "Dados sincronizados. Abrindo WhatsApp...",
       });
 
       const message = buildAppAccessMessage({
@@ -337,8 +386,6 @@ export default function AdminSchoolTeachers() {
             teacherId: t.id,
             phoneRaw: phone.raw,
             phoneUsed: phone.international,
-            urlBase: `https://wa.me/${phone.international}`,
-            hasTextParam: true,
             messageLength: whatsapp.cleanMessage.length,
             encodedLength: whatsapp.encodedLength,
           });
@@ -346,11 +393,7 @@ export default function AdminSchoolTeachers() {
           opened?.focus();
           if (opened) opened.opener = null;
         } catch (encodeError) {
-          console.error("[teacher-whatsapp] falha ao montar URL/encode", {
-            teacherId: t.id,
-            phoneUsed: phone.international,
-            error: encodeError,
-          });
+          console.error("[teacher-whatsapp] falha ao montar URL/encode", { teacherId: t.id, error: encodeError });
           await navigator.clipboard?.writeText(message);
           toast({
             title: "Erro ao abrir WhatsApp",
@@ -359,11 +402,7 @@ export default function AdminSchoolTeachers() {
           });
         }
       } else {
-        console.warn("[teacher-whatsapp] telefone inválido ou ausente", {
-          teacherId: t.id,
-          phoneRaw: phone.raw,
-          digits: phone.digits,
-        });
+        console.warn("[teacher-whatsapp] telefone inválido ou ausente", { teacherId: t.id, phoneRaw: phone.raw });
         await navigator.clipboard?.writeText(message);
         toast({
           title: "Telefone inválido ou não cadastrado",
@@ -446,7 +485,7 @@ export default function AdminSchoolTeachers() {
               <TableHead>Disciplinas</TableHead>
               <TableHead>Contato</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="w-[240px]">Ações</TableHead>
+              <TableHead className="w-[360px]">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -517,6 +556,29 @@ export default function AdminSchoolTeachers() {
                           <Smartphone className="w-3.5 h-3.5" />
                         )}
                         {t.profile_id ? "Reenviar app" : "Enviar app"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="gap-1.5"
+                        title="Validar/sincronizar acesso sem abrir WhatsApp"
+                        onClick={() => validateAccess(t)}
+                        disabled={validatingId === t.id || !t.email}
+                      >
+                        {validatingId === t.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-3.5 h-3.5" />
+                        )}
+                        Validar
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title="Ver logs de acesso"
+                        onClick={() => setLogsOpenId(t.id)}
+                      >
+                        <FileText className="w-4 h-4" />
                       </Button>
                       <Button size="icon" variant="ghost" onClick={() => openEdit(t)}>
                         <Pencil className="w-4 h-4" />
@@ -666,6 +728,77 @@ export default function AdminSchoolTeachers() {
             <Button onClick={save} disabled={saving}>
               {saving ? "Salvando..." : "Salvar"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!logsOpenId} onOpenChange={(open) => !open && setLogsOpenId(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              Logs de acesso — {teachers.find((t) => t.id === logsOpenId)?.full_name ?? ""}
+            </DialogTitle>
+          </DialogHeader>
+          {(() => {
+            const t = teachers.find((x) => x.id === logsOpenId);
+            if (!t) return null;
+            const logs = accessLogs[t.id] ?? [];
+            return (
+              <div className="space-y-3">
+                <div className="rounded-md border p-3 text-sm space-y-1 bg-muted/30">
+                  <div><strong>E-mail:</strong> {t.email ?? "—"}</div>
+                  <div><strong>profile_id:</strong> <span className="font-mono text-xs">{t.profile_id ?? "—"}</span></div>
+                  <div><strong>Status atual:</strong>{" "}
+                    {accessStatus[t.id] === "LOGIN_FUNCTIONAL" ? "Login funcional ✓"
+                      : accessStatus[t.id] === "ACCESS_SYNCED" ? "Acesso sincronizado"
+                      : accessStatus[t.id] === "SYNC_ERROR" ? "Erro de sincronização"
+                      : accessStatus[t.id] === "AUTH_INVALID" ? "Auth inválido"
+                      : !t.profile_id ? "Acesso ainda não enviado"
+                      : t.must_change_password ? "Aguardando primeiro login" : "Ativo no app"}
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button size="sm" variant="outline" onClick={() => validateAccess(t)} disabled={validatingId === t.id}>
+                    {validatingId === t.id ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
+                    Validar agora
+                  </Button>
+                </div>
+                <div className="max-h-[320px] overflow-auto space-y-2">
+                  {logs.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-6">
+                      Nenhum log nesta sessão. Clique em "Validar agora" para testar o acesso.
+                    </p>
+                  ) : (
+                    logs.map((log, i) => (
+                      <div key={i} className="rounded-md border p-2 text-xs space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Badge
+                            variant="outline"
+                            className={
+                              log.status === "LOGIN_FUNCTIONAL" || log.status === "ACCESS_SYNCED"
+                                ? "text-success border-success/40"
+                                : "text-destructive border-destructive/40"
+                            }
+                          >
+                            {log.status}
+                          </Badge>
+                          <span className="text-muted-foreground">{new Date(log.at).toLocaleString("pt-BR")}</span>
+                        </div>
+                        <div>{log.message}</div>
+                        {log.data && (
+                          <div className="text-muted-foreground font-mono">
+                            auth_id: {log.data.auth_id ?? "—"} · reason: {log.data.reason ?? "—"} · login_valid: {String(log.data.login_valid ?? false)}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLogsOpenId(null)}>Fechar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
