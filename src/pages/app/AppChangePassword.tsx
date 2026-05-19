@@ -58,6 +58,10 @@ const AppChangePassword = () => {
     if (error) {
       toast({ title: "Erro ao alterar senha", description: error.message, variant: "destructive" });
     } else {
+      await supabase
+        .from("profiles")
+        .update({ must_change_password: false })
+        .eq("id", user.id);
       setSuccess(true);
       setCurrentPassword("");
       setNewPassword("");
@@ -67,6 +71,7 @@ const AppChangePassword = () => {
 
     setLoading(false);
   };
+
 
   return (
     <div className="p-4 max-w-md mx-auto">
