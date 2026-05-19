@@ -17,6 +17,24 @@ import { ChevronLeft, ChevronRight, GraduationCap, Plus, Trash2, Check, Chevrons
 
 const DEFAULT_CLASS_NAME = "Reforço de Inglês";
 
+const TIME_SLOTS: { label: string; start: string; end: string; period: string }[] = [
+  { label: "08h às 10h", start: "08:00", end: "10:00", period: "Manhã" },
+  { label: "10h às 12h", start: "10:00", end: "12:00", period: "Manhã" },
+  { label: "14h às 16h", start: "14:00", end: "16:00", period: "Tarde" },
+  { label: "16h às 18h", start: "16:00", end: "18:00", period: "Tarde" },
+  { label: "19h às 21h", start: "19:00", end: "21:00", period: "Noite" },
+];
+
+function periodOf(hhmm: string): string {
+  const h = parseInt(hhmm.slice(0, 2), 10);
+  if (h < 12) return "Manhã";
+  if (h < 18) return "Tarde";
+  return "Noite";
+}
+function fmtHHMM(d: Date) {
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 type ViewMode = "month" | "week";
 
 interface Lesson {
@@ -302,7 +320,53 @@ export default function AdminSchoolCalendar() {
       toast({ title: "Nada a gerar", description: "Verifique os dias da semana e a data final", variant: "destructive" });
       return;
     }
+
+    // Conflict detection: check overlap for same teacher on the same day
     setSaving(true);
+    const dayStarts = rows.map((r) => r.starts_at);
+    const minDay = new Date(Math.min(...dayStarts.map((s) => new Date(s).getTime())));
+    const maxDay = new Date(Math.max(...dayStarts.map((s) => new Date(s).getTime())));
+    minDay.setHours(0, 0, 0, 0);
+    maxDay.setHours(23, 59, 59, 999);
+    const { data: existing } = await supabase
+      .from("school_lessons")
+      .select("starts_at,ends_at")
+      .eq("teacher_id", form.teacher_id)
+      .neq("status", "CANCELED")
+      .gte("starts_at", minDay.toISOString())
+      .lte("starts_at", maxDay.toISOString());
+
+    const conflicts: string[] = [];
+    for (const r of rows) {
+      const rs = new Date(r.starts_at).getTime();
+      const re = new Date(r.ends_at).getTime();
+      // overlap within the same set being created
+      for (const r2 of rows) {
+        if (r2 === r) continue;
+        const r2s = new Date(r2.starts_at).getTime();
+        const r2e = new Date(r2.ends_at).getTime();
+        if (sameDay(new Date(rs), new Date(r2s)) && rs < r2e && re > r2s) {
+          conflicts.push(new Date(rs).toLocaleString("pt-BR"));
+        }
+      }
+      for (const e of existing ?? []) {
+        const es = new Date(e.starts_at).getTime();
+        const ee = new Date(e.ends_at).getTime();
+        if (rs < ee && re > es) {
+          conflicts.push(new Date(rs).toLocaleString("pt-BR"));
+        }
+      }
+    }
+    if (conflicts.length > 0) {
+      setSaving(false);
+      toast({
+        title: "Conflito de horário",
+        description: `O professor já tem aula em: ${[...new Set(conflicts)].slice(0, 3).join(", ")}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     const { error } = await supabase.from("school_lessons").insert(rows);
     setSaving(false);
     if (error) {
@@ -453,7 +517,7 @@ export default function AdminSchoolCalendar() {
             return (
               <div
                 key={d.toISOString()}
-                className={`min-h-[100px] border rounded-md p-1 text-xs flex flex-col gap-1 cursor-pointer hover:bg-muted/50 transition-colors ${
+                className={`min-h-[130px] border rounded-md p-1 text-xs flex flex-col gap-1 cursor-pointer hover:bg-muted/50 transition-colors ${
                   inMonth ? "bg-card" : "bg-muted/30 text-muted-foreground"
                 } ${today ? "ring-2 ring-primary" : ""}`}
                 onClick={() => openDayDialog(d)}
@@ -465,19 +529,27 @@ export default function AdminSchoolCalendar() {
                 <div className="flex flex-col gap-0.5 overflow-hidden">
                   {dayLessons.slice(0, 3).map((l) => {
                     const teacher = teachers.find((t) => t.id === l.teacher_id);
+                    const cls = classes.find((c) => c.id === l.class_id);
+                    const unit = units.find((u) => u.id === l.unit_id);
                     const s = new Date(l.starts_at);
+                    const e = new Date(l.ends_at);
                     return (
                       <div
                         key={l.id}
                         className={`truncate rounded px-1 py-0.5 border ${STATUS_COLOR[l.status] ?? ""}`}
-                        title={`${teacher?.full_name ?? ""} — ${STATUS_LABEL[l.status]}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
+                        title={`${fmtHHMM(s)}-${fmtHHMM(e)} • ${cls?.name ?? "Sem turma"} • ${teacher?.full_name ?? ""} • ${unit?.name ?? ""}`}
+                        onClick={(ev) => {
+                          ev.stopPropagation();
                           deleteLesson(l.id);
                         }}
                       >
-                        {String(s.getHours()).padStart(2, "0")}:{String(s.getMinutes()).padStart(2, "0")}{" "}
-                        {teacher?.full_name?.split(" ")[0] ?? ""}
+                        <div className="font-semibold leading-tight">
+                          {fmtHHMM(s)}–{fmtHHMM(e)}
+                        </div>
+                        <div className="truncate leading-tight">{cls?.name ?? "Sem turma"}</div>
+                        <div className="truncate leading-tight opacity-80">
+                          {teacher?.full_name?.split(" ").slice(0, 2).join(" ") ?? ""}
+                        </div>
                       </div>
                     );
                   })}
@@ -557,15 +629,32 @@ export default function AdminSchoolCalendar() {
               <Label>Data *</Label>
               <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label>Início</Label>
-                <Input type="time" value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
+            <div className="md:col-span-2">
+              <Label>Blocos rápidos ({periodOf(form.start_time)})</Label>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {TIME_SLOTS.map((s) => {
+                  const active = form.start_time === s.start && form.end_time === s.end;
+                  return (
+                    <Button
+                      key={s.label}
+                      type="button"
+                      size="sm"
+                      variant={active ? "default" : "outline"}
+                      onClick={() => setForm((f) => ({ ...f, start_time: s.start, end_time: s.end }))}
+                    >
+                      {s.label}
+                    </Button>
+                  );
+                })}
               </div>
-              <div>
-                <Label>Fim</Label>
-                <Input type="time" value={form.end_time} onChange={(e) => setForm({ ...form, end_time: e.target.value })} />
-              </div>
+            </div>
+            <div>
+              <Label>Início</Label>
+              <Input type="time" value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
+            </div>
+            <div>
+              <Label>Fim</Label>
+              <Input type="time" value={form.end_time} onChange={(e) => setForm({ ...form, end_time: e.target.value })} />
             </div>
             <div className="md:col-span-2 flex items-center gap-2 pt-2 border-t">
               <Switch checked={form.recurring} onCheckedChange={(v) => setForm({ ...form, recurring: v })} />
