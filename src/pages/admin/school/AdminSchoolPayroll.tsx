@@ -76,16 +76,34 @@ const TYPE_LABEL = Object.fromEntries(PAYMENT_TYPES.map((p) => [p.value, p.label
 function fmtBRL(n: number) {
   return Number(n).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
-function currentMonth() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
 function fmtDate(d?: string | null) {
   if (!d) return "—";
   return new Date(d + (d.length === 10 ? "T00:00:00" : "")).toLocaleDateString("pt-BR");
 }
-function fmtMonth(d: string) {
-  return new Date(d + "T00:00:00").toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+function toISO(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function addMonths(iso: string, months: number) {
+  const [y, m, day] = iso.split("-").map(Number);
+  const d = new Date(y, m - 1 + months, day);
+  return toISO(d);
+}
+/** Início do ciclo aberto baseado em hoje e no dia de fechamento da unidade. */
+function computeCycleStart(closingDay: number, ref: Date = new Date()) {
+  const safe = Math.min(Math.max(closingDay || 20, 1), 28);
+  const y = ref.getFullYear();
+  const m = ref.getMonth();
+  const day = ref.getDate();
+  // ciclo aberto = [último closingDay <= hoje, próximo closingDay)
+  const startDate = day >= safe ? new Date(y, m, safe) : new Date(y, m - 1, safe);
+  return toISO(startDate);
+}
+function cycleEndOf(cycleStart: string) {
+  return addMonths(cycleStart, 1);
+}
+function fmtCycle(start: string, end?: string | null) {
+  const e = end || cycleEndOf(start);
+  return `${fmtDate(start)} → ${fmtDate(e)}`;
 }
 
 interface UnitConfig {
