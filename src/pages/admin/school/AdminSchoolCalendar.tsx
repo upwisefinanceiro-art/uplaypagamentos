@@ -10,8 +10,12 @@ import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { toast } from "@/hooks/use-toast";
-import { ChevronLeft, ChevronRight, GraduationCap, Plus, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, GraduationCap, Plus, Trash2, Check, ChevronsUpDown, Pencil } from "lucide-react";
+
+const DEFAULT_CLASS_NAME = "Reforço de Inglês";
 
 type ViewMode = "month" | "week";
 
