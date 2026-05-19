@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { CalendarCheck2, XCircle, CheckCircle2, Clock, AlertCircle } from "lucide-react";
+import { CalendarCheck2, XCircle, CheckCircle2, Clock, AlertCircle, Building2 } from "lucide-react";
 
 interface Lesson {
   id: string;
@@ -24,6 +25,14 @@ interface Lesson {
   notes: string | null;
   class_id: string | null;
   course_id: string | null;
+  teacher_id: string;
+  unit_id: string;
+}
+
+interface TeacherRow {
+  id: string;
+  unit_id: string;
+  unit_name: string;
 }
 
 const STATUS_META: Record<string, { label: string; cls: string; icon: any }> = {
@@ -45,7 +54,8 @@ function fmtTime(d: string) {
 
 export default function TeacherLessons() {
   const { user } = useAuth();
-  const [teacherId, setTeacherId] = useState<string | null>(null);
+  const [teachers, setTeachers] = useState<TeacherRow[]>([]);
+  const [unitFilter, setUnitFilter] = useState<string>("ALL");
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
   const [classes, setClasses] = useState<Record<string, string>>({});
@@ -59,25 +69,32 @@ export default function TeacherLessons() {
     if (!user) return;
     setLoading(true);
     try {
-      const { data: teacher } = await supabase
+      const { data: teacherRows } = await supabase
         .from("school_teachers")
-        .select("id")
-        .eq("profile_id", user.id)
-        .maybeSingle();
-      if (!teacher) {
-        setTeacherId(null);
+        .select("id,unit_id,units(name)")
+        .eq("profile_id", user.id);
+
+      const list: TeacherRow[] = (teacherRows ?? []).map((t: any) => ({
+        id: t.id,
+        unit_id: t.unit_id,
+        unit_name: t.units?.name ?? "Unidade",
+      }));
+      setTeachers(list);
+
+      if (list.length === 0) {
         setLessons([]);
         return;
       }
-      setTeacherId(teacher.id);
+
+      const teacherIds = list.map((t) => t.id);
       const { data, error } = await supabase
         .from("school_lessons")
         .select("*")
-        .eq("teacher_id", teacher.id)
+        .in("teacher_id", teacherIds)
         .order("starts_at", { ascending: false })
-        .limit(200);
+        .limit(500);
       if (error) throw error;
-      setLessons(data ?? []);
+      setLessons((data ?? []) as Lesson[]);
 
       const classIds = Array.from(new Set((data ?? []).map((l: any) => l.class_id).filter(Boolean)));
       const courseIds = Array.from(new Set((data ?? []).map((l: any) => l.course_id).filter(Boolean)));
@@ -100,11 +117,21 @@ export default function TeacherLessons() {
     load();
   }, [user?.id]);
 
+  const unitNameById = useMemo(
+    () => Object.fromEntries(teachers.map((t) => [t.unit_id, t.unit_name])),
+    [teachers]
+  );
+
+  const scopedLessons = useMemo(() => {
+    if (unitFilter === "ALL") return lessons;
+    return lessons.filter((l) => l.unit_id === unitFilter);
+  }, [lessons, unitFilter]);
+
   const filtered = useMemo(() => {
     const now = new Date();
     const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    return lessons
+    return scopedLessons
       .filter((l) => {
         const d = new Date(l.starts_at);
         if (filter === "upcoming") return d >= new Date(now.getFullYear(), now.getMonth(), now.getDate()) && l.status !== "CANCELED";
@@ -112,13 +139,13 @@ export default function TeacherLessons() {
         return true;
       })
       .sort((a, b) => +new Date(a.starts_at) - +new Date(b.starts_at));
-  }, [lessons, filter]);
+  }, [scopedLessons, filter]);
 
   const totals = useMemo(() => {
     const month = new Date();
     const startMonth = new Date(month.getFullYear(), month.getMonth(), 1);
     const endMonth = new Date(month.getFullYear(), month.getMonth() + 1, 1);
-    const monthLessons = lessons.filter((l) => {
+    const monthLessons = scopedLessons.filter((l) => {
       const d = new Date(l.starts_at);
       return d >= startMonth && d < endMonth && l.status !== "CANCELED";
     });
@@ -127,9 +154,9 @@ export default function TeacherLessons() {
       monthHours: monthLessons.reduce((s, l) => s + Number(l.duration_hours || 0), 0),
       monthValue: monthLessons.reduce((s, l) => s + Number(l.computed_value || 0), 0),
       validatedValue: validated.reduce((s, l) => s + Number(l.computed_value || 0), 0),
-      pending: lessons.filter((l) => l.status === "SCHEDULED" && new Date(l.starts_at) <= new Date()).length,
+      pending: scopedLessons.filter((l) => l.status === "SCHEDULED" && new Date(l.starts_at) <= new Date()).length,
     };
-  }, [lessons]);
+  }, [scopedLessons]);
 
   const confirm = async (l: Lesson) => {
     setBusy(l.id);
@@ -162,7 +189,7 @@ export default function TeacherLessons() {
     load();
   };
 
-  if (!teacherId && !loading) {
+  if (teachers.length === 0 && !loading) {
     return (
       <Card className="p-8 text-center max-w-md mx-auto mt-12">
         <AlertCircle className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
@@ -176,9 +203,25 @@ export default function TeacherLessons() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold">Minhas Aulas</h1>
-        <p className="text-sm text-muted-foreground">Confirme as aulas dadas e acompanhe a validação.</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Minhas Aulas</h1>
+          <p className="text-sm text-muted-foreground">Confirme as aulas dadas e acompanhe a validação.</p>
+        </div>
+        {teachers.length > 1 && (
+          <div className="flex items-center gap-2">
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+            <Select value={unitFilter} onValueChange={setUnitFilter}>
+              <SelectTrigger className="w-[220px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Todas as unidades ({teachers.length})</SelectItem>
+                {teachers.map((t) => (
+                  <SelectItem key={t.unit_id} value={t.unit_id}>{t.unit_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -232,6 +275,12 @@ export default function TeacherLessons() {
                       <Icon className="h-3 w-3" />
                       {meta.label}
                     </Badge>
+                    {teachers.length > 1 && unitNameById[l.unit_id] && (
+                      <Badge variant="outline" className="gap-1">
+                        <Building2 className="h-3 w-3" />
+                        {unitNameById[l.unit_id]}
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-sm mt-1">
                     {l.class_id ? classes[l.class_id] : l.course_id ? courses[l.course_id] : "Aula avulsa"}
