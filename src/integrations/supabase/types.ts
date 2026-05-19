@@ -1466,6 +1466,7 @@ export type Database = {
         Row: {
           company_id: string
           created_at: string
+          cycle_end_date: string | null
           due_date: string | null
           generated_at: string
           generated_by: string | null
@@ -1487,6 +1488,7 @@ export type Database = {
         Insert: {
           company_id: string
           created_at?: string
+          cycle_end_date?: string | null
           due_date?: string | null
           generated_at?: string
           generated_by?: string | null
@@ -1508,6 +1510,7 @@ export type Database = {
         Update: {
           company_id?: string
           created_at?: string
+          cycle_end_date?: string | null
           due_date?: string | null
           generated_at?: string
           generated_by?: string | null
@@ -2312,6 +2315,7 @@ export type Database = {
         Args: { _closure_id: string; _notes?: string; _proof_url?: string }
         Returns: undefined
       }
+      payroll_cycle_end: { Args: { _start: string }; Returns: string }
       recalc_school_payroll_closure: {
         Args: { _closure_id: string }
         Returns: undefined

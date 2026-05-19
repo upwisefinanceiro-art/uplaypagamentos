@@ -28,7 +28,8 @@ interface Closure {
   teacher_id: string;
   unit_id: string;
   company_id: string;
-  reference_month: string;
+  reference_month: string; // início do ciclo
+  cycle_end_date: string | null; // fim do ciclo (exclusivo)
   lessons_count: number;
   total_hours: number;
   total_value: number;
@@ -76,16 +77,34 @@ const TYPE_LABEL = Object.fromEntries(PAYMENT_TYPES.map((p) => [p.value, p.label
 function fmtBRL(n: number) {
   return Number(n).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
-function currentMonth() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
 function fmtDate(d?: string | null) {
   if (!d) return "—";
   return new Date(d + (d.length === 10 ? "T00:00:00" : "")).toLocaleDateString("pt-BR");
 }
-function fmtMonth(d: string) {
-  return new Date(d + "T00:00:00").toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+function toISO(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function addMonths(iso: string, months: number) {
+  const [y, m, day] = iso.split("-").map(Number);
+  const d = new Date(y, m - 1 + months, day);
+  return toISO(d);
+}
+/** Início do ciclo aberto baseado em hoje e no dia de fechamento da unidade. */
+function computeCycleStart(closingDay: number, ref: Date = new Date()) {
+  const safe = Math.min(Math.max(closingDay || 20, 1), 28);
+  const y = ref.getFullYear();
+  const m = ref.getMonth();
+  const day = ref.getDate();
+  // ciclo aberto = [último closingDay <= hoje, próximo closingDay)
+  const startDate = day >= safe ? new Date(y, m, safe) : new Date(y, m - 1, safe);
+  return toISO(startDate);
+}
+function cycleEndOf(cycleStart: string) {
+  return addMonths(cycleStart, 1);
+}
+function fmtCycle(start: string, end?: string | null) {
+  const e = end || cycleEndOf(start);
+  return `${fmtDate(start)} → ${fmtDate(e)}`;
 }
 
 interface UnitConfig {
@@ -99,7 +118,8 @@ export default function AdminSchoolPayroll() {
   const { user } = useAuth();
   const { units, loading: unitsLoading } = useSchoolAccess();
   const [unitId, setUnitId] = useState<string>("");
-  const [month, setMonth] = useState<string>(currentMonth());
+  // Início do ciclo da folha (data ISO yyyy-mm-dd). Default = ciclo atual com closingDay=20
+  const [cycleStart, setCycleStart] = useState<string>(() => computeCycleStart(20));
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [closures, setClosures] = useState<Closure[]>([]);
   const [payments, setPayments] = useState<TeacherPayment[]>([]);
@@ -137,12 +157,15 @@ export default function AdminSchoolPayroll() {
     if (!unitId && units.length) setUnitId(units[0].id);
   }, [units, unitId]);
 
-  const monthStart = `${month}-01`;
-  const monthEnd = useMemo(() => {
-    const [y, m] = month.split("-").map(Number);
-    const d = new Date(y, m, 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-  }, [month]);
+  const cycleEnd = useMemo(() => cycleEndOf(cycleStart), [cycleStart]);
+
+  // Quando muda a unidade, recalcula o ciclo aberto pela config dela
+  useEffect(() => {
+    if (unitConfig?.payroll_closing_day) {
+      setCycleStart(computeCycleStart(unitConfig.payroll_closing_day));
+    }
+  }, [unitConfig?.id]);
+
 
   const load = async () => {
     if (!unitId) return;
@@ -159,20 +182,20 @@ export default function AdminSchoolPayroll() {
           .from("school_payroll_closures")
           .select("*")
           .eq("unit_id", unitId)
-          .eq("reference_month", monthStart),
+          .eq("reference_month", cycleStart),
         supabase
           .from("school_lessons")
           .select("teacher_id,duration_hours,computed_value")
           .eq("unit_id", unitId)
           .eq("status", "VALIDATED")
-          .gte("starts_at", monthStart)
-          .lt("starts_at", monthEnd),
+          .gte("starts_at", cycleStart)
+          .lt("starts_at", cycleEnd),
         supabase
           .from("school_teacher_payments")
           .select("*")
           .eq("unit_id", unitId)
-          .gte("payment_date", monthStart)
-          .lt("payment_date", monthEnd)
+          .gte("payment_date", cycleStart)
+          .lt("payment_date", cycleEnd)
           .order("payment_date", { ascending: false }),
         supabase
           .from("units")
@@ -199,13 +222,13 @@ export default function AdminSchoolPayroll() {
 
   useEffect(() => {
     load();
-  }, [unitId, month]);
+  }, [unitId, cycleStart]);
 
   const generate = async (teacherId: string) => {
     setBusy(teacherId);
     const { error } = await supabase.rpc("generate_school_payroll_closure", {
       _teacher_id: teacherId,
-      _reference_month: monthStart,
+      _reference_month: cycleStart,
     });
     setBusy(null);
     if (error) return toast({ title: "Erro", description: error.message, variant: "destructive" });
@@ -221,7 +244,7 @@ export default function AdminSchoolPayroll() {
       if (!a || a.count === 0) continue;
       const { error } = await supabase.rpc("generate_school_payroll_closure", {
         _teacher_id: t.id,
-        _reference_month: monthStart,
+        _reference_month: cycleStart,
       });
       if (!error) ok++;
     }
@@ -255,7 +278,7 @@ export default function AdminSchoolPayroll() {
       amount,
       payment_date: payForm.payment_date,
       competence_month: payOpen.reference_month,
-      description: `Pagamento folha ${fmtMonth(payOpen.reference_month)}`,
+      description: `Pagamento folha ${fmtCycle(payOpen.reference_month, payOpen.cycle_end_date)}`,
       notes: payForm.notes || null,
       payment_proof_url: payForm.proof || null,
       status: "PAGO",
@@ -322,7 +345,7 @@ export default function AdminSchoolPayroll() {
       payment_type: newPayForm.payment_type,
       amount,
       payment_date: newPayForm.payment_date,
-      competence_month: monthStart,
+      competence_month: cycleStart,
       description: newPayForm.description || TYPE_LABEL[newPayForm.payment_type],
       notes: newPayForm.notes || null,
       payment_proof_url: newPayForm.proof || null,
@@ -393,7 +416,7 @@ export default function AdminSchoolPayroll() {
     const remaining = Math.max(Number(c.total_value) - Number(c.paid_amount || 0), 0);
     const lines = [
       `RELATÓRIO DE FOLHA - ${teacher?.full_name ?? "-"}`,
-      `Competência: ${fmtMonth(c.reference_month)}`,
+      `Competência: ${fmtCycle(c.reference_month, c.cycle_end_date)}`,
       `Unidade: ${unitConfig?.name ?? "-"}`,
       ``,
       `Hora-aula: ${fmtBRL(Number(teacher?.hourly_rate ?? 0))}`,
@@ -478,12 +501,12 @@ export default function AdminSchoolPayroll() {
             <Wallet className="h-6 w-6" /> Folha de Pagamento
           </h1>
           <p className="text-sm text-muted-foreground">
-            Fechamento mensal, adiantamentos, bônus e pagamentos avulsos por professor.
+            Fechamento por ciclo personalizado (ex.: dia 20 ao dia 20), adiantamentos, bônus e pagamentos avulsos por professor.
           </p>
           {unitConfig && (
             <p className="text-xs text-muted-foreground mt-1">
               <Calendar className="h-3 w-3 inline mr-1" />
-              Fechamento automático todo dia <b>{unitConfig.payroll_closing_day}</b> ·
+              Ciclo: <b>dia {unitConfig.payroll_closing_day}</b> ao <b>dia {unitConfig.payroll_closing_day}</b> ·
               {" "}Pagamento dia <b>{unitConfig.payroll_payment_day}</b>
             </p>
           )}
@@ -503,8 +526,36 @@ export default function AdminSchoolPayroll() {
             </div>
           )}
           <div>
-            <Label className="text-xs">Competência</Label>
-            <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+            <Label className="text-xs">Ciclo (fechamento)</Label>
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                onClick={() => setCycleStart(addMonths(cycleStart, -1))}
+                title="Ciclo anterior"
+              >
+                ‹
+              </Button>
+              <Input
+                type="date"
+                value={cycleStart}
+                onChange={(e) => e.target.value && setCycleStart(e.target.value)}
+                className="w-[150px]"
+              />
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                onClick={() => setCycleStart(addMonths(cycleStart, 1))}
+                title="Próximo ciclo"
+              >
+                ›
+              </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Competência: <b>{fmtCycle(cycleStart, cycleEnd)}</b>
+            </p>
           </div>
           <Button variant="outline" onClick={load}><RefreshCcw className="h-4 w-4" /></Button>
           <Button variant="outline" onClick={openConfig} title="Configurar fechamento">
@@ -537,7 +588,7 @@ export default function AdminSchoolPayroll() {
 
       <Tabs defaultValue="closures">
         <TabsList>
-          <TabsTrigger value="closures">Fechamento mensal</TabsTrigger>
+          <TabsTrigger value="closures">Fechamento do ciclo</TabsTrigger>
           <TabsTrigger value="history">Histórico de pagamentos</TabsTrigger>
         </TabsList>
 
@@ -829,8 +880,8 @@ export default function AdminSchoolPayroll() {
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Todo dia configurado de fechamento, o sistema soma automaticamente as aulas
-              validadas do mês e gera o fechamento de cada professor.
+              Todo dia configurado de fechamento, o sistema encerra o ciclo (do último fechamento até hoje) e gera automaticamente
+              a folha de cada professor com as aulas validadas no período.
             </p>
             <div className="grid grid-cols-2 gap-3">
               <div>
