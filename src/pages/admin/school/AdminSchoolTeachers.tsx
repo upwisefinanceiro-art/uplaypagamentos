@@ -362,43 +362,14 @@ export default function AdminSchoolTeachers() {
     sendingRef.current = t.id;
     setSendingId(t.id);
     try {
-      // Sempre garante que o acesso esteja sincronizado (email + senha padrão)
-      const { data: accessRes, error: accessErr } = await supabase.functions.invoke(
-        "create-teacher-user",
-        {
-          body: {
-            teacher_id: t.id,
-            email: t.email,
-            full_name: t.full_name,
-            phone: t.phone,
-            password: DEFAULT_PASSWORD,
-          },
-        },
-      );
-      const accessData = accessRes as TeacherAccessResponse | null;
-      const errMsg = accessData?.error || accessErr?.message;
-      if (errMsg) {
-        setAccessStatus((prev) => ({ ...prev, [t.id]: errMsg.toLowerCase().includes("auth") ? "AUTH_INVALID" : "SYNC_ERROR" }));
-        toast({ title: "Falha ao criar acesso", description: errMsg, variant: "destructive" });
-        return;
-      }
-      setAccessStatus((prev) => ({
-        ...prev,
-        [t.id]: accessData?.login_valid ? "LOGIN_FUNCTIONAL" : "ACCESS_SYNCED",
-      }));
-      console.info("[teacher-access] acesso sincronizado", {
-        teacherId: t.id,
-        authId: accessData?.auth_id ?? accessData?.user_id,
-        profileId: accessData?.profile_id,
-        email: accessData?.email ?? t.email,
-        status: accessData?.status,
-        reason: accessData?.reason,
-        rebuilt: accessData?.rebuilt,
-        syncedAt: accessData?.synced_at,
-      });
+      const accessData = await syncTeacherAccess(t);
+      if (!accessData) return;
+
       toast({
-        title: accessData?.status_label ?? (t.profile_id ? "Acesso atualizado" : "Acesso criado"),
-        description: "Login validado com senha padrão 12345678.",
+        title: accessData.status_label ?? (accessData.login_valid ? "Login funcional ✓" : "Acesso sincronizado"),
+        description: accessData.login_valid
+          ? "Login validado automaticamente. Abrindo WhatsApp..."
+          : "Dados sincronizados. Abrindo WhatsApp...",
       });
 
       const message = buildAppAccessMessage({
@@ -415,8 +386,6 @@ export default function AdminSchoolTeachers() {
             teacherId: t.id,
             phoneRaw: phone.raw,
             phoneUsed: phone.international,
-            urlBase: `https://wa.me/${phone.international}`,
-            hasTextParam: true,
             messageLength: whatsapp.cleanMessage.length,
             encodedLength: whatsapp.encodedLength,
           });
@@ -424,11 +393,7 @@ export default function AdminSchoolTeachers() {
           opened?.focus();
           if (opened) opened.opener = null;
         } catch (encodeError) {
-          console.error("[teacher-whatsapp] falha ao montar URL/encode", {
-            teacherId: t.id,
-            phoneUsed: phone.international,
-            error: encodeError,
-          });
+          console.error("[teacher-whatsapp] falha ao montar URL/encode", { teacherId: t.id, error: encodeError });
           await navigator.clipboard?.writeText(message);
           toast({
             title: "Erro ao abrir WhatsApp",
@@ -437,11 +402,7 @@ export default function AdminSchoolTeachers() {
           });
         }
       } else {
-        console.warn("[teacher-whatsapp] telefone inválido ou ausente", {
-          teacherId: t.id,
-          phoneRaw: phone.raw,
-          digits: phone.digits,
-        });
+        console.warn("[teacher-whatsapp] telefone inválido ou ausente", { teacherId: t.id, phoneRaw: phone.raw });
         await navigator.clipboard?.writeText(message);
         toast({
           title: "Telefone inválido ou não cadastrado",
