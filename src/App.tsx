@@ -110,6 +110,9 @@ const App = () => {
                 <Route path="planos-saas" element={<AdminSaasPlans />} />
                 <Route path="backup" element={<AdminBackup />} />
                 <Route path="auditoria-asaas" element={<AdminAuditoriaAsaas />} />
+                <Route path="escola/professores" element={<AdminSchoolTeachers />} />
+                <Route path="escola/turmas" element={<AdminSchoolClasses />} />
+                <Route path="escola/calendario" element={<AdminSchoolCalendar />} />
                 <Route path="alterar-senha" element={<AppChangePassword />} />
               </Route>
 
