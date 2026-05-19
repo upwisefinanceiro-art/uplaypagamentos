@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Wallet, CheckCircle2, Clock } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Wallet, CheckCircle2, Clock, Building2 } from "lucide-react";
 
 interface Closure {
   id: string;
@@ -18,6 +19,8 @@ interface Closure {
   due_date: string | null;
   scheduled_payment_date: string | null;
   notes: string | null;
+  teacher_id: string;
+  unit_id: string;
 }
 interface PaymentRow {
   id: string;
@@ -27,6 +30,12 @@ interface PaymentRow {
   description: string | null;
   status: string;
   closure_id: string | null;
+  teacher_id: string;
+}
+interface TeacherRow {
+  id: string;
+  unit_id: string;
+  unit_name: string;
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -59,6 +68,8 @@ function fmtMonth(d: string) {
 
 export default function TeacherPayroll() {
   const { user } = useAuth();
+  const [teachers, setTeachers] = useState<TeacherRow[]>([]);
+  const [unitFilter, setUnitFilter] = useState<string>("ALL");
   const [closures, setClosures] = useState<Closure[]>([]);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,25 +77,31 @@ export default function TeacherPayroll() {
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const { data: teacher } = await supabase
+      const { data: teacherRows } = await supabase
         .from("school_teachers")
-        .select("id")
-        .eq("profile_id", user.id)
-        .maybeSingle();
-      if (!teacher) {
+        .select("id,unit_id,units(name)")
+        .eq("profile_id", user.id);
+      const list: TeacherRow[] = (teacherRows ?? []).map((t: any) => ({
+        id: t.id,
+        unit_id: t.unit_id,
+        unit_name: t.units?.name ?? "Unidade",
+      }));
+      setTeachers(list);
+      if (list.length === 0) {
         setLoading(false);
         return;
       }
+      const ids = list.map((t) => t.id);
       const [cRes, pRes] = await Promise.all([
         supabase
           .from("school_payroll_closures")
           .select("*")
-          .eq("teacher_id", teacher.id)
+          .in("teacher_id", ids)
           .order("reference_month", { ascending: false }),
         supabase
           .from("school_teacher_payments")
-          .select("id,payment_type,amount,payment_date,description,status,closure_id")
-          .eq("teacher_id", teacher.id)
+          .select("id,payment_type,amount,payment_date,description,status,closure_id,teacher_id")
+          .in("teacher_id", ids)
           .order("payment_date", { ascending: false }),
       ]);
       setClosures((cRes.data ?? []) as Closure[]);
@@ -93,17 +110,49 @@ export default function TeacherPayroll() {
     })();
   }, [user?.id]);
 
-  const totalPending = closures.reduce((s, c) => {
+  const teacherUnitById = useMemo(
+    () => Object.fromEntries(teachers.map((t) => [t.id, t])),
+    [teachers]
+  );
+
+  const scopedClosures = useMemo(() => {
+    if (unitFilter === "ALL") return closures;
+    return closures.filter((c) => c.unit_id === unitFilter);
+  }, [closures, unitFilter]);
+
+  const scopedPayments = useMemo(() => {
+    if (unitFilter === "ALL") return payments;
+    const ids = teachers.filter((t) => t.unit_id === unitFilter).map((t) => t.id);
+    return payments.filter((p) => ids.includes(p.teacher_id));
+  }, [payments, unitFilter, teachers]);
+
+  const totalPending = scopedClosures.reduce((s, c) => {
     if (c.status === "CANCELED") return s;
     return s + Math.max(Number(c.total_value) - Number(c.paid_amount || 0), 0);
   }, 0);
-  const totalPaid = payments.filter((p) => p.status === "PAGO").reduce((s, p) => s + Number(p.amount), 0);
+  const totalPaid = scopedPayments.filter((p) => p.status === "PAGO").reduce((s, p) => s + Number(p.amount), 0);
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold">Meus Pagamentos</h1>
-        <p className="text-sm text-muted-foreground">Folha mensal, adiantamentos e pagamentos avulsos.</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Meus Pagamentos</h1>
+          <p className="text-sm text-muted-foreground">Folha mensal, adiantamentos e pagamentos avulsos.</p>
+        </div>
+        {teachers.length > 1 && (
+          <div className="flex items-center gap-2">
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+            <Select value={unitFilter} onValueChange={setUnitFilter}>
+              <SelectTrigger className="w-[220px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Todas as unidades ({teachers.length})</SelectItem>
+                {teachers.map((t) => (
+                  <SelectItem key={t.unit_id} value={t.unit_id}>{t.unit_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -131,21 +180,30 @@ export default function TeacherPayroll() {
 
         <TabsContent value="closures" className="space-y-2">
           {loading && <p className="text-sm text-muted-foreground">Carregando...</p>}
-          {!loading && closures.length === 0 && (
+          {!loading && scopedClosures.length === 0 && (
             <Card className="p-6 text-center text-sm text-muted-foreground">
               <Wallet className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
               Nenhum fechamento ainda.
             </Card>
           )}
-          {closures.map((c) => {
+          {scopedClosures.map((c) => {
             const paid = Number(c.paid_amount || 0);
             const total = Number(c.total_value);
             const remaining = Math.max(total - paid, 0);
+            const unitName = teacherUnitById[c.teacher_id]?.unit_name;
             return (
               <Card key={c.id} className="p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="font-semibold capitalize">{fmtMonth(c.reference_month)}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold capitalize">{fmtMonth(c.reference_month)}</p>
+                      {teachers.length > 1 && unitName && (
+                        <Badge variant="outline" className="gap-1">
+                          <Building2 className="h-3 w-3" />
+                          {unitName}
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground">
                       {c.lessons_count} aulas · {Number(c.total_hours).toFixed(2)}h
                     </p>
@@ -183,24 +241,35 @@ export default function TeacherPayroll() {
         </TabsContent>
 
         <TabsContent value="history" className="space-y-2">
-          {payments.length === 0 && (
+          {scopedPayments.length === 0 && (
             <Card className="p-6 text-center text-sm text-muted-foreground">Nenhum pagamento registrado.</Card>
           )}
-          {payments.map((p) => (
-            <Card key={p.id} className="p-3 flex items-center justify-between">
-              <div>
-                <p className="font-medium text-sm">{TYPE_LABEL[p.payment_type] ?? p.payment_type}</p>
-                <p className="text-xs text-muted-foreground">{p.description ?? "—"}</p>
-                <p className="text-[11px] text-muted-foreground">{fmtDate(p.payment_date)}</p>
-              </div>
-              <div className="text-right">
-                <p className="font-bold">{fmtBRL(Number(p.amount))}</p>
-                <Badge variant="outline" className={p.status === "PAGO" ? "bg-emerald-500/10 text-emerald-700" : "bg-muted"}>
-                  {p.status}
-                </Badge>
-              </div>
-            </Card>
-          ))}
+          {scopedPayments.map((p) => {
+            const unitName = teacherUnitById[p.teacher_id]?.unit_name;
+            return (
+              <Card key={p.id} className="p-3 flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-medium text-sm">{TYPE_LABEL[p.payment_type] ?? p.payment_type}</p>
+                    {teachers.length > 1 && unitName && (
+                      <Badge variant="outline" className="gap-1 text-[10px]">
+                        <Building2 className="h-3 w-3" />
+                        {unitName}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">{p.description ?? "—"}</p>
+                  <p className="text-[11px] text-muted-foreground">{fmtDate(p.payment_date)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold">{fmtBRL(Number(p.amount))}</p>
+                  <Badge variant="outline" className={p.status === "PAGO" ? "bg-emerald-500/10 text-emerald-700" : "bg-muted"}>
+                    {p.status}
+                  </Badge>
+                </div>
+              </Card>
+            );
+          })}
         </TabsContent>
       </Tabs>
     </div>

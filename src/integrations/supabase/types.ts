@@ -2311,6 +2311,7 @@ export type Database = {
       get_company_secrets: { Args: { _company_id: string }; Returns: Json }
       get_email_by_cpf: { Args: { _cpf: string }; Returns: string }
       get_teacher_id_for: { Args: { _user_id: string }; Returns: string }
+      get_teacher_ids_for: { Args: { _user_id: string }; Returns: string[] }
       get_unit_secrets: { Args: { _unit_id: string }; Returns: Json }
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
       get_user_unit_id: { Args: { _user_id: string }; Returns: string }
@@ -2319,6 +2320,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      is_teacher_of: {
+        Args: { _teacher_id: string; _user_id: string }
         Returns: boolean
       }
       mark_school_payroll_paid: {
