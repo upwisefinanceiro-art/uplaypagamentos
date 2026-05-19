@@ -458,7 +458,46 @@ export default function AdminSchoolTeachers() {
               <Switch checked={form.active} onCheckedChange={(v) => setForm({ ...form, active: v })} />
               <Label>Ativo</Label>
             </div>
+
+            <div className="md:col-span-2 mt-2 rounded-lg border border-border bg-muted/30 p-3 space-y-3">
+              <div className="flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-primary" />
+                <p className="text-sm font-medium">Acesso ao aplicativo Upplay</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={form.create_access}
+                  onCheckedChange={(v) => setForm({ ...form, create_access: v })}
+                  disabled={!!editing?.profile_id}
+                />
+                <Label className="text-sm">
+                  {editing?.profile_id
+                    ? "Acesso já criado — atualize a senha abaixo se quiser redefinir"
+                    : "Criar acesso automático após salvar"}
+                </Label>
+              </div>
+              {(form.create_access || editing?.profile_id) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <Label>Senha inicial</Label>
+                    <Input
+                      type="text"
+                      value={form.initial_password}
+                      onChange={(e) => setForm({ ...form, initial_password: e.target.value })}
+                      placeholder={DEFAULT_PASSWORD}
+                    />
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Padrão: <strong>{DEFAULT_PASSWORD}</strong>. O professor será obrigado a trocar no primeiro acesso.
+                    </p>
+                  </div>
+                  <div className="flex items-end text-xs text-muted-foreground">
+                    Login do professor: <span className="font-mono ml-1">{form.email || "informe o e-mail"}</span>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               Cancelar
