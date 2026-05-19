@@ -28,7 +28,8 @@ interface Closure {
   teacher_id: string;
   unit_id: string;
   company_id: string;
-  reference_month: string;
+  reference_month: string; // início do ciclo
+  cycle_end_date: string | null; // fim do ciclo (exclusivo)
   lessons_count: number;
   total_hours: number;
   total_value: number;
