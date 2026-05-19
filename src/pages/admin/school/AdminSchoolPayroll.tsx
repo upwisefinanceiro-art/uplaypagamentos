@@ -278,7 +278,7 @@ export default function AdminSchoolPayroll() {
       amount,
       payment_date: payForm.payment_date,
       competence_month: payOpen.reference_month,
-      description: `Pagamento folha ${fmtCycle(payOpen.reference_month)}`,
+      description: `Pagamento folha ${fmtCycle(payOpen.reference_month, payOpen.cycle_end_date)}`,
       notes: payForm.notes || null,
       payment_proof_url: payForm.proof || null,
       status: "PAGO",
