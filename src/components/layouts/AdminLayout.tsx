@@ -52,6 +52,8 @@ const schoolMenuItems = [
   { path: "/admin/escola/calendario", icon: CalendarDays, label: "Calendário Escolar", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
   { path: "/admin/escola/professores", icon: Users2, label: "Professores", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
   { path: "/admin/escola/turmas", icon: GraduationCap, label: "Turmas", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
+  { path: "/admin/escola/validacao", icon: ShieldCheck, label: "Validação de Aulas", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
+  { path: "/admin/escola/folha", icon: Banknote, label: "Folha Escolar", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
 ];
 
 const AdminLayout = () => {

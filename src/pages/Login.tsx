@@ -36,7 +36,8 @@ const Login = () => {
     if (roles.length > 0) {
       const isSuperAdmin = roles.includes("SUPER_ADMIN");
       const isAdmin = roles.includes("ADMIN_MASTER") || roles.includes("ADMIN_UNIDADE");
-      const target = isSuperAdmin ? "/super" : isAdmin ? "/admin" : "/app";
+      const isTeacher = roles.includes("PROFESSOR") && !isAdmin && !isSuperAdmin;
+      const target = isSuperAdmin ? "/super" : isAdmin ? "/admin" : isTeacher ? "/professor" : "/app";
       console.info("[auth] Login redirect", { roles, target });
       navigate(target, { replace: true });
     } else {

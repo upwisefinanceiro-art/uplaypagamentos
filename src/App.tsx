@@ -39,6 +39,11 @@ import AdminAuditoriaAsaas from "./pages/admin/AdminAuditoriaAsaas";
 import AdminSchoolTeachers from "./pages/admin/school/AdminSchoolTeachers";
 import AdminSchoolClasses from "./pages/admin/school/AdminSchoolClasses";
 import AdminSchoolCalendar from "./pages/admin/school/AdminSchoolCalendar";
+import AdminSchoolValidation from "./pages/admin/school/AdminSchoolValidation";
+import AdminSchoolPayroll from "./pages/admin/school/AdminSchoolPayroll";
+import TeacherLayout from "./components/layouts/TeacherLayout";
+import TeacherLessons from "./pages/teacher/TeacherLessons";
+import TeacherPayroll from "./pages/teacher/TeacherPayroll";
 import SuperAdminLayout from "./components/layouts/SuperAdminLayout";
 import SuperDashboard from "./pages/super/SuperDashboard";
 import SuperCompanies from "./pages/super/SuperCompanies";
@@ -113,7 +118,19 @@ const App = () => {
                 <Route path="escola/professores" element={<AdminSchoolTeachers />} />
                 <Route path="escola/turmas" element={<AdminSchoolClasses />} />
                 <Route path="escola/calendario" element={<AdminSchoolCalendar />} />
+                <Route path="escola/validacao" element={<AdminSchoolValidation />} />
+                <Route path="escola/folha" element={<AdminSchoolPayroll />} />
                 <Route path="alterar-senha" element={<AppChangePassword />} />
+              </Route>
+
+              {/* Área do Professor */}
+              <Route path="/professor" element={
+                <ProtectedRoute requiredRoles={["PROFESSOR", "ADMIN_MASTER", "ADMIN_UNIDADE", "SUPER_ADMIN"]}>
+                  <TeacherLayout />
+                </ProtectedRoute>
+              }>
+                <Route index element={<TeacherLessons />} />
+                <Route path="folha" element={<TeacherPayroll />} />
               </Route>
 
               {/* Painel Super Admin */}
