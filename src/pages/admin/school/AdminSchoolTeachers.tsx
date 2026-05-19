@@ -221,37 +221,61 @@ export default function AdminSchoolTeachers() {
     fetchTeachers();
   };
 
-  const sendAccess = (t: Teacher) => {
+  const sendAccess = async (t: Teacher) => {
     if (!t.email) {
-      toast({ title: "Cadastre um e-mail para o professor", variant: "destructive" });
-      return;
-    }
-    if (!t.profile_id) {
       toast({
-        title: "Acesso ainda não criado",
-        description: "Edite o professor e marque 'Criar acesso ao app'.",
+        title: "Cadastre um e-mail para o professor",
+        description: "É necessário um e-mail para gerar o acesso ao app.",
         variant: "destructive",
       });
       return;
     }
-    const message =
-      `Olá, ${t.full_name}.\n\n` +
-      `Seu acesso ao aplicativo Upplay foi liberado.\n\n` +
-      `Login: ${t.email}\n` +
-      `Senha inicial: ${DEFAULT_PASSWORD}\n\n` +
-      `Baixe o aplicativo e acompanhe:\n` +
-      `• Calendário de aulas\n• Horários\n• Agenda\n• Pagamentos\n• Aulas confirmadas\n\n` +
-      `Após o primeiro acesso, recomendamos alterar sua senha.`;
-    const phone = (t.phone ?? "").replace(/\D/g, "");
-    if (phone) {
-      const intl = phone.length <= 11 ? `55${phone}` : phone;
-      window.open(`https://wa.me/${intl}?text=${encodeURIComponent(message)}`, "_blank");
-    } else {
-      navigator.clipboard?.writeText(message);
-      toast({
-        title: "Telefone não cadastrado",
-        description: "Mensagem de acesso copiada para a área de transferência.",
-      });
+    setSendingId(t.id);
+    try {
+      // Cria/garante acesso automaticamente
+      if (!t.profile_id) {
+        const { data: accessRes, error: accessErr } = await supabase.functions.invoke(
+          "create-teacher-user",
+          {
+            body: {
+              teacher_id: t.id,
+              email: t.email,
+              full_name: t.full_name,
+              phone: t.phone,
+              password: DEFAULT_PASSWORD,
+            },
+          },
+        );
+        const errMsg = (accessRes as { error?: string })?.error || accessErr?.message;
+        if (errMsg) {
+          toast({ title: "Falha ao criar acesso", description: errMsg, variant: "destructive" });
+          return;
+        }
+        toast({ title: "Acesso criado", description: "Login gerado com senha padrão 12345678." });
+      }
+
+      const message =
+        `Olá, ${t.full_name}.\n\n` +
+        `Seu acesso ao aplicativo Upplay foi liberado.\n\n` +
+        `Login: ${t.email}\n` +
+        `Senha inicial: ${DEFAULT_PASSWORD}\n\n` +
+        `No aplicativo você poderá visualizar:\n` +
+        `• Calendário\n• Aulas\n• Horários\n• Pagamentos\n• Agenda\n\n` +
+        `Após o primeiro acesso, recomendamos alterar sua senha.`;
+      const phone = (t.phone ?? "").replace(/\D/g, "");
+      if (phone) {
+        const intl = phone.length <= 11 ? `55${phone}` : phone;
+        window.open(`https://wa.me/${intl}?text=${encodeURIComponent(message)}`, "_blank");
+      } else {
+        await navigator.clipboard?.writeText(message);
+        toast({
+          title: "Telefone não cadastrado",
+          description: "Mensagem de acesso copiada para a área de transferência.",
+        });
+      }
+      fetchTeachers();
+    } finally {
+      setSendingId(null);
     }
   };
 
