@@ -480,6 +480,13 @@ export default function AdminSchoolPayroll() {
           <p className="text-sm text-muted-foreground">
             Fechamento mensal, adiantamentos, bônus e pagamentos avulsos por professor.
           </p>
+          {unitConfig && (
+            <p className="text-xs text-muted-foreground mt-1">
+              <Calendar className="h-3 w-3 inline mr-1" />
+              Fechamento automático todo dia <b>{unitConfig.payroll_closing_day}</b> ·
+              {" "}Pagamento dia <b>{unitConfig.payroll_payment_day}</b>
+            </p>
+          )}
         </div>
         <div className="flex items-end gap-2 flex-wrap">
           {units.length > 1 && (
@@ -500,6 +507,9 @@ export default function AdminSchoolPayroll() {
             <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
           </div>
           <Button variant="outline" onClick={load}><RefreshCcw className="h-4 w-4" /></Button>
+          <Button variant="outline" onClick={openConfig} title="Configurar fechamento">
+            <Settings className="h-4 w-4" />
+          </Button>
           <Button onClick={() => openNewPayment()}>
             <Plus className="h-4 w-4 mr-1" /> Novo pagamento
           </Button>
