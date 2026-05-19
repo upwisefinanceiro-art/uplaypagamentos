@@ -33,6 +33,22 @@ interface Teacher {
   must_change_password?: boolean | null;
 }
 
+type TeacherAccessStatus = "ACCESS_SYNCED" | "WAITING_FIRST_LOGIN" | "SYNC_ERROR" | "AUTH_INVALID" | "LOGIN_FUNCTIONAL";
+
+type TeacherAccessResponse = {
+  error?: string;
+  user_id?: string;
+  auth_id?: string;
+  profile_id?: string;
+  email?: string;
+  status?: string;
+  status_label?: string;
+  login_valid?: boolean;
+  rebuilt?: boolean;
+  reason?: string;
+  synced_at?: string;
+};
+
 const DEFAULT_PASSWORD = "12345678";
 const WHATSAPP_TAB_TARGET = "uplay_teacher_app_whatsapp";
 
@@ -88,6 +104,7 @@ export default function AdminSchoolTeachers() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [accessStatus, setAccessStatus] = useState<Record<string, TeacherAccessStatus>>({});
   const sendingRef = useRef<string | null>(null);
 
   const fetchTeachers = async () => {
@@ -280,14 +297,30 @@ export default function AdminSchoolTeachers() {
           },
         },
       );
-      const errMsg = (accessRes as { error?: string })?.error || accessErr?.message;
+      const accessData = accessRes as TeacherAccessResponse | null;
+      const errMsg = accessData?.error || accessErr?.message;
       if (errMsg) {
+        setAccessStatus((prev) => ({ ...prev, [t.id]: errMsg.toLowerCase().includes("auth") ? "AUTH_INVALID" : "SYNC_ERROR" }));
         toast({ title: "Falha ao criar acesso", description: errMsg, variant: "destructive" });
         return;
       }
+      setAccessStatus((prev) => ({
+        ...prev,
+        [t.id]: accessData?.login_valid ? "LOGIN_FUNCTIONAL" : "ACCESS_SYNCED",
+      }));
+      console.info("[teacher-access] acesso sincronizado", {
+        teacherId: t.id,
+        authId: accessData?.auth_id ?? accessData?.user_id,
+        profileId: accessData?.profile_id,
+        email: accessData?.email ?? t.email,
+        status: accessData?.status,
+        reason: accessData?.reason,
+        rebuilt: accessData?.rebuilt,
+        syncedAt: accessData?.synced_at,
+      });
       toast({
-        title: t.profile_id ? "Acesso atualizado" : "Acesso criado",
-        description: "Login sincronizado com senha padrão 12345678.",
+        title: accessData?.status_label ?? (t.profile_id ? "Acesso atualizado" : "Acesso criado"),
+        description: "Login validado com senha padrão 12345678.",
       });
 
       const message = buildAppAccessMessage({
@@ -443,7 +476,19 @@ export default function AdminSchoolTeachers() {
                   <TableCell>
                     <div className="flex flex-col gap-1">
                       {t.active ? <Badge>Ativo</Badge> : <Badge variant="secondary">Inativo</Badge>}
-                      {!t.profile_id ? (
+                      {accessStatus[t.id] === "LOGIN_FUNCTIONAL" ? (
+                        <Badge variant="outline" className="gap-1 text-success border-success/40">
+                          <ShieldCheck className="w-3 h-3" /> Login funcional
+                        </Badge>
+                      ) : accessStatus[t.id] === "ACCESS_SYNCED" ? (
+                        <Badge variant="outline" className="gap-1 text-success border-success/40">
+                          <ShieldCheck className="w-3 h-3" /> Acesso sincronizado
+                        </Badge>
+                      ) : accessStatus[t.id] === "SYNC_ERROR" ? (
+                        <Badge variant="outline" className="text-destructive border-destructive/40">Erro de sincronização</Badge>
+                      ) : accessStatus[t.id] === "AUTH_INVALID" ? (
+                        <Badge variant="outline" className="text-destructive border-destructive/40">Auth inválido</Badge>
+                      ) : !t.profile_id ? (
                         <Badge variant="outline" className="text-muted-foreground">Acesso não enviado</Badge>
                       ) : t.must_change_password ? (
                         <Badge variant="outline" className="gap-1 text-warning border-warning/40">
