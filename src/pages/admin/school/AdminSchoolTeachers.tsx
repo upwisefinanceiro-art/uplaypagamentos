@@ -731,6 +731,77 @@ export default function AdminSchoolTeachers() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!logsOpenId} onOpenChange={(open) => !open && setLogsOpenId(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              Logs de acesso — {teachers.find((t) => t.id === logsOpenId)?.full_name ?? ""}
+            </DialogTitle>
+          </DialogHeader>
+          {(() => {
+            const t = teachers.find((x) => x.id === logsOpenId);
+            if (!t) return null;
+            const logs = accessLogs[t.id] ?? [];
+            return (
+              <div className="space-y-3">
+                <div className="rounded-md border p-3 text-sm space-y-1 bg-muted/30">
+                  <div><strong>E-mail:</strong> {t.email ?? "—"}</div>
+                  <div><strong>profile_id:</strong> <span className="font-mono text-xs">{t.profile_id ?? "—"}</span></div>
+                  <div><strong>Status atual:</strong>{" "}
+                    {accessStatus[t.id] === "LOGIN_FUNCTIONAL" ? "Login funcional ✓"
+                      : accessStatus[t.id] === "ACCESS_SYNCED" ? "Acesso sincronizado"
+                      : accessStatus[t.id] === "SYNC_ERROR" ? "Erro de sincronização"
+                      : accessStatus[t.id] === "AUTH_INVALID" ? "Auth inválido"
+                      : !t.profile_id ? "Acesso ainda não enviado"
+                      : t.must_change_password ? "Aguardando primeiro login" : "Ativo no app"}
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button size="sm" variant="outline" onClick={() => validateAccess(t)} disabled={validatingId === t.id}>
+                    {validatingId === t.id ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
+                    Validar agora
+                  </Button>
+                </div>
+                <div className="max-h-[320px] overflow-auto space-y-2">
+                  {logs.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-6">
+                      Nenhum log nesta sessão. Clique em "Validar agora" para testar o acesso.
+                    </p>
+                  ) : (
+                    logs.map((log, i) => (
+                      <div key={i} className="rounded-md border p-2 text-xs space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Badge
+                            variant="outline"
+                            className={
+                              log.status === "LOGIN_FUNCTIONAL" || log.status === "ACCESS_SYNCED"
+                                ? "text-success border-success/40"
+                                : "text-destructive border-destructive/40"
+                            }
+                          >
+                            {log.status}
+                          </Badge>
+                          <span className="text-muted-foreground">{new Date(log.at).toLocaleString("pt-BR")}</span>
+                        </div>
+                        <div>{log.message}</div>
+                        {log.data && (
+                          <div className="text-muted-foreground font-mono">
+                            auth_id: {log.data.auth_id ?? "—"} · reason: {log.data.reason ?? "—"} · login_valid: {String(log.data.login_valid ?? false)}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLogsOpenId(null)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
