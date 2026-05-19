@@ -104,8 +104,86 @@ export default function AdminSchoolTeachers() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [validatingId, setValidatingId] = useState<string | null>(null);
   const [accessStatus, setAccessStatus] = useState<Record<string, TeacherAccessStatus>>({});
+  const [accessLogs, setAccessLogs] = useState<Record<string, { at: string; status: TeacherAccessStatus; message: string; data?: TeacherAccessResponse }[]>>({});
+  const [logsOpenId, setLogsOpenId] = useState<string | null>(null);
   const sendingRef = useRef<string | null>(null);
+
+  const appendLog = (teacherId: string, status: TeacherAccessStatus, message: string, data?: TeacherAccessResponse) => {
+    setAccessLogs((prev) => {
+      const list = prev[teacherId] ?? [];
+      return { ...prev, [teacherId]: [{ at: new Date().toISOString(), status, message, data }, ...list].slice(0, 20) };
+    });
+  };
+
+  const syncTeacherAccess = async (t: Teacher): Promise<TeacherAccessResponse | null> => {
+    const { data: accessRes, error: accessErr } = await supabase.functions.invoke(
+      "create-teacher-user",
+      {
+        body: {
+          teacher_id: t.id,
+          email: t.email,
+          full_name: t.full_name,
+          phone: t.phone,
+          password: DEFAULT_PASSWORD,
+        },
+      },
+    );
+    const accessData = accessRes as TeacherAccessResponse | null;
+    const errMsg = accessData?.error || accessErr?.message;
+    if (errMsg) {
+      const status: TeacherAccessStatus = errMsg.toLowerCase().includes("auth") ? "AUTH_INVALID" : "SYNC_ERROR";
+      setAccessStatus((prev) => ({ ...prev, [t.id]: status }));
+      appendLog(t.id, status, errMsg, accessData ?? undefined);
+      toast({ title: "Falha ao validar acesso", description: errMsg, variant: "destructive" });
+      return null;
+    }
+    const status: TeacherAccessStatus = accessData?.login_valid ? "LOGIN_FUNCTIONAL" : "ACCESS_SYNCED";
+    setAccessStatus((prev) => ({ ...prev, [t.id]: status }));
+    appendLog(
+      t.id,
+      status,
+      accessData?.login_valid
+        ? "Login validado automaticamente com senha padrão."
+        : "Acesso sincronizado (login não validado).",
+      accessData ?? undefined,
+    );
+    console.info("[teacher-access] acesso sincronizado", {
+      teacherId: t.id,
+      authId: accessData?.auth_id ?? accessData?.user_id,
+      profileId: accessData?.profile_id,
+      email: accessData?.email ?? t.email,
+      status: accessData?.status,
+      reason: accessData?.reason,
+      rebuilt: accessData?.rebuilt,
+      loginValid: accessData?.login_valid,
+      syncedAt: accessData?.synced_at,
+    });
+    return accessData;
+  };
+
+  const validateAccess = async (t: Teacher) => {
+    if (!t.email) {
+      toast({ title: "Cadastre um e-mail para o professor", variant: "destructive" });
+      return;
+    }
+    setValidatingId(t.id);
+    try {
+      const data = await syncTeacherAccess(t);
+      if (data) {
+        toast({
+          title: data.login_valid ? "Login funcional ✓" : "Acesso sincronizado",
+          description: data.login_valid
+            ? "Validado automaticamente com a senha padrão 12345678."
+            : "Dados sincronizados, login ainda não confirmado.",
+        });
+        fetchTeachers();
+      }
+    } finally {
+      setValidatingId(null);
+    }
+  };
 
   const fetchTeachers = async () => {
     setLoading(true);
