@@ -61,6 +61,7 @@ export default function AdminSchoolTeachers() {
   const [editing, setEditing] = useState<Teacher | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [sendingId, setSendingId] = useState<string | null>(null);
 
   const fetchTeachers = async () => {
     setLoading(true);
@@ -71,9 +72,22 @@ export default function AdminSchoolTeachers() {
     if (error) {
       toast({ title: "Erro ao carregar professores", description: error.message, variant: "destructive" });
       setTeachers([]);
-    } else {
-      setTeachers((data ?? []) as Teacher[]);
+      setLoading(false);
+      return;
     }
+    const rows = (data ?? []) as Teacher[];
+    const profileIds = rows.map((r) => r.profile_id).filter(Boolean) as string[];
+    if (profileIds.length) {
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id, must_change_password")
+        .in("id", profileIds);
+      const map = new Map((profs ?? []).map((p: any) => [p.id, p.must_change_password]));
+      rows.forEach((r) => {
+        if (r.profile_id) r.must_change_password = map.get(r.profile_id) ?? null;
+      });
+    }
+    setTeachers(rows);
     setLoading(false);
   };
 
