@@ -558,8 +558,6 @@ export default function AdminSchoolPayroll() {
                 const remaining = Math.max(closureValue - paid, 0);
                 const diverged = c && closureValue.toFixed(2) !== a.value.toFixed(2);
                 const advances = advancesByTeacher[t.id] || 0;
-                const previewBruto = c ? closureValue : a.value;
-                const previewFinal = Math.max(previewBruto - advances - (c ? Number(c.paid_amount || 0) - advances : 0), 0);
 
                 return (
                   <div key={t.id} className="p-4 flex flex-col md:flex-row md:items-center gap-3">
