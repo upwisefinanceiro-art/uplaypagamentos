@@ -1468,6 +1468,8 @@ export type Database = {
           created_at: string
           cycle_end_date: string | null
           due_date: string | null
+          finance_entry_id: string | null
+          finance_posted_at: string | null
           generated_at: string
           generated_by: string | null
           id: string
@@ -1490,6 +1492,8 @@ export type Database = {
           created_at?: string
           cycle_end_date?: string | null
           due_date?: string | null
+          finance_entry_id?: string | null
+          finance_posted_at?: string | null
           generated_at?: string
           generated_by?: string | null
           id?: string
@@ -1512,6 +1516,8 @@ export type Database = {
           created_at?: string
           cycle_end_date?: string | null
           due_date?: string | null
+          finance_entry_id?: string | null
+          finance_posted_at?: string | null
           generated_at?: string
           generated_by?: string | null
           id?: string
@@ -1918,6 +1924,7 @@ export type Database = {
           email_acesso: string | null
           email_empresa: string | null
           estado: string | null
+          finance_posting_day: number
           id: string
           name: string
           partnership_plan: string
@@ -1960,6 +1967,7 @@ export type Database = {
           email_acesso?: string | null
           email_empresa?: string | null
           estado?: string | null
+          finance_posting_day?: number
           id?: string
           name: string
           partnership_plan?: string
@@ -2002,6 +2010,7 @@ export type Database = {
           email_acesso?: string | null
           email_empresa?: string | null
           estado?: string | null
+          finance_posting_day?: number
           id?: string
           name?: string
           partnership_plan?: string
@@ -2287,6 +2296,7 @@ export type Database = {
     }
     Functions: {
       auto_generate_payroll_closures: { Args: never; Returns: Json }
+      auto_post_pending_payroll_to_finance: { Args: never; Returns: number }
       find_duplicate_cpf: {
         Args: { _cpf: string; _exclude_id?: string }
         Returns: {
@@ -2316,6 +2326,10 @@ export type Database = {
         Returns: undefined
       }
       payroll_cycle_end: { Args: { _start: string }; Returns: string }
+      post_payroll_closure_to_finance: {
+        Args: { _closure_id: string }
+        Returns: string
+      }
       recalc_school_payroll_closure: {
         Args: { _closure_id: string }
         Returns: undefined
