@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, GraduationCap, KeyRound, Send, ShieldCheck } from "lucide-react";
+import { Plus, Pencil, Trash2, GraduationCap, KeyRound, ShieldCheck, Smartphone, Loader2 } from "lucide-react";
 
 interface Teacher {
   id: string;
@@ -29,6 +29,7 @@ interface Teacher {
   notes: string | null;
   active: boolean;
   profile_id: string | null;
+  must_change_password?: boolean | null;
 }
 
 const DEFAULT_PASSWORD = "12345678";
@@ -60,6 +61,7 @@ export default function AdminSchoolTeachers() {
   const [editing, setEditing] = useState<Teacher | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [sendingId, setSendingId] = useState<string | null>(null);
 
   const fetchTeachers = async () => {
     setLoading(true);
@@ -70,9 +72,22 @@ export default function AdminSchoolTeachers() {
     if (error) {
       toast({ title: "Erro ao carregar professores", description: error.message, variant: "destructive" });
       setTeachers([]);
-    } else {
-      setTeachers((data ?? []) as Teacher[]);
+      setLoading(false);
+      return;
     }
+    const rows = (data ?? []) as Teacher[];
+    const profileIds = rows.map((r) => r.profile_id).filter(Boolean) as string[];
+    if (profileIds.length) {
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id, must_change_password")
+        .in("id", profileIds);
+      const map = new Map((profs ?? []).map((p: any) => [p.id, p.must_change_password]));
+      rows.forEach((r) => {
+        if (r.profile_id) r.must_change_password = map.get(r.profile_id) ?? null;
+      });
+    }
+    setTeachers(rows);
     setLoading(false);
   };
 
@@ -206,37 +221,61 @@ export default function AdminSchoolTeachers() {
     fetchTeachers();
   };
 
-  const sendAccess = (t: Teacher) => {
+  const sendAccess = async (t: Teacher) => {
     if (!t.email) {
-      toast({ title: "Cadastre um e-mail para o professor", variant: "destructive" });
-      return;
-    }
-    if (!t.profile_id) {
       toast({
-        title: "Acesso ainda não criado",
-        description: "Edite o professor e marque 'Criar acesso ao app'.",
+        title: "Cadastre um e-mail para o professor",
+        description: "É necessário um e-mail para gerar o acesso ao app.",
         variant: "destructive",
       });
       return;
     }
-    const message =
-      `Olá, ${t.full_name}.\n\n` +
-      `Seu acesso ao aplicativo Upplay foi liberado.\n\n` +
-      `Login: ${t.email}\n` +
-      `Senha inicial: ${DEFAULT_PASSWORD}\n\n` +
-      `Baixe o aplicativo e acompanhe:\n` +
-      `• Calendário de aulas\n• Horários\n• Agenda\n• Pagamentos\n• Aulas confirmadas\n\n` +
-      `Após o primeiro acesso, recomendamos alterar sua senha.`;
-    const phone = (t.phone ?? "").replace(/\D/g, "");
-    if (phone) {
-      const intl = phone.length <= 11 ? `55${phone}` : phone;
-      window.open(`https://wa.me/${intl}?text=${encodeURIComponent(message)}`, "_blank");
-    } else {
-      navigator.clipboard?.writeText(message);
-      toast({
-        title: "Telefone não cadastrado",
-        description: "Mensagem de acesso copiada para a área de transferência.",
-      });
+    setSendingId(t.id);
+    try {
+      // Cria/garante acesso automaticamente
+      if (!t.profile_id) {
+        const { data: accessRes, error: accessErr } = await supabase.functions.invoke(
+          "create-teacher-user",
+          {
+            body: {
+              teacher_id: t.id,
+              email: t.email,
+              full_name: t.full_name,
+              phone: t.phone,
+              password: DEFAULT_PASSWORD,
+            },
+          },
+        );
+        const errMsg = (accessRes as { error?: string })?.error || accessErr?.message;
+        if (errMsg) {
+          toast({ title: "Falha ao criar acesso", description: errMsg, variant: "destructive" });
+          return;
+        }
+        toast({ title: "Acesso criado", description: "Login gerado com senha padrão 12345678." });
+      }
+
+      const message =
+        `Olá, ${t.full_name}.\n\n` +
+        `Seu acesso ao aplicativo Upplay foi liberado.\n\n` +
+        `Login: ${t.email}\n` +
+        `Senha inicial: ${DEFAULT_PASSWORD}\n\n` +
+        `No aplicativo você poderá visualizar:\n` +
+        `• Calendário\n• Aulas\n• Horários\n• Pagamentos\n• Agenda\n\n` +
+        `Após o primeiro acesso, recomendamos alterar sua senha.`;
+      const phone = (t.phone ?? "").replace(/\D/g, "");
+      if (phone) {
+        const intl = phone.length <= 11 ? `55${phone}` : phone;
+        window.open(`https://wa.me/${intl}?text=${encodeURIComponent(message)}`, "_blank");
+      } else {
+        await navigator.clipboard?.writeText(message);
+        toast({
+          title: "Telefone não cadastrado",
+          description: "Mensagem de acesso copiada para a área de transferência.",
+        });
+      }
+      fetchTeachers();
+    } finally {
+      setSendingId(null);
     }
   };
 
@@ -309,7 +348,7 @@ export default function AdminSchoolTeachers() {
               <TableHead>Disciplinas</TableHead>
               <TableHead>Contato</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="w-[160px]">Ações</TableHead>
+              <TableHead className="w-[240px]">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -339,24 +378,35 @@ export default function AdminSchoolTeachers() {
                   <TableCell>
                     <div className="flex flex-col gap-1">
                       {t.active ? <Badge>Ativo</Badge> : <Badge variant="secondary">Inativo</Badge>}
-                      {t.profile_id ? (
-                        <Badge variant="outline" className="gap-1">
-                          <ShieldCheck className="w-3 h-3" /> App
+                      {!t.profile_id ? (
+                        <Badge variant="outline" className="text-muted-foreground">Acesso não enviado</Badge>
+                      ) : t.must_change_password ? (
+                        <Badge variant="outline" className="gap-1 text-warning border-warning/40">
+                          <Smartphone className="w-3 h-3" /> Aguardando 1º login
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="text-muted-foreground">Sem acesso</Badge>
+                        <Badge variant="outline" className="gap-1 text-success border-success/40">
+                          <ShieldCheck className="w-3 h-3" /> Ativo no app
+                        </Badge>
                       )}
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-1">
+                    <div className="flex gap-1 items-center">
                       <Button
-                        size="icon"
-                        variant="ghost"
-                        title="Enviar acesso ao professor"
+                        size="sm"
+                        variant={t.profile_id ? "outline" : "default"}
+                        className="gap-1.5"
+                        title={t.profile_id ? "Reenviar acesso no WhatsApp" : "Criar acesso e enviar no WhatsApp"}
                         onClick={() => sendAccess(t)}
+                        disabled={sendingId === t.id}
                       >
-                        <Send className="w-4 h-4" />
+                        {sendingId === t.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Smartphone className="w-3.5 h-3.5" />
+                        )}
+                        {t.profile_id ? "Reenviar app" : "Enviar app"}
                       </Button>
                       <Button size="icon" variant="ghost" onClick={() => openEdit(t)}>
                         <Pencil className="w-4 h-4" />
@@ -366,6 +416,7 @@ export default function AdminSchoolTeachers() {
                       </Button>
                     </div>
                   </TableCell>
+
 
                 </TableRow>
               ))
