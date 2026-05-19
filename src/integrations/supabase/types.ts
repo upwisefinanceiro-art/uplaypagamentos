@@ -1396,6 +1396,7 @@ export type Database = {
           hourly_rate_snapshot: number
           id: string
           notes: string | null
+          payroll_closure_id: string | null
           recurrence_id: string | null
           starts_at: string
           status: string
@@ -1420,6 +1421,7 @@ export type Database = {
           hourly_rate_snapshot?: number
           id?: string
           notes?: string | null
+          payroll_closure_id?: string | null
           recurrence_id?: string | null
           starts_at: string
           status?: string
@@ -1444,6 +1446,7 @@ export type Database = {
           hourly_rate_snapshot?: number
           id?: string
           notes?: string | null
+          payroll_closure_id?: string | null
           recurrence_id?: string | null
           starts_at?: string
           status?: string
@@ -1453,6 +1456,63 @@ export type Database = {
           updated_at?: string
           validated_at?: string | null
           validated_by?: string | null
+        }
+        Relationships: []
+      }
+      school_payroll_closures: {
+        Row: {
+          company_id: string
+          created_at: string
+          generated_at: string
+          generated_by: string | null
+          id: string
+          lessons_count: number
+          notes: string | null
+          paid_at: string | null
+          payment_proof_url: string | null
+          reference_month: string
+          status: string
+          teacher_id: string
+          total_hours: number
+          total_value: number
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          generated_at?: string
+          generated_by?: string | null
+          id?: string
+          lessons_count?: number
+          notes?: string | null
+          paid_at?: string | null
+          payment_proof_url?: string | null
+          reference_month: string
+          status?: string
+          teacher_id: string
+          total_hours?: number
+          total_value?: number
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          generated_at?: string
+          generated_by?: string | null
+          id?: string
+          lessons_count?: number
+          notes?: string | null
+          paid_at?: string | null
+          payment_proof_url?: string | null
+          reference_month?: string
+          status?: string
+          teacher_id?: string
+          total_hours?: number
+          total_value?: number
+          unit_id?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -2147,6 +2207,10 @@ export type Database = {
           id: string
         }[]
       }
+      generate_school_payroll_closure: {
+        Args: { _reference_month: string; _teacher_id: string }
+        Returns: string
+      }
       get_company_secrets: { Args: { _company_id: string }; Returns: Json }
       get_email_by_cpf: { Args: { _cpf: string }; Returns: string }
       get_teacher_id_for: { Args: { _user_id: string }; Returns: string }
@@ -2159,6 +2223,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      mark_school_payroll_paid: {
+        Args: { _closure_id: string; _notes?: string; _proof_url?: string }
+        Returns: undefined
       }
       resolve_auth_email: { Args: { _login: string }; Returns: string }
       update_company_secrets: {
