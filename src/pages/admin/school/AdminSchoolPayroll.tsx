@@ -880,8 +880,8 @@ export default function AdminSchoolPayroll() {
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Todo dia configurado de fechamento, o sistema soma automaticamente as aulas
-              validadas do mês e gera o fechamento de cada professor.
+              Todo dia configurado de fechamento, o sistema encerra o ciclo (do último fechamento até hoje) e gera automaticamente
+              a folha de cada professor com as aulas validadas no período.
             </p>
             <div className="grid grid-cols-2 gap-3">
               <div>
