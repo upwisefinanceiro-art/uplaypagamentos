@@ -485,7 +485,7 @@ export default function AdminSchoolTeachers() {
               <TableHead>Disciplinas</TableHead>
               <TableHead>Contato</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="w-[240px]">Ações</TableHead>
+              <TableHead className="w-[360px]">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
