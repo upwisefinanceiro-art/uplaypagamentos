@@ -19,9 +19,12 @@ import {
   Activity,
   Banknote,
   Landmark,
+  CalendarDays,
+  Users2,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSchoolAccess } from "@/hooks/useSchoolAccess";
 import CompanyBlockedOverlay from "@/components/admin/CompanyBlockedOverlay";
 
 const menuItems = [
