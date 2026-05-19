@@ -541,19 +541,17 @@ export default function AdminSchoolCalendar() {
             </div>
             <div className="md:col-span-2">
               <Label>Turma</Label>
-              <Select value={form.class_id} onValueChange={(v) => setForm({ ...form, class_id: v })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="NONE">— Sem turma —</SelectItem>
-                  {classesForUnit.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <ClassCombobox
+                value={form.class_id}
+                classes={classesForUnit}
+                disabled={!form.unit_id}
+                onChange={(id) => setForm((f) => ({ ...f, class_id: id }))}
+                onCreate={async (name) => {
+                  const id = await createClass(name);
+                  if (id) setForm((f) => ({ ...f, class_id: id }));
+                }}
+                onRename={renameClass}
+              />
             </div>
             <div>
               <Label>Data *</Label>
