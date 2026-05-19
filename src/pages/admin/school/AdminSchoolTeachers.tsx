@@ -378,24 +378,35 @@ export default function AdminSchoolTeachers() {
                   <TableCell>
                     <div className="flex flex-col gap-1">
                       {t.active ? <Badge>Ativo</Badge> : <Badge variant="secondary">Inativo</Badge>}
-                      {t.profile_id ? (
-                        <Badge variant="outline" className="gap-1">
-                          <ShieldCheck className="w-3 h-3" /> App
+                      {!t.profile_id ? (
+                        <Badge variant="outline" className="text-muted-foreground">Acesso não enviado</Badge>
+                      ) : t.must_change_password ? (
+                        <Badge variant="outline" className="gap-1 text-warning border-warning/40">
+                          <Smartphone className="w-3 h-3" /> Aguardando 1º login
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="text-muted-foreground">Sem acesso</Badge>
+                        <Badge variant="outline" className="gap-1 text-success border-success/40">
+                          <ShieldCheck className="w-3 h-3" /> Ativo no app
+                        </Badge>
                       )}
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-1">
+                    <div className="flex gap-1 items-center">
                       <Button
-                        size="icon"
-                        variant="ghost"
-                        title="Enviar acesso ao professor"
+                        size="sm"
+                        variant={t.profile_id ? "outline" : "default"}
+                        className="gap-1.5"
+                        title={t.profile_id ? "Reenviar acesso no WhatsApp" : "Criar acesso e enviar no WhatsApp"}
                         onClick={() => sendAccess(t)}
+                        disabled={sendingId === t.id}
                       >
-                        <Send className="w-4 h-4" />
+                        {sendingId === t.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Smartphone className="w-3.5 h-3.5" />
+                        )}
+                        {t.profile_id ? "Reenviar app" : "Enviar app"}
                       </Button>
                       <Button size="icon" variant="ghost" onClick={() => openEdit(t)}>
                         <Pencil className="w-4 h-4" />
@@ -405,6 +416,7 @@ export default function AdminSchoolTeachers() {
                       </Button>
                     </div>
                   </TableCell>
+
 
                 </TableRow>
               ))
