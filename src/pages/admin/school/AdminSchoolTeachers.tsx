@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSchoolAccess, SchoolUnit } from "@/hooks/useSchoolAccess";
@@ -34,6 +34,31 @@ interface Teacher {
 }
 
 const DEFAULT_PASSWORD = "12345678";
+const WHATSAPP_TAB_TARGET = "uplay_teacher_app_whatsapp";
+
+const resolveWhatsAppPhone = (rawPhone: string | null | undefined) => {
+  const digits = (rawPhone ?? "").replace(/\D/g, "");
+  const national = digits.startsWith("55") ? digits.slice(2) : digits;
+  const isValid = national.length >= 10 && national.length <= 11;
+
+  return {
+    raw: rawPhone ?? "",
+    digits,
+    national,
+    international: isValid ? `55${national}` : "",
+    isValid,
+  };
+};
+
+const buildWhatsAppTeacherUrl = (phone: string, message: string) => {
+  const cleanMessage = message.replace(/\r\n/g, "\n").replace(/[ \t]+\n/g, "\n").trim();
+  const encodedMessage = encodeURIComponent(cleanMessage);
+  return {
+    url: `https://wa.me/${phone}?text=${encodedMessage}`,
+    cleanMessage,
+    encodedLength: encodedMessage.length,
+  };
+};
 
 const emptyForm = {
   full_name: "",
@@ -63,6 +88,7 @@ export default function AdminSchoolTeachers() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const sendingRef = useRef<string | null>(null);
 
   const fetchTeachers = async () => {
     setLoading(true);
