@@ -337,10 +337,27 @@ export default function AdminSchoolTeachers() {
                     {t.phone ? <><br />{t.phone}</> : null}
                   </TableCell>
                   <TableCell>
-                    {t.active ? <Badge>Ativo</Badge> : <Badge variant="secondary">Inativo</Badge>}
+                    <div className="flex flex-col gap-1">
+                      {t.active ? <Badge>Ativo</Badge> : <Badge variant="secondary">Inativo</Badge>}
+                      {t.profile_id ? (
+                        <Badge variant="outline" className="gap-1">
+                          <ShieldCheck className="w-3 h-3" /> App
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-muted-foreground">Sem acesso</Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title="Enviar acesso ao professor"
+                        onClick={() => sendAccess(t)}
+                      >
+                        <Send className="w-4 h-4" />
+                      </Button>
                       <Button size="icon" variant="ghost" onClick={() => openEdit(t)}>
                         <Pencil className="w-4 h-4" />
                       </Button>
@@ -349,6 +366,7 @@ export default function AdminSchoolTeachers() {
                       </Button>
                     </div>
                   </TableCell>
+
                 </TableRow>
               ))
             )}
