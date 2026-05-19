@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, GraduationCap, KeyRound, ShieldCheck, Smartphone, Loader2 } from "lucide-react";
+import { buildAppAccessMessage } from "@/lib/app-access-message";
 
 interface Teacher {
   id: string;
