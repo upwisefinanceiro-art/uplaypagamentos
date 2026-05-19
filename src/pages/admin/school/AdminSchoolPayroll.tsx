@@ -526,8 +526,36 @@ export default function AdminSchoolPayroll() {
             </div>
           )}
           <div>
-            <Label className="text-xs">Competência</Label>
-            <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+            <Label className="text-xs">Ciclo (fechamento)</Label>
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                onClick={() => setCycleStart(addMonths(cycleStart, -1))}
+                title="Ciclo anterior"
+              >
+                ‹
+              </Button>
+              <Input
+                type="date"
+                value={cycleStart}
+                onChange={(e) => e.target.value && setCycleStart(e.target.value)}
+                className="w-[150px]"
+              />
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                onClick={() => setCycleStart(addMonths(cycleStart, 1))}
+                title="Próximo ciclo"
+              >
+                ›
+              </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Competência: <b>{fmtCycle(cycleStart, cycleEnd)}</b>
+            </p>
           </div>
           <Button variant="outline" onClick={load}><RefreshCcw className="h-4 w-4" /></Button>
           <Button variant="outline" onClick={openConfig} title="Configurar fechamento">
