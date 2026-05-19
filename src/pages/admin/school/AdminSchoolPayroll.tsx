@@ -40,6 +40,8 @@ interface Closure {
   scheduled_payment_date: string | null;
   payment_proof_url: string | null;
   notes: string | null;
+  finance_entry_id: string | null;
+  finance_posted_at: string | null;
 }
 interface AggLesson {
   teacher_id: string;
