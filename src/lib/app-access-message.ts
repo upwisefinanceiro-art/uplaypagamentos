@@ -20,35 +20,106 @@ export const buildAppAccessMessage = ({ fullName, email, unitId, login }: AppAcc
   const firstName = getFirstName(fullName);
   const resolvedLogin = login || email || "";
   const isCustomUnit = unitId ? CUSTOM_MESSAGE_UNIT_IDS.has(unitId) : false;
-
-  if (isCustomUnit) {
-    return (
-      `Olá, *${firstName}*! 👋\n\n` +
-      `📚 App da *Escola Up wise / Ensinup* 📚\n\n` +
-      `Aqui é da *UPLAY Pagamentos*. Seu acesso ao aplicativo já está disponível ✅\n\n` +
-      `📲 *Acesse pelo link:*\n${APP_URL}\n\n` +
-      `📧 *E-mail:* ${resolvedLogin}\n` +
-      `🔒 *Senha:* ${DEFAULT_PASSWORD}\n\n` +
-      `Por favor, acesse o app e acompanhe seus pagamentos.\n\n` +
-      `Qualquer dúvida estamos à disposição! 😊`
-    );
-  }
+  const unitName = isCustomUnit ? "Escola Up wise / Ensinup" : "Upplay";
 
   return (
-    `Olá, *${firstName}*! 👋\n\n` +
-    `Aqui é da *UPLAY Pagamentos*.\n\n` +
-    `Seu acesso ao aplicativo já está disponível ✅\n\n` +
-    `📲 *Acesse pelo link:*\n${APP_URL}\n\n` +
-    `📧 *E-mail:* ${resolvedLogin}\n` +
-    `🔒 *Senha:* ${DEFAULT_PASSWORD}\n\n` +
-    `Por favor, acesse o app e acompanhe seus pagamentos.\n\n` +
-    `Qualquer dúvida estamos à disposição! 😊`
+    `Olá, Professor(a) *${firstName}*.
+
+` +
+    `Seja bem-vindo(a) ao aplicativo escolar da *${unitName}*.
+
+` +
+    `Agora você poderá acompanhar sua rotina acadêmica com mais praticidade, organização e acesso às suas aulas diretamente pelo aplicativo.
+
+` +
+    `📲 *Baixe o aplicativo:*
+${APP_URL}
+
+` +
+    `🔐 *Seus dados de acesso:*
+
+` +
+    `*Login:*
+${resolvedLogin}
+
+` +
+    `*Senha inicial:*
+${DEFAULT_PASSWORD}
+
+` +
+    `No aplicativo você poderá visualizar:
+` +
+    `• Calendário
+` +
+    `• Horários
+` +
+    `• Aulas
+` +
+    `• Agenda
+` +
+    `• Pagamentos
+
+` +
+    `Após o primeiro acesso, recomendamos alterar sua senha.
+
+` +
+    `Desejamos uma excelente experiência na plataforma! 🎓`
   );
 };
 
 export const buildAppAccessCopyText = ({ fullName, email, unitId, login }: AppAccessMessageParams) => {
-  const message = buildAppAccessMessage({ fullName, email, unitId, login });
-  return `${message}\n\n📲 *Instale o app no celular:*\n${INSTALL_URL}`;
+  const firstName = getFirstName(fullName);
+  const resolvedLogin = login || email || "";
+  const isCustomUnit = unitId ? CUSTOM_MESSAGE_UNIT_IDS.has(unitId) : false;
+  const unitName = isCustomUnit ? "Escola Up wise / Ensinup" : "Upplay";
+
+  return (
+    `Olá, Professor(a) *${firstName}*.
+
+` +
+    `Seja bem-vindo(a) ao aplicativo escolar da *${unitName}*.
+
+` +
+    `Agora você poderá acompanhar sua rotina acadêmica com mais praticidade, organização e acesso às suas aulas diretamente pelo aplicativo.
+
+` +
+    `📲 *Baixe o aplicativo:*
+${APP_URL}
+
+` +
+    `🔐 *Seus dados de acesso:*
+
+` +
+    `*Login:*
+${resolvedLogin}
+
+` +
+    `*Senha inicial:*
+${DEFAULT_PASSWORD}
+
+` +
+    `No aplicativo você poderá visualizar:
+` +
+    `• Calendário
+` +
+    `• Horários
+` +
+    `• Aulas
+` +
+    `• Agenda
+` +
+    `• Pagamentos
+
+` +
+    `Após o primeiro acesso, recomendamos alterar sua senha.
+
+` +
+    `Desejamos uma excelente experiência na plataforma! 🎓
+
+` +
+    `📲 *Instale o app no celular:*
+${INSTALL_URL}`
+  );
 };
 
 export { APP_URL, CUSTOM_MESSAGE_UNIT_IDS, DEFAULT_PASSWORD, INSTALL_URL };
