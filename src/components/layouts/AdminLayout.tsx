@@ -61,8 +61,10 @@ const AdminLayout = () => {
   const { hasRole, signOut } = useAuth();
 
   const userRole = hasRole("ADMIN_MASTER") ? "ADMIN_MASTER" : "ADMIN_UNIDADE";
+  const { hasAccess: hasSchoolAccess } = useSchoolAccess();
 
-  const filteredMenu = menuItems.filter((item) => item.roles.includes(userRole));
+  const allItems = [...baseMenuItems, ...(hasSchoolAccess ? schoolMenuItems : [])];
+  const filteredMenu = allItems.filter((item) => item.roles.includes(userRole));
 
   const isActive = (path: string) => {
     if (path === "/admin") return location.pathname === "/admin";
