@@ -501,12 +501,12 @@ export default function AdminSchoolPayroll() {
             <Wallet className="h-6 w-6" /> Folha de Pagamento
           </h1>
           <p className="text-sm text-muted-foreground">
-            Fechamento mensal, adiantamentos, bônus e pagamentos avulsos por professor.
+            Fechamento por ciclo personalizado (ex.: dia 20 ao dia 20), adiantamentos, bônus e pagamentos avulsos por professor.
           </p>
           {unitConfig && (
             <p className="text-xs text-muted-foreground mt-1">
               <Calendar className="h-3 w-3 inline mr-1" />
-              Fechamento automático todo dia <b>{unitConfig.payroll_closing_day}</b> ·
+              Ciclo: <b>dia {unitConfig.payroll_closing_day}</b> ao <b>dia {unitConfig.payroll_closing_day}</b> ·
               {" "}Pagamento dia <b>{unitConfig.payroll_payment_day}</b>
             </p>
           )}
