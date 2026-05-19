@@ -157,12 +157,15 @@ export default function AdminSchoolPayroll() {
     if (!unitId && units.length) setUnitId(units[0].id);
   }, [units, unitId]);
 
-  const monthStart = `${month}-01`;
-  const monthEnd = useMemo(() => {
-    const [y, m] = month.split("-").map(Number);
-    const d = new Date(y, m, 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-  }, [month]);
+  const cycleEnd = useMemo(() => cycleEndOf(cycleStart), [cycleStart]);
+
+  // Quando muda a unidade, recalcula o ciclo aberto pela config dela
+  useEffect(() => {
+    if (unitConfig?.payroll_closing_day) {
+      setCycleStart(computeCycleStart(unitConfig.payroll_closing_day));
+    }
+  }, [unitConfig?.id]);
+
 
   const load = async () => {
     if (!unitId) return;
