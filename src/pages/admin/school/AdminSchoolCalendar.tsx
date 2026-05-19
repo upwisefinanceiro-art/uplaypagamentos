@@ -17,6 +17,24 @@ import { ChevronLeft, ChevronRight, GraduationCap, Plus, Trash2, Check, Chevrons
 
 const DEFAULT_CLASS_NAME = "Reforço de Inglês";
 
+const TIME_SLOTS: { label: string; start: string; end: string; period: string }[] = [
+  { label: "08h às 10h", start: "08:00", end: "10:00", period: "Manhã" },
+  { label: "10h às 12h", start: "10:00", end: "12:00", period: "Manhã" },
+  { label: "14h às 16h", start: "14:00", end: "16:00", period: "Tarde" },
+  { label: "16h às 18h", start: "16:00", end: "18:00", period: "Tarde" },
+  { label: "19h às 21h", start: "19:00", end: "21:00", period: "Noite" },
+];
+
+function periodOf(hhmm: string): string {
+  const h = parseInt(hhmm.slice(0, 2), 10);
+  if (h < 12) return "Manhã";
+  if (h < 18) return "Tarde";
+  return "Noite";
+}
+function fmtHHMM(d: Date) {
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 type ViewMode = "month" | "week";
 
 interface Lesson {
