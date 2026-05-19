@@ -629,15 +629,32 @@ export default function AdminSchoolCalendar() {
               <Label>Data *</Label>
               <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label>Início</Label>
-                <Input type="time" value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
+            <div className="md:col-span-2">
+              <Label>Blocos rápidos ({periodOf(form.start_time)})</Label>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {TIME_SLOTS.map((s) => {
+                  const active = form.start_time === s.start && form.end_time === s.end;
+                  return (
+                    <Button
+                      key={s.label}
+                      type="button"
+                      size="sm"
+                      variant={active ? "default" : "outline"}
+                      onClick={() => setForm((f) => ({ ...f, start_time: s.start, end_time: s.end }))}
+                    >
+                      {s.label}
+                    </Button>
+                  );
+                })}
               </div>
-              <div>
-                <Label>Fim</Label>
-                <Input type="time" value={form.end_time} onChange={(e) => setForm({ ...form, end_time: e.target.value })} />
-              </div>
+            </div>
+            <div>
+              <Label>Início</Label>
+              <Input type="time" value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
+            </div>
+            <div>
+              <Label>Fim</Label>
+              <Input type="time" value={form.end_time} onChange={(e) => setForm({ ...form, end_time: e.target.value })} />
             </div>
             <div className="md:col-span-2 flex items-center gap-2 pt-2 border-t">
               <Switch checked={form.recurring} onCheckedChange={(v) => setForm({ ...form, recurring: v })} />
