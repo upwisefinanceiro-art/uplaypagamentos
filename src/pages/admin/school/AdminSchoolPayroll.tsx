@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
-import { Wallet, RefreshCcw, CheckCircle2, AlertCircle, Plus, Trash2, Calendar } from "lucide-react";
+import { Wallet, RefreshCcw, CheckCircle2, AlertCircle, Plus, Trash2, Calendar, Settings, FileText } from "lucide-react";
 
 interface Teacher {
   id: string;
