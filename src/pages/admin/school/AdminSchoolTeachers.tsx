@@ -105,9 +105,12 @@ export default function AdminSchoolTeachers() {
       notes: t.notes ?? "",
       active: t.active,
       unit_id: t.unit_id,
+      create_access: !t.profile_id,
+      initial_password: DEFAULT_PASSWORD,
     });
     setDialogOpen(true);
   };
+
 
   const save = async () => {
     if (!form.full_name.trim()) {
