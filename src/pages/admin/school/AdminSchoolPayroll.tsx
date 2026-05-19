@@ -416,7 +416,7 @@ export default function AdminSchoolPayroll() {
     const remaining = Math.max(Number(c.total_value) - Number(c.paid_amount || 0), 0);
     const lines = [
       `RELATÓRIO DE FOLHA - ${teacher?.full_name ?? "-"}`,
-      `Competência: ${fmtCycle(c.reference_month)}`,
+      `Competência: ${fmtCycle(c.reference_month, c.cycle_end_date)}`,
       `Unidade: ${unitConfig?.name ?? "-"}`,
       ``,
       `Hora-aula: ${fmtBRL(Number(teacher?.hourly_rate ?? 0))}`,
