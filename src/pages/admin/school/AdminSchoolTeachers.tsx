@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, GraduationCap, KeyRound, Send, ShieldCheck, Smartphone, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, GraduationCap, KeyRound, ShieldCheck, Smartphone, Loader2 } from "lucide-react";
 
 interface Teacher {
   id: string;
