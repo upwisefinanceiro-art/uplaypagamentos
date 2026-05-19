@@ -1291,6 +1291,228 @@ export type Database = {
           },
         ]
       }
+      school_classes: {
+        Row: {
+          active: boolean
+          company_id: string
+          course_id: string | null
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          company_id: string
+          course_id?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          company_id?: string
+          course_id?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      school_lesson_recurrences: {
+        Row: {
+          class_id: string | null
+          company_id: string
+          course_id: string | null
+          created_at: string
+          created_by: string | null
+          end_date: string
+          end_time: string
+          id: string
+          notes: string | null
+          start_date: string
+          start_time: string
+          teacher_id: string
+          unit_id: string
+          updated_at: string
+          weekdays: number[]
+        }
+        Insert: {
+          class_id?: string | null
+          company_id: string
+          course_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          end_date: string
+          end_time: string
+          id?: string
+          notes?: string | null
+          start_date: string
+          start_time: string
+          teacher_id: string
+          unit_id: string
+          updated_at?: string
+          weekdays?: number[]
+        }
+        Update: {
+          class_id?: string | null
+          company_id?: string
+          course_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          end_date?: string
+          end_time?: string
+          id?: string
+          notes?: string | null
+          start_date?: string
+          start_time?: string
+          teacher_id?: string
+          unit_id?: string
+          updated_at?: string
+          weekdays?: number[]
+        }
+        Relationships: []
+      }
+      school_lessons: {
+        Row: {
+          cancel_reason: string | null
+          canceled_at: string | null
+          class_id: string | null
+          company_id: string
+          computed_value: number
+          course_id: string | null
+          created_at: string
+          created_by: string | null
+          duration_hours: number
+          ends_at: string
+          hourly_rate_snapshot: number
+          id: string
+          notes: string | null
+          recurrence_id: string | null
+          starts_at: string
+          status: string
+          teacher_confirmed_at: string | null
+          teacher_id: string
+          unit_id: string
+          updated_at: string
+          validated_at: string | null
+          validated_by: string | null
+        }
+        Insert: {
+          cancel_reason?: string | null
+          canceled_at?: string | null
+          class_id?: string | null
+          company_id: string
+          computed_value?: number
+          course_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          duration_hours?: number
+          ends_at: string
+          hourly_rate_snapshot?: number
+          id?: string
+          notes?: string | null
+          recurrence_id?: string | null
+          starts_at: string
+          status?: string
+          teacher_confirmed_at?: string | null
+          teacher_id: string
+          unit_id: string
+          updated_at?: string
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Update: {
+          cancel_reason?: string | null
+          canceled_at?: string | null
+          class_id?: string | null
+          company_id?: string
+          computed_value?: number
+          course_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          duration_hours?: number
+          ends_at?: string
+          hourly_rate_snapshot?: number
+          id?: string
+          notes?: string | null
+          recurrence_id?: string | null
+          starts_at?: string
+          status?: string
+          teacher_confirmed_at?: string | null
+          teacher_id?: string
+          unit_id?: string
+          updated_at?: string
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Relationships: []
+      }
+      school_teachers: {
+        Row: {
+          active: boolean
+          company_id: string
+          cpf: string | null
+          created_at: string
+          email: string | null
+          full_name: string
+          hourly_rate: number
+          id: string
+          notes: string | null
+          payment_type: string | null
+          phone: string | null
+          pix_key: string | null
+          profile_id: string | null
+          subjects: string[]
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          company_id: string
+          cpf?: string | null
+          created_at?: string
+          email?: string | null
+          full_name: string
+          hourly_rate?: number
+          id?: string
+          notes?: string | null
+          payment_type?: string | null
+          phone?: string | null
+          pix_key?: string | null
+          profile_id?: string | null
+          subjects?: string[]
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          company_id?: string
+          cpf?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string
+          hourly_rate?: number
+          id?: string
+          notes?: string | null
+          payment_type?: string | null
+          phone?: string | null
+          pix_key?: string | null
+          profile_id?: string | null
+          subjects?: string[]
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       stock_baixa_warnings: {
         Row: {
           created_at: string
@@ -1563,6 +1785,7 @@ export type Database = {
           preferred_bank: string
           razao_social: string | null
           rg_ie: string | null
+          school_module_enabled: boolean
           status: string
           tipo_cadastro: string | null
           updated_at: string
@@ -1602,6 +1825,7 @@ export type Database = {
           preferred_bank?: string
           razao_social?: string | null
           rg_ie?: string | null
+          school_module_enabled?: boolean
           status?: string
           tipo_cadastro?: string | null
           updated_at?: string
@@ -1641,6 +1865,7 @@ export type Database = {
           preferred_bank?: string
           razao_social?: string | null
           rg_ie?: string | null
+          school_module_enabled?: boolean
           status?: string
           tipo_cadastro?: string | null
           updated_at?: string
@@ -1924,6 +2149,7 @@ export type Database = {
       }
       get_company_secrets: { Args: { _company_id: string }; Returns: Json }
       get_email_by_cpf: { Args: { _cpf: string }; Returns: string }
+      get_teacher_id_for: { Args: { _user_id: string }; Returns: string }
       get_unit_secrets: { Args: { _unit_id: string }; Returns: Json }
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
       get_user_unit_id: { Args: { _user_id: string }; Returns: string }
