@@ -588,7 +588,7 @@ export default function AdminSchoolPayroll() {
 
       <Tabs defaultValue="closures">
         <TabsList>
-          <TabsTrigger value="closures">Fechamento mensal</TabsTrigger>
+          <TabsTrigger value="closures">Fechamento do ciclo</TabsTrigger>
           <TabsTrigger value="history">Histórico de pagamentos</TabsTrigger>
         </TabsList>
 
