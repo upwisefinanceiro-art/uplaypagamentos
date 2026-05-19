@@ -169,11 +169,34 @@ export default function AdminSchoolCalendar() {
     loadLessons();
   }, [range.start.toISOString(), range.end.toISOString(), unitFilter, teacherFilter]);
 
-  const openDayDialog = (date: Date) => {
+  const ensureDefaultClass = async (unitId: string): Promise<string> => {
+    if (!unitId) return "NONE";
+    const unit = units.find((u) => u.id === unitId);
+    if (!unit) return "NONE";
+    const existing = classes.find(
+      (c) => c.unit_id === unitId && c.name.trim().toLowerCase() === DEFAULT_CLASS_NAME.toLowerCase(),
+    );
+    if (existing) return existing.id;
+    const { data, error } = await supabase
+      .from("school_classes")
+      .insert({ name: DEFAULT_CLASS_NAME, unit_id: unitId, company_id: unit.company_id, active: true })
+      .select("id,name,unit_id,course_id")
+      .single();
+    if (error || !data) {
+      console.error("[ensureDefaultClass]", error);
+      return "NONE";
+    }
+    setClasses((prev) => [...prev, data as SchoolClass]);
+    return data.id;
+  };
+
+  const openDayDialog = async (date: Date) => {
+    const defaultUnit = unitFilter !== "ALL" ? unitFilter : units[0]?.id ?? "";
+    const defaultClassId = defaultUnit ? await ensureDefaultClass(defaultUnit) : "NONE";
     setForm({
-      unit_id: unitFilter !== "ALL" ? unitFilter : units[0]?.id ?? "",
+      unit_id: defaultUnit,
       teacher_id: teacherFilter !== "ALL" ? teacherFilter : "",
-      class_id: "NONE",
+      class_id: defaultClassId,
       date: fmtDateInput(date),
       start_time: "19:00",
       end_time: "21:00",
@@ -183,6 +206,41 @@ export default function AdminSchoolCalendar() {
       end_date: fmtDateInput(addDays(date, 30)),
     });
     setOpen(true);
+  };
+
+  const createClass = async (name: string): Promise<string | null> => {
+    const trimmed = name.trim();
+    if (!trimmed || !form.unit_id) return null;
+    const unit = units.find((u) => u.id === form.unit_id);
+    if (!unit) return null;
+    const dup = classes.find(
+      (c) => c.unit_id === form.unit_id && c.name.trim().toLowerCase() === trimmed.toLowerCase(),
+    );
+    if (dup) return dup.id;
+    const { data, error } = await supabase
+      .from("school_classes")
+      .insert({ name: trimmed, unit_id: form.unit_id, company_id: unit.company_id, active: true })
+      .select("id,name,unit_id,course_id")
+      .single();
+    if (error || !data) {
+      toast({ title: "Erro ao criar turma", description: error?.message, variant: "destructive" });
+      return null;
+    }
+    setClasses((prev) => [...prev, data as SchoolClass]);
+    toast({ title: "Turma criada", description: trimmed });
+    return data.id;
+  };
+
+  const renameClass = async (classId: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    const { error } = await supabase.from("school_classes").update({ name: trimmed }).eq("id", classId);
+    if (error) {
+      toast({ title: "Erro ao renomear", description: error.message, variant: "destructive" });
+      return;
+    }
+    setClasses((prev) => prev.map((c) => (c.id === classId ? { ...c, name: trimmed } : c)));
+    toast({ title: "Turma renomeada" });
   };
 
   const lessonsForDay = (d: Date) => lessons.filter((l) => sameDay(new Date(l.starts_at), d));
