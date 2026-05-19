@@ -508,7 +508,10 @@ export default function AdminSchoolCalendar() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <Label>Unidade *</Label>
-              <Select value={form.unit_id} onValueChange={(v) => setForm({ ...form, unit_id: v, teacher_id: "", class_id: "NONE" })}>
+              <Select value={form.unit_id} onValueChange={async (v) => {
+                const defClass = await ensureDefaultClass(v);
+                setForm((f) => ({ ...f, unit_id: v, teacher_id: "", class_id: defClass }));
+              }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
