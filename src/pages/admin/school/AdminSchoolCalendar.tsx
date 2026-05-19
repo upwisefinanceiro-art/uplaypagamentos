@@ -517,7 +517,7 @@ export default function AdminSchoolCalendar() {
             return (
               <div
                 key={d.toISOString()}
-                className={`min-h-[100px] border rounded-md p-1 text-xs flex flex-col gap-1 cursor-pointer hover:bg-muted/50 transition-colors ${
+                className={`min-h-[130px] border rounded-md p-1 text-xs flex flex-col gap-1 cursor-pointer hover:bg-muted/50 transition-colors ${
                   inMonth ? "bg-card" : "bg-muted/30 text-muted-foreground"
                 } ${today ? "ring-2 ring-primary" : ""}`}
                 onClick={() => openDayDialog(d)}
