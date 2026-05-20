@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { CalendarCheck2, XCircle, CheckCircle2, Clock, AlertCircle, Building2 } from "lucide-react";
+import { CalendarCheck2, XCircle, CheckCircle2, Clock, AlertCircle, Building2, type LucideIcon } from "lucide-react";
 import { logTeacherAppEvent } from "@/lib/teacher-app-logger";
 
 interface Lesson {
@@ -37,7 +37,14 @@ interface TeacherRow {
   unit_name: string;
 }
 
-const STATUS_META: Record<string, { label: string; cls: string; icon: any }> = {
+type TeacherSelectRow = {
+  id: string;
+  unit_id: string;
+  company_id: string | null;
+  units?: { name?: string | null } | null;
+};
+
+const STATUS_META: Record<string, { label: string; cls: string; icon: LucideIcon }> = {
   SCHEDULED: { label: "Agendada", cls: "bg-blue-500/10 text-blue-600 border-blue-200", icon: Clock },
   CONFIRMED: { label: "Confirmada por você", cls: "bg-amber-500/10 text-amber-700 border-amber-200", icon: CheckCircle2 },
   VALIDATED: { label: "Validada", cls: "bg-emerald-500/10 text-emerald-700 border-emerald-200", icon: CalendarCheck2 },
@@ -80,7 +87,7 @@ export default function TeacherLessons() {
         .eq("active", true);
       if (teacherError) throw teacherError;
 
-      const list: TeacherRow[] = (teacherRows ?? []).map((t: any) => ({
+      const list: TeacherRow[] = ((teacherRows ?? []) as TeacherSelectRow[]).map((t) => ({
         id: t.id,
         unit_id: t.unit_id,
         company_id: t.company_id ?? null,
@@ -114,7 +121,8 @@ export default function TeacherLessons() {
         .order("starts_at", { ascending: false })
         .limit(500);
       if (error) throw error;
-      setLessons((data ?? []) as Lesson[]);
+      const lessonRows = (data ?? []) as Lesson[];
+      setLessons(lessonRows);
       void logTeacherAppEvent({
         userId: user.id,
         event: "teacher_lessons_loaded",
@@ -124,37 +132,38 @@ export default function TeacherLessons() {
         details: {
           teacher_ids: teacherIds,
           unit_ids: list.map((t) => t.unit_id),
-          lessons_count: data?.length ?? 0,
+          lessons_count: lessonRows.length,
           filter,
         },
       });
 
-      const classIds = Array.from(new Set((data ?? []).map((l: any) => l.class_id).filter(Boolean)));
-      const courseIds = Array.from(new Set((data ?? []).map((l: any) => l.course_id).filter(Boolean)));
+      const classIds = Array.from(new Set(lessonRows.map((l) => l.class_id).filter(Boolean)));
+      const courseIds = Array.from(new Set(lessonRows.map((l) => l.course_id).filter(Boolean)));
       if (classIds.length) {
         const { data: cs, error: classError } = await supabase.from("school_classes").select("id,name").in("id", classIds);
         if (classError) console.warn("[teacher-lessons] erro ao carregar turmas", { userId: user.id, classError });
-        setClasses(Object.fromEntries((cs ?? []).map((c: any) => [c.id, c.name])));
+        setClasses(Object.fromEntries(((cs ?? []) as Array<{ id: string; name: string }>).map((c) => [c.id, c.name])));
       } else {
         setClasses({});
       }
       if (courseIds.length) {
         const { data: cs, error: courseError } = await supabase.from("courses").select("id,name").in("id", courseIds);
         if (courseError) console.warn("[teacher-lessons] erro ao carregar cursos", { userId: user.id, courseError });
-        setCourses(Object.fromEntries((cs ?? []).map((c: any) => [c.id, c.name])));
+        setCourses(Object.fromEntries(((cs ?? []) as Array<{ id: string; name: string }>).map((c) => [c.id, c.name])));
       } else {
         setCourses({});
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Erro desconhecido";
       console.error("[teacher-lessons] erro ao carregar área do professor", { userId: user.id, error: e });
       void logTeacherAppEvent({
         userId: user.id,
         event: "teacher_lessons_load_error",
         status: "ERROR",
-        message: e.message,
-        details: { error: e, filter },
+        message,
+        details: { error: message, filter },
       });
-      toast({ title: "Erro ao carregar aulas", description: e.message, variant: "destructive" });
+      toast({ title: "Erro ao carregar aulas", description: message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
