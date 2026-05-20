@@ -125,14 +125,23 @@ const Login = () => {
         return;
       }
 
-      // Check if unit is blocked/inactive
+      // Check if unit is blocked/inactive. Professores podem ter múltiplas unidades;
+      // nesse caso, só bloqueia se não houver nenhum vínculo docente ativo em unidade ativa.
       if (profileData?.unit_id) {
-        const { data: unitData } = await supabase.from("units_public").select("status").eq("id", profileData.unit_id).maybeSingle();
+        const [{ data: unitData }, { data: rolesData }, { data: teacherLinks }] = await Promise.all([
+          supabase.from("units_public").select("status").eq("id", profileData.unit_id).maybeSingle(),
+          supabase.from("user_roles").select("role").eq("user_id", authedUser?.id || ""),
+          supabase.from("school_teachers").select("unit_id,units(status)").eq("profile_id", authedUser?.id || "").eq("active", true),
+        ]);
         if (unitData && (unitData.status === "BLOQUEADO" || unitData.status === "INATIVO")) {
           // Only block non-master roles
-          const { data: rolesData } = await supabase.from("user_roles").select("role").eq("user_id", (await supabase.auth.getUser()).data.user?.id || "");
           const isMaster = rolesData?.some((r: { role: string }) => r.role === "ADMIN_MASTER" || r.role === "SUPER_ADMIN");
-          if (!isMaster) {
+          const isTeacher = rolesData?.some((r: { role: string }) => r.role === "PROFESSOR") || (teacherLinks?.length ?? 0) > 0;
+          const hasActiveTeacherUnit = (teacherLinks ?? []).some((t: any) => {
+            const status = t.units?.status;
+            return status !== "BLOQUEADO" && status !== "INATIVO";
+          });
+          if (!isMaster && (!isTeacher || !hasActiveTeacherUnit)) {
             console.warn("[auth] Empresa bloqueada/inativa", { email, status: unitData.status });
             await supabase.auth.signOut();
             toast({
