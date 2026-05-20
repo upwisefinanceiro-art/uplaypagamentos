@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { CalendarCheck2, XCircle, CheckCircle2, Clock, AlertCircle, Building2 } from "lucide-react";
+import { logTeacherAppEvent } from "@/lib/teacher-app-logger";
 
 interface Lesson {
   id: string;
@@ -32,6 +33,7 @@ interface Lesson {
 interface TeacherRow {
   id: string;
   unit_id: string;
+  company_id: string | null;
   unit_name: string;
 }
 
@@ -69,24 +71,41 @@ export default function TeacherLessons() {
     if (!user) return;
     setLoading(true);
     try {
-      const { data: teacherRows } = await supabase
+      console.info("[teacher-lessons] carregando vínculos", { userId: user.id });
+      const { data: teacherRows, error: teacherError } = await supabase
         .from("school_teachers")
-        .select("id,unit_id,units(name)")
-        .eq("profile_id", user.id);
+        .select("id,unit_id,company_id,active,units(name)")
+        .eq("profile_id", user.id)
+        .eq("active", true);
+      if (teacherError) throw teacherError;
 
       const list: TeacherRow[] = (teacherRows ?? []).map((t: any) => ({
         id: t.id,
         unit_id: t.unit_id,
+        company_id: t.company_id ?? null,
         unit_name: t.units?.name ?? "Unidade",
       }));
       setTeachers(list);
 
       if (list.length === 0) {
         setLessons([]);
+        setClasses({});
+        setCourses({});
+        void logTeacherAppEvent({
+          userId: user.id,
+          event: "teacher_lessons_no_active_link",
+          status: "WARN",
+          message: "Usuário sem vínculo ativo de professor",
+        });
         return;
       }
 
       const teacherIds = list.map((t) => t.id);
+      console.info("[teacher-lessons] vínculos encontrados", {
+        userId: user.id,
+        teacherIds,
+        units: list.map((t) => t.unit_id),
+      });
       const { data, error } = await supabase
         .from("school_lessons")
         .select("*")
@@ -95,18 +114,45 @@ export default function TeacherLessons() {
         .limit(500);
       if (error) throw error;
       setLessons((data ?? []) as Lesson[]);
+      void logTeacherAppEvent({
+        userId: user.id,
+        event: "teacher_lessons_loaded",
+        teacherId: teacherIds[0] ?? null,
+        unitId: list[0]?.unit_id ?? null,
+        companyId: list[0]?.company_id ?? null,
+        details: {
+          teacher_ids: teacherIds,
+          unit_ids: list.map((t) => t.unit_id),
+          lessons_count: data?.length ?? 0,
+          filter,
+        },
+      });
 
       const classIds = Array.from(new Set((data ?? []).map((l: any) => l.class_id).filter(Boolean)));
       const courseIds = Array.from(new Set((data ?? []).map((l: any) => l.course_id).filter(Boolean)));
       if (classIds.length) {
-        const { data: cs } = await supabase.from("school_classes").select("id,name").in("id", classIds);
+        const { data: cs, error: classError } = await supabase.from("school_classes").select("id,name").in("id", classIds);
+        if (classError) console.warn("[teacher-lessons] erro ao carregar turmas", { userId: user.id, classError });
         setClasses(Object.fromEntries((cs ?? []).map((c: any) => [c.id, c.name])));
+      } else {
+        setClasses({});
       }
       if (courseIds.length) {
-        const { data: cs } = await supabase.from("courses").select("id,name").in("id", courseIds);
+        const { data: cs, error: courseError } = await supabase.from("courses").select("id,name").in("id", courseIds);
+        if (courseError) console.warn("[teacher-lessons] erro ao carregar cursos", { userId: user.id, courseError });
         setCourses(Object.fromEntries((cs ?? []).map((c: any) => [c.id, c.name])));
+      } else {
+        setCourses({});
       }
     } catch (e: any) {
+      console.error("[teacher-lessons] erro ao carregar área do professor", { userId: user.id, error: e });
+      void logTeacherAppEvent({
+        userId: user.id,
+        event: "teacher_lessons_load_error",
+        status: "ERROR",
+        message: e.message,
+        details: { error: e, filter },
+      });
       toast({ title: "Erro ao carregar aulas", description: e.message, variant: "destructive" });
     } finally {
       setLoading(false);
