@@ -137,11 +137,15 @@ const Login = () => {
           // Only block non-master roles
           const isMaster = rolesData?.some((r: { role: string }) => r.role === "ADMIN_MASTER" || r.role === "SUPER_ADMIN");
           const isTeacher = rolesData?.some((r: { role: string }) => r.role === "PROFESSOR") || (teacherLinks?.length ?? 0) > 0;
-          const teacherUnitIds = Array.from(new Set((teacherLinks ?? []).map((t: any) => t.unit_id).filter(Boolean)));
+          const teacherUnitIds = Array.from(
+            new Set(((teacherLinks ?? []) as Array<{ unit_id: string | null }>).map((t) => t.unit_id).filter(Boolean)),
+          );
           const { data: teacherUnits } = teacherUnitIds.length
             ? await supabase.from("units_public").select("id,status").in("id", teacherUnitIds)
             : { data: [] };
-          const hasActiveTeacherUnit = (teacherUnits ?? []).some((u: any) => u.status !== "BLOQUEADO" && u.status !== "INATIVO");
+          const hasActiveTeacherUnit = ((teacherUnits ?? []) as Array<{ status: string | null }>).some(
+            (u) => u.status !== "BLOQUEADO" && u.status !== "INATIVO",
+          );
           if (!isMaster && (!isTeacher || !hasActiveTeacherUnit)) {
             console.warn("[auth] Empresa bloqueada/inativa", { email, status: unitData.status });
             await supabase.auth.signOut();
