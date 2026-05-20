@@ -121,6 +121,7 @@ const App = () => {
                 <Route path="escola/calendario" element={<AdminSchoolCalendar />} />
                 <Route path="escola/validacao" element={<AdminSchoolValidation />} />
                 <Route path="escola/folha" element={<AdminSchoolPayroll />} />
+                <Route path="escola/saude" element={<AdminSchoolHealth />} />
                 <Route path="alterar-senha" element={<AppChangePassword />} />
               </Route>
 
