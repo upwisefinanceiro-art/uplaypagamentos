@@ -45,6 +45,8 @@ type TeacherSelectRow = {
 
 type UnitNameRow = { id: string; name: string | null };
 
+const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) return error.stack || error.message;
   if (error && typeof error === "object") {
@@ -87,11 +89,23 @@ export default function TeacherLessons() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const reloadTimerRef = useRef<number | null>(null);
 
-  const load = async () => {
+  const load = async (attempt = 0) => {
     if (!user) return;
     setLoading(true);
     setLoadError(null);
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session && attempt === 0) {
+        await supabase.auth.refreshSession();
+        await wait(500);
+        return load(1);
+      }
+
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError || !authData.user) {
+        throw new Error(`Sessão não carregada para consultar aulas: ${authError?.message ?? "usuário ausente"}`);
+      }
+
       console.info("[teacher-lessons] carregando vínculos", { userId: user.id });
       const { data: teacherRows, error: teacherError } = await supabase
         .from("school_teachers")
@@ -117,6 +131,12 @@ export default function TeacherLessons() {
       setTeachers(list);
 
       if (list.length === 0) {
+        if (attempt === 0) {
+          console.warn("[teacher-lessons] nenhum vínculo retornado; tentando novamente após refresh de sessão", { userId: user.id });
+          await supabase.auth.refreshSession();
+          await wait(700);
+          return load(1);
+        }
         setLessons([]);
         setClasses({});
         setCourses({});
@@ -175,6 +195,12 @@ export default function TeacherLessons() {
         setCourses({});
       }
     } catch (e: unknown) {
+      if (attempt === 0) {
+        console.warn("[teacher-lessons] falha inicial; renovando sessão e tentando novamente", { userId: user.id, error: e });
+        await supabase.auth.refreshSession();
+        await wait(700);
+        return load(1);
+      }
       const message = getErrorMessage(e);
       setLoadError(message);
       console.error("[teacher-lessons] erro ao carregar área do professor", {
