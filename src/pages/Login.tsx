@@ -131,16 +131,17 @@ const Login = () => {
         const [{ data: unitData }, { data: rolesData }, { data: teacherLinks }] = await Promise.all([
           supabase.from("units_public").select("status").eq("id", profileData.unit_id).maybeSingle(),
           supabase.from("user_roles").select("role").eq("user_id", authedUser?.id || ""),
-          supabase.from("school_teachers").select("unit_id,units(status)").eq("profile_id", authedUser?.id || "").eq("active", true),
+          supabase.from("school_teachers").select("unit_id").eq("profile_id", authedUser?.id || "").eq("active", true),
         ]);
         if (unitData && (unitData.status === "BLOQUEADO" || unitData.status === "INATIVO")) {
           // Only block non-master roles
           const isMaster = rolesData?.some((r: { role: string }) => r.role === "ADMIN_MASTER" || r.role === "SUPER_ADMIN");
           const isTeacher = rolesData?.some((r: { role: string }) => r.role === "PROFESSOR") || (teacherLinks?.length ?? 0) > 0;
-          const hasActiveTeacherUnit = (teacherLinks ?? []).some((t: any) => {
-            const status = t.units?.status;
-            return status !== "BLOQUEADO" && status !== "INATIVO";
-          });
+          const teacherUnitIds = Array.from(new Set((teacherLinks ?? []).map((t: any) => t.unit_id).filter(Boolean)));
+          const { data: teacherUnits } = teacherUnitIds.length
+            ? await supabase.from("units_public").select("id,status").in("id", teacherUnitIds)
+            : { data: [] };
+          const hasActiveTeacherUnit = (teacherUnits ?? []).some((u: any) => u.status !== "BLOQUEADO" && u.status !== "INATIVO");
           if (!isMaster && (!isTeacher || !hasActiveTeacherUnit)) {
             console.warn("[auth] Empresa bloqueada/inativa", { email, status: unitData.status });
             await supabase.auth.signOut();
