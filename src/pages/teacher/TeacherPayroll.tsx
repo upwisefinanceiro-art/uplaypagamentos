@@ -45,10 +45,20 @@ type TeacherSelectRow = {
   id: string;
   unit_id: string;
   company_id: string | null;
-  units?: { name?: string | null } | null;
 };
 
+type UnitNameRow = { id: string; name: string | null };
 type RealtimeTeacherRow = { teacher_id?: string; profile_id?: string } | null;
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.stack || error.message;
+  if (error && typeof error === "object") {
+    const err = error as { message?: string; code?: string; details?: string; hint?: string };
+    const parts = [err.message, err.code && `Código: ${err.code}`, err.details && `Detalhes: ${err.details}`, err.hint && `Dica: ${err.hint}`].filter(Boolean);
+    if (parts.length) return parts.join(" | ");
+  }
+  return String(error || "Erro sem detalhes retornado pelo backend");
+}
 
 const TYPE_LABEL: Record<string, string> = {
   FOLHA_MENSAL: "Folha mensal",
@@ -85,25 +95,35 @@ export default function TeacherPayroll() {
   const [closures, setClosures] = useState<Closure[]>([]);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const reloadTimerRef = useRef<number | null>(null);
 
   const load = async () => {
     if (!user) return;
     setLoading(true);
+    setLoadError(null);
     try {
       console.info("[teacher-payroll] carregando vínculos", { userId: user.id });
       const { data: teacherRows, error: teacherError } = await supabase
         .from("school_teachers")
-        .select("id,unit_id,company_id,active,units(name)")
+        .select("id,unit_id,company_id,active")
         .eq("profile_id", user.id)
         .eq("active", true);
       if (teacherError) throw teacherError;
 
-      const list: TeacherRow[] = ((teacherRows ?? []) as TeacherSelectRow[]).map((t) => ({
+      const rows = (teacherRows ?? []) as TeacherSelectRow[];
+      const unitIds = Array.from(new Set(rows.map((t) => t.unit_id).filter(Boolean)));
+      const { data: unitRows, error: unitError } = unitIds.length
+        ? await supabase.from("units_public").select("id,name").in("id", unitIds)
+        : { data: [] as UnitNameRow[], error: null };
+      if (unitError) console.warn("[teacher-payroll] erro ao carregar nomes das unidades", { userId: user.id, unitIds, error: unitError });
+      const unitNameByUnitId = Object.fromEntries(((unitRows ?? []) as UnitNameRow[]).map((u) => [u.id, u.name ?? "Unidade"]));
+
+      const list: TeacherRow[] = rows.map((t) => ({
         id: t.id,
         unit_id: t.unit_id,
         company_id: t.company_id ?? null,
-        unit_name: t.units?.name ?? "Unidade",
+        unit_name: unitNameByUnitId[t.unit_id] ?? "Unidade",
       }));
       setTeachers(list);
       if (list.length === 0) {
@@ -150,8 +170,14 @@ export default function TeacherPayroll() {
         },
       });
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : "Erro desconhecido";
-      console.error("[teacher-payroll] erro ao carregar folha", { userId: user.id, error: e });
+      const message = getErrorMessage(e);
+      setLoadError(message);
+      console.error("[teacher-payroll] erro ao carregar folha", {
+        userId: user.id,
+        error: e,
+        failedQuery: "school_teachers -> school_payroll_closures/school_teacher_payments",
+        payload: { profile_id: user.id },
+      });
       void logTeacherAppEvent({
         userId: user.id,
         event: "teacher_payroll_load_error",
@@ -296,6 +322,12 @@ export default function TeacherPayroll() {
         </TabsList>
 
         <TabsContent value="closures" className="space-y-2">
+          {loadError && (
+            <Card className="p-4 text-sm text-destructive break-words">
+              <p className="font-semibold mb-1">Erro ao carregar folha</p>
+              <p>{loadError}</p>
+            </Card>
+          )}
           {loading && <p className="text-sm text-muted-foreground">Carregando...</p>}
           {!loading && scopedClosures.length === 0 && (
             <Card className="p-6 text-center text-sm text-muted-foreground">
