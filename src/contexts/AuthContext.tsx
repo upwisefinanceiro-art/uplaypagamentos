@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, ReactNode } fro
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 
-const AUTH_TIMEOUT_MS = 5000;
+const AUTH_TIMEOUT_MS = 12000;
 
 type AppRole = "ADMIN_MASTER" | "ADMIN_UNIDADE" | "RESPONSAVEL" | "SUPER_ADMIN" | "PROFESSOR";
 
@@ -52,16 +52,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchUserData = async (userId: string) => {
     try {
       console.info("[auth] fetchUserData started", { userId });
-      const [profileRes, rolesRes] = await Promise.all([
+      const [profileRes, rolesRes, teacherRes] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", userId),
+        supabase.from("school_teachers").select("id,unit_id").eq("profile_id", userId).eq("active", true).limit(1),
       ]);
 
       if (profileRes.error) console.error("[auth] profile lookup error:", profileRes.error);
       if (rolesRes.error) console.error("[auth] roles lookup error:", rolesRes.error);
+      if (teacherRes.error) console.error("[auth] teacher link lookup error:", teacherRes.error);
 
       const fetchedRoles = (rolesRes.data ?? []).map((r: { role: string }) => r.role as AppRole);
-      console.info("[auth] fetchUserData completed", { userId, roles: fetchedRoles, hasProfile: !!profileRes.data });
+      const hasTeacherLink = (teacherRes.data?.length ?? 0) > 0;
+      if (hasTeacherLink && !fetchedRoles.includes("PROFESSOR")) {
+        fetchedRoles.push("PROFESSOR");
+      }
+      console.info("[auth] fetchUserData completed", { userId, roles: fetchedRoles, hasProfile: !!profileRes.data, hasTeacherLink });
       return {
         profile: (profileRes.data as Profile | null) ?? null,
         roles: fetchedRoles,
