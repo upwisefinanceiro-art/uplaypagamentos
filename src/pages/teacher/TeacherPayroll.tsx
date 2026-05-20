@@ -41,6 +41,15 @@ interface TeacherRow {
   unit_name: string;
 }
 
+type TeacherSelectRow = {
+  id: string;
+  unit_id: string;
+  company_id: string | null;
+  units?: { name?: string | null } | null;
+};
+
+type RealtimeTeacherRow = { teacher_id?: string; profile_id?: string } | null;
+
 const TYPE_LABEL: Record<string, string> = {
   FOLHA_MENSAL: "Folha mensal",
   ADIANTAMENTO: "Adiantamento",
@@ -90,7 +99,7 @@ export default function TeacherPayroll() {
         .eq("active", true);
       if (teacherError) throw teacherError;
 
-      const list: TeacherRow[] = (teacherRows ?? []).map((t: any) => ({
+      const list: TeacherRow[] = ((teacherRows ?? []) as TeacherSelectRow[]).map((t) => ({
         id: t.id,
         unit_id: t.unit_id,
         company_id: t.company_id ?? null,
@@ -140,16 +149,17 @@ export default function TeacherPayroll() {
           payments_count: pRes.data?.length ?? 0,
         },
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Erro desconhecido";
       console.error("[teacher-payroll] erro ao carregar folha", { userId: user.id, error: e });
       void logTeacherAppEvent({
         userId: user.id,
         event: "teacher_payroll_load_error",
         status: "ERROR",
-        message: e.message,
-        details: { error: e },
+        message,
+        details: { error: message },
       });
-      toast({ title: "Erro ao carregar folha", description: e.message, variant: "destructive" });
+      toast({ title: "Erro ao carregar folha", description: message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -164,7 +174,7 @@ export default function TeacherPayroll() {
   useEffect(() => {
     if (!user || teachers.length === 0) return;
     const teacherIds = teachers.map((t) => t.id);
-    const scheduleReload = (source: string, row: { teacher_id?: string; profile_id?: string } | null, eventType: string) => {
+    const scheduleReload = (source: string, row: RealtimeTeacherRow, eventType: string) => {
       if (row?.teacher_id && !teacherIds.includes(row.teacher_id)) return;
       if (row?.profile_id && row.profile_id !== user.id) return;
       console.info("[teacher-payroll] atualização em tempo real", { userId: user.id, source, eventType });
@@ -175,13 +185,13 @@ export default function TeacherPayroll() {
     const channel = supabase
       .channel(`teacher-payroll-${user.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "school_payroll_closures" }, (payload) =>
-        scheduleReload("school_payroll_closures", (payload.new ?? payload.old) as any, payload.eventType),
+        scheduleReload("school_payroll_closures", (payload.new ?? payload.old) as RealtimeTeacherRow, payload.eventType),
       )
       .on("postgres_changes", { event: "*", schema: "public", table: "school_teacher_payments" }, (payload) =>
-        scheduleReload("school_teacher_payments", (payload.new ?? payload.old) as any, payload.eventType),
+        scheduleReload("school_teacher_payments", (payload.new ?? payload.old) as RealtimeTeacherRow, payload.eventType),
       )
       .on("postgres_changes", { event: "*", schema: "public", table: "school_teachers" }, (payload) =>
-        scheduleReload("school_teachers", (payload.new ?? payload.old) as any, payload.eventType),
+        scheduleReload("school_teachers", (payload.new ?? payload.old) as RealtimeTeacherRow, payload.eventType),
       )
       .subscribe((status) => console.info("[teacher-payroll] realtime", { userId: user.id, status }));
 
