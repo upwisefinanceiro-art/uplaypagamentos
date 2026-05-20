@@ -1871,6 +1871,48 @@ export type Database = {
           },
         ]
       }
+      teacher_app_logs: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          details: Json
+          event: string
+          id: string
+          message: string | null
+          route: string | null
+          status: string
+          teacher_id: string | null
+          unit_id: string | null
+          user_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          details?: Json
+          event: string
+          id?: string
+          message?: string | null
+          route?: string | null
+          status?: string
+          teacher_id?: string | null
+          unit_id?: string | null
+          user_id: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          details?: Json
+          event?: string
+          id?: string
+          message?: string | null
+          route?: string | null
+          status?: string
+          teacher_id?: string | null
+          unit_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       unit_financial_costs: {
         Row: {
           cost_per_student: number

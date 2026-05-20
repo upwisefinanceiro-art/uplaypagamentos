@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card } from "@/components/ui/card";
@@ -8,7 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { CalendarCheck2, XCircle, CheckCircle2, Clock, AlertCircle, Building2 } from "lucide-react";
+import { CalendarCheck2, XCircle, CheckCircle2, Clock, AlertCircle, Building2, type LucideIcon } from "lucide-react";
+import { logTeacherAppEvent } from "@/lib/teacher-app-logger";
 
 interface Lesson {
   id: string;
@@ -32,10 +33,18 @@ interface Lesson {
 interface TeacherRow {
   id: string;
   unit_id: string;
+  company_id: string | null;
   unit_name: string;
 }
 
-const STATUS_META: Record<string, { label: string; cls: string; icon: any }> = {
+type TeacherSelectRow = {
+  id: string;
+  unit_id: string;
+  company_id: string | null;
+  units?: { name?: string | null } | null;
+};
+
+const STATUS_META: Record<string, { label: string; cls: string; icon: LucideIcon }> = {
   SCHEDULED: { label: "Agendada", cls: "bg-blue-500/10 text-blue-600 border-blue-200", icon: Clock },
   CONFIRMED: { label: "Confirmada por você", cls: "bg-amber-500/10 text-amber-700 border-amber-200", icon: CheckCircle2 },
   VALIDATED: { label: "Validada", cls: "bg-emerald-500/10 text-emerald-700 border-emerald-200", icon: CalendarCheck2 },
@@ -64,29 +73,47 @@ export default function TeacherLessons() {
   const [cancelOpen, setCancelOpen] = useState<Lesson | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const reloadTimerRef = useRef<number | null>(null);
 
   const load = async () => {
     if (!user) return;
     setLoading(true);
     try {
-      const { data: teacherRows } = await supabase
+      console.info("[teacher-lessons] carregando vínculos", { userId: user.id });
+      const { data: teacherRows, error: teacherError } = await supabase
         .from("school_teachers")
-        .select("id,unit_id,units(name)")
-        .eq("profile_id", user.id);
+        .select("id,unit_id,company_id,active,units(name)")
+        .eq("profile_id", user.id)
+        .eq("active", true);
+      if (teacherError) throw teacherError;
 
-      const list: TeacherRow[] = (teacherRows ?? []).map((t: any) => ({
+      const list: TeacherRow[] = ((teacherRows ?? []) as TeacherSelectRow[]).map((t) => ({
         id: t.id,
         unit_id: t.unit_id,
+        company_id: t.company_id ?? null,
         unit_name: t.units?.name ?? "Unidade",
       }));
       setTeachers(list);
 
       if (list.length === 0) {
         setLessons([]);
+        setClasses({});
+        setCourses({});
+        void logTeacherAppEvent({
+          userId: user.id,
+          event: "teacher_lessons_no_active_link",
+          status: "WARN",
+          message: "Usuário sem vínculo ativo de professor",
+        });
         return;
       }
 
       const teacherIds = list.map((t) => t.id);
+      console.info("[teacher-lessons] vínculos encontrados", {
+        userId: user.id,
+        teacherIds,
+        units: list.map((t) => t.unit_id),
+      });
       const { data, error } = await supabase
         .from("school_lessons")
         .select("*")
@@ -94,20 +121,49 @@ export default function TeacherLessons() {
         .order("starts_at", { ascending: false })
         .limit(500);
       if (error) throw error;
-      setLessons((data ?? []) as Lesson[]);
+      const lessonRows = (data ?? []) as Lesson[];
+      setLessons(lessonRows);
+      void logTeacherAppEvent({
+        userId: user.id,
+        event: "teacher_lessons_loaded",
+        teacherId: teacherIds[0] ?? null,
+        unitId: list[0]?.unit_id ?? null,
+        companyId: list[0]?.company_id ?? null,
+        details: {
+          teacher_ids: teacherIds,
+          unit_ids: list.map((t) => t.unit_id),
+          lessons_count: lessonRows.length,
+          filter,
+        },
+      });
 
-      const classIds = Array.from(new Set((data ?? []).map((l: any) => l.class_id).filter(Boolean)));
-      const courseIds = Array.from(new Set((data ?? []).map((l: any) => l.course_id).filter(Boolean)));
+      const classIds = Array.from(new Set(lessonRows.map((l) => l.class_id).filter(Boolean)));
+      const courseIds = Array.from(new Set(lessonRows.map((l) => l.course_id).filter(Boolean)));
       if (classIds.length) {
-        const { data: cs } = await supabase.from("school_classes").select("id,name").in("id", classIds);
-        setClasses(Object.fromEntries((cs ?? []).map((c: any) => [c.id, c.name])));
+        const { data: cs, error: classError } = await supabase.from("school_classes").select("id,name").in("id", classIds);
+        if (classError) console.warn("[teacher-lessons] erro ao carregar turmas", { userId: user.id, classError });
+        setClasses(Object.fromEntries(((cs ?? []) as Array<{ id: string; name: string }>).map((c) => [c.id, c.name])));
+      } else {
+        setClasses({});
       }
       if (courseIds.length) {
-        const { data: cs } = await supabase.from("courses").select("id,name").in("id", courseIds);
-        setCourses(Object.fromEntries((cs ?? []).map((c: any) => [c.id, c.name])));
+        const { data: cs, error: courseError } = await supabase.from("courses").select("id,name").in("id", courseIds);
+        if (courseError) console.warn("[teacher-lessons] erro ao carregar cursos", { userId: user.id, courseError });
+        setCourses(Object.fromEntries(((cs ?? []) as Array<{ id: string; name: string }>).map((c) => [c.id, c.name])));
+      } else {
+        setCourses({});
       }
-    } catch (e: any) {
-      toast({ title: "Erro ao carregar aulas", description: e.message, variant: "destructive" });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Erro desconhecido";
+      console.error("[teacher-lessons] erro ao carregar área do professor", { userId: user.id, error: e });
+      void logTeacherAppEvent({
+        userId: user.id,
+        event: "teacher_lessons_load_error",
+        status: "ERROR",
+        message,
+        details: { error: message, filter },
+      });
+      toast({ title: "Erro ao carregar aulas", description: message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -116,6 +172,43 @@ export default function TeacherLessons() {
   useEffect(() => {
     load();
   }, [user?.id]);
+
+  const teacherIdsKey = useMemo(() => teachers.map((t) => t.id).sort().join(","), [teachers]);
+
+  useEffect(() => {
+    if (!user || teachers.length === 0) return;
+    const teacherIds = teachers.map((t) => t.id);
+    const channel = supabase
+      .channel(`teacher-lessons-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "school_lessons" },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as Partial<Lesson> | null;
+          if (!row?.teacher_id || !teacherIds.includes(row.teacher_id)) return;
+          console.info("[teacher-lessons] atualização em tempo real", { userId: user.id, teacherId: row.teacher_id, event: payload.eventType });
+          if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
+          reloadTimerRef.current = window.setTimeout(() => void load(), 300);
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "school_teachers" },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as { profile_id?: string } | null;
+          if (row?.profile_id !== user.id) return;
+          console.info("[teacher-lessons] vínculo de professor atualizado", { userId: user.id, event: payload.eventType });
+          if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
+          reloadTimerRef.current = window.setTimeout(() => void load(), 300);
+        },
+      )
+      .subscribe((status) => console.info("[teacher-lessons] realtime", { userId: user.id, status }));
+
+    return () => {
+      if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, teacherIdsKey]);
 
   const unitNameById = useMemo(
     () => Object.fromEntries(teachers.map((t) => [t.unit_id, t.unit_name])),
@@ -160,12 +253,18 @@ export default function TeacherLessons() {
 
   const confirm = async (l: Lesson) => {
     setBusy(l.id);
+    console.info("[teacher-lessons] confirmando aula", { userId: user?.id, lessonId: l.id, teacherId: l.teacher_id, unitId: l.unit_id });
     const { error } = await supabase
       .from("school_lessons")
       .update({ status: "CONFIRMED", teacher_confirmed_at: new Date().toISOString() })
       .eq("id", l.id);
     setBusy(null);
-    if (error) return toast({ title: "Erro", description: error.message, variant: "destructive" });
+    if (error) {
+      console.error("[teacher-lessons] erro ao confirmar aula", { userId: user?.id, lessonId: l.id, error });
+      if (user) void logTeacherAppEvent({ userId: user.id, event: "teacher_lesson_confirm_error", status: "ERROR", message: error.message, teacherId: l.teacher_id, unitId: l.unit_id, details: { lesson_id: l.id } });
+      return toast({ title: "Erro", description: error.message, variant: "destructive" });
+    }
+    if (user) void logTeacherAppEvent({ userId: user.id, event: "teacher_lesson_confirmed", teacherId: l.teacher_id, unitId: l.unit_id, details: { lesson_id: l.id } });
     toast({ title: "Aula confirmada", description: "Aguardando validação do administrador." });
     load();
   };
@@ -182,7 +281,12 @@ export default function TeacherLessons() {
       })
       .eq("id", cancelOpen.id);
     setBusy(null);
-    if (error) return toast({ title: "Erro", description: error.message, variant: "destructive" });
+    if (error) {
+      console.error("[teacher-lessons] erro ao cancelar aula", { userId: user?.id, lessonId: cancelOpen.id, error });
+      if (user) void logTeacherAppEvent({ userId: user.id, event: "teacher_lesson_cancel_error", status: "ERROR", message: error.message, teacherId: cancelOpen.teacher_id, unitId: cancelOpen.unit_id, details: { lesson_id: cancelOpen.id } });
+      return toast({ title: "Erro", description: error.message, variant: "destructive" });
+    }
+    if (user) void logTeacherAppEvent({ userId: user.id, event: "teacher_lesson_canceled", teacherId: cancelOpen.teacher_id, unitId: cancelOpen.unit_id, details: { lesson_id: cancelOpen.id, has_reason: !!cancelReason } });
     toast({ title: "Aula cancelada" });
     setCancelOpen(null);
     setCancelReason("");
