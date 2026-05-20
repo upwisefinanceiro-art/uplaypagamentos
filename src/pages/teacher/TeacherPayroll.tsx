@@ -174,32 +174,58 @@ export default function TeacherPayroll() {
   useEffect(() => {
     if (!user || teachers.length === 0) return;
     const teacherIds = teachers.map((t) => t.id);
+    let reconnectAttempts = 0;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let reconnectTimer: number | null = null;
+
     const scheduleReload = (source: string, row: RealtimeTeacherRow, eventType: string) => {
       if (row?.teacher_id && !teacherIds.includes(row.teacher_id)) return;
       if (row?.profile_id && row.profile_id !== user.id) return;
-      console.info("[teacher-payroll] atualização em tempo real", { userId: user.id, source, eventType });
+      console.info("[teacher-payroll] realtime", { userId: user.id, source, eventType });
       if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
       reloadTimerRef.current = window.setTimeout(() => void load(), 300);
     };
 
-    const channel = supabase
-      .channel(`teacher-payroll-${user.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "school_payroll_closures" }, (payload) =>
-        scheduleReload("school_payroll_closures", (payload.new ?? payload.old) as RealtimeTeacherRow, payload.eventType),
-      )
-      .on("postgres_changes", { event: "*", schema: "public", table: "school_teacher_payments" }, (payload) =>
-        scheduleReload("school_teacher_payments", (payload.new ?? payload.old) as RealtimeTeacherRow, payload.eventType),
-      )
-      .on("postgres_changes", { event: "*", schema: "public", table: "school_teachers" }, (payload) =>
-        scheduleReload("school_teachers", (payload.new ?? payload.old) as RealtimeTeacherRow, payload.eventType),
-      )
-      .subscribe((status) => console.info("[teacher-payroll] realtime", { userId: user.id, status }));
+    const setup = () => {
+      channel = supabase
+        .channel(`teacher-payroll-${user.id}-${Date.now()}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "school_payroll_closures" }, (payload) =>
+          scheduleReload("school_payroll_closures", (payload.new ?? payload.old) as RealtimeTeacherRow, payload.eventType),
+        )
+        .on("postgres_changes", { event: "*", schema: "public", table: "school_teacher_payments" }, (payload) =>
+          scheduleReload("school_teacher_payments", (payload.new ?? payload.old) as RealtimeTeacherRow, payload.eventType),
+        )
+        .on("postgres_changes", { event: "*", schema: "public", table: "school_teachers" }, (payload) =>
+          scheduleReload("school_teachers", (payload.new ?? payload.old) as RealtimeTeacherRow, payload.eventType),
+        )
+        .subscribe((status) => {
+          console.info("[teacher-payroll] realtime status", { userId: user.id, status });
+          if (status === "SUBSCRIBED") {
+            reconnectAttempts = 0;
+            void logTeacherAppEvent({ userId: user.id, event: "REALTIME_CONNECTED", details: { source: "payroll" } });
+          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+            void logTeacherAppEvent({ userId: user.id, event: "REALTIME_DISCONNECTED", status: "WARN", details: { source: "payroll", status } });
+            const backoff = Math.min(30000, 2000 * Math.pow(2, reconnectAttempts++));
+            if (reconnectTimer) window.clearTimeout(reconnectTimer);
+            reconnectTimer = window.setTimeout(() => {
+              if (channel) void supabase.removeChannel(channel);
+              setup();
+            }, backoff);
+          }
+        });
+    };
+
+    setup();
+    const safetyPoll = window.setInterval(() => void load(), 60000);
 
     return () => {
       if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
-      supabase.removeChannel(channel);
+      if (reconnectTimer) window.clearTimeout(reconnectTimer);
+      window.clearInterval(safetyPoll);
+      if (channel) void supabase.removeChannel(channel);
     };
   }, [user?.id, teacherIdsKey]);
+
 
   const teacherUnitById = useMemo(
     () => Object.fromEntries(teachers.map((t) => [t.id, t])),

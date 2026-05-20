@@ -136,6 +136,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
 
+        // Resiliência: SIGNED_OUT inesperado → tenta refresh 1x antes de derrubar a sessão.
+        if (_event === "SIGNED_OUT" && currentUserIdRef.current) {
+          void (async () => {
+            const { data, error } = await supabase.auth.refreshSession();
+            if (!error && data.session) {
+              console.info("[auth] SIGNED_OUT recuperado via refreshSession");
+              setSession(data.session);
+              setUser(data.session.user);
+              return;
+            }
+            console.warn("[auth] SIGNED_OUT confirmado, limpando sessão", { error });
+            void syncSession(null);
+          })();
+          return;
+        }
+
+
+
         // Evita re-sync (e re-render com loading=true) quando o navegador
         // dispara SIGNED_IN apenas porque a aba voltou ao foco e a sessão
         // continua sendo a mesma. Isso preserva o estado de formulários

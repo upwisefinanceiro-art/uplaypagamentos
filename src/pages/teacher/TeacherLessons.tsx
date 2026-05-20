@@ -178,37 +178,63 @@ export default function TeacherLessons() {
   useEffect(() => {
     if (!user || teachers.length === 0) return;
     const teacherIds = teachers.map((t) => t.id);
-    const channel = supabase
-      .channel(`teacher-lessons-${user.id}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "school_lessons" },
-        (payload) => {
-          const row = (payload.new ?? payload.old) as Partial<Lesson> | null;
-          if (!row?.teacher_id || !teacherIds.includes(row.teacher_id)) return;
-          console.info("[teacher-lessons] atualização em tempo real", { userId: user.id, teacherId: row.teacher_id, event: payload.eventType });
-          if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
-          reloadTimerRef.current = window.setTimeout(() => void load(), 300);
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "school_teachers" },
-        (payload) => {
-          const row = (payload.new ?? payload.old) as { profile_id?: string } | null;
-          if (row?.profile_id !== user.id) return;
-          console.info("[teacher-lessons] vínculo de professor atualizado", { userId: user.id, event: payload.eventType });
-          if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
-          reloadTimerRef.current = window.setTimeout(() => void load(), 300);
-        },
-      )
-      .subscribe((status) => console.info("[teacher-lessons] realtime", { userId: user.id, status }));
+    let reconnectAttempts = 0;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let reconnectTimer: number | null = null;
+
+    const setup = () => {
+      channel = supabase
+        .channel(`teacher-lessons-${user.id}-${Date.now()}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "school_lessons" },
+          (payload) => {
+            const row = (payload.new ?? payload.old) as Partial<Lesson> | null;
+            if (!row?.teacher_id || !teacherIds.includes(row.teacher_id)) return;
+            if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
+            reloadTimerRef.current = window.setTimeout(() => void load(), 300);
+          },
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "school_teachers" },
+          (payload) => {
+            const row = (payload.new ?? payload.old) as { profile_id?: string } | null;
+            if (row?.profile_id !== user.id) return;
+            if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
+            reloadTimerRef.current = window.setTimeout(() => void load(), 300);
+          },
+        )
+        .subscribe((status) => {
+          console.info("[teacher-lessons] realtime", { userId: user.id, status });
+          if (status === "SUBSCRIBED") {
+            reconnectAttempts = 0;
+            void logTeacherAppEvent({ userId: user.id, event: "REALTIME_CONNECTED", details: { source: "lessons" } });
+          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+            void logTeacherAppEvent({ userId: user.id, event: "REALTIME_DISCONNECTED", status: "WARN", details: { source: "lessons", status } });
+            const backoff = Math.min(30000, 2000 * Math.pow(2, reconnectAttempts++));
+            if (reconnectTimer) window.clearTimeout(reconnectTimer);
+            reconnectTimer = window.setTimeout(() => {
+              if (channel) void supabase.removeChannel(channel);
+              setup();
+            }, backoff);
+          }
+        });
+    };
+
+    setup();
+
+    // Polling de segurança a cada 60s caso o realtime caia silenciosamente
+    const safetyPoll = window.setInterval(() => void load(), 60000);
 
     return () => {
       if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
-      supabase.removeChannel(channel);
+      if (reconnectTimer) window.clearTimeout(reconnectTimer);
+      window.clearInterval(safetyPoll);
+      if (channel) void supabase.removeChannel(channel);
     };
   }, [user?.id, teacherIdsKey]);
+
 
   const unitNameById = useMemo(
     () => Object.fromEntries(teachers.map((t) => [t.unit_id, t.unit_name])),

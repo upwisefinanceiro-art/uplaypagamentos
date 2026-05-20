@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSessionGuard } from "@/hooks/useSessionGuard";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { CalendarDays, Wallet, LogOut, Menu, GraduationCap, KeyRound } from "lucide-react";
@@ -12,7 +13,8 @@ const menu = [
 ];
 
 export default function TeacherLayout() {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, user } = useAuth();
+  useSessionGuard(user?.id);
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
