@@ -41,7 +41,7 @@ export default function AdminSchoolHealth() {
   const loadAll = async () => {
     setLoading(true);
     const [tRes, uRes, lRes] = await Promise.all([
-      supabase.from("school_teachers").select("id, full_name, unit_id, active, units(name)").order("full_name"),
+      supabase.from("school_teachers").select("id, full_name, unit_id, active").order("full_name"),
       supabase.from("units").select("id, name").order("name"),
       supabase
         .from("teacher_app_logs")
@@ -49,13 +49,14 @@ export default function AdminSchoolHealth() {
         .order("created_at", { ascending: false })
         .limit(100),
     ]);
+    const unitMap = new Map((uRes.data ?? []).map((u) => [u.id, u.name]));
     setTeachers(
-      (tRes.data ?? []).map((t: { id: string; full_name: string; unit_id: string; active: boolean; units?: { name?: string } | null }) => ({
+      (tRes.data ?? []).map((t) => ({
         id: t.id,
         full_name: t.full_name,
         unit_id: t.unit_id,
         active: t.active,
-        unit_name: t.units?.name ?? "—",
+        unit_name: unitMap.get(t.unit_id) ?? "—",
       })),
     );
     setUnits(uRes.data ?? []);
