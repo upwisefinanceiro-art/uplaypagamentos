@@ -41,8 +41,19 @@ type TeacherSelectRow = {
   id: string;
   unit_id: string;
   company_id: string | null;
-  units?: { name?: string | null } | null;
 };
+
+type UnitNameRow = { id: string; name: string | null };
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.stack || error.message;
+  if (error && typeof error === "object") {
+    const err = error as { message?: string; code?: string; details?: string; hint?: string };
+    const parts = [err.message, err.code && `Código: ${err.code}`, err.details && `Detalhes: ${err.details}`, err.hint && `Dica: ${err.hint}`].filter(Boolean);
+    if (parts.length) return parts.join(" | ");
+  }
+  return String(error || "Erro sem detalhes retornado pelo backend");
+}
 
 const STATUS_META: Record<string, { label: string; cls: string; icon: LucideIcon }> = {
   SCHEDULED: { label: "Agendada", cls: "bg-blue-500/10 text-blue-600 border-blue-200", icon: Clock },
@@ -73,25 +84,35 @@ export default function TeacherLessons() {
   const [cancelOpen, setCancelOpen] = useState<Lesson | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const reloadTimerRef = useRef<number | null>(null);
 
   const load = async () => {
     if (!user) return;
     setLoading(true);
+    setLoadError(null);
     try {
       console.info("[teacher-lessons] carregando vínculos", { userId: user.id });
       const { data: teacherRows, error: teacherError } = await supabase
         .from("school_teachers")
-        .select("id,unit_id,company_id,active,units(name)")
+        .select("id,unit_id,company_id,active")
         .eq("profile_id", user.id)
         .eq("active", true);
       if (teacherError) throw teacherError;
 
-      const list: TeacherRow[] = ((teacherRows ?? []) as TeacherSelectRow[]).map((t) => ({
+      const rows = (teacherRows ?? []) as TeacherSelectRow[];
+      const unitIds = Array.from(new Set(rows.map((t) => t.unit_id).filter(Boolean)));
+      const { data: unitRows, error: unitError } = unitIds.length
+        ? await supabase.from("units_public").select("id,name").in("id", unitIds)
+        : { data: [] as UnitNameRow[], error: null };
+      if (unitError) console.warn("[teacher-lessons] erro ao carregar nomes das unidades", { userId: user.id, unitIds, error: unitError });
+      const unitNameByUnitId = Object.fromEntries(((unitRows ?? []) as UnitNameRow[]).map((u) => [u.id, u.name ?? "Unidade"]));
+
+      const list: TeacherRow[] = rows.map((t) => ({
         id: t.id,
         unit_id: t.unit_id,
         company_id: t.company_id ?? null,
-        unit_name: t.units?.name ?? "Unidade",
+        unit_name: unitNameByUnitId[t.unit_id] ?? "Unidade",
       }));
       setTeachers(list);
 
@@ -154,8 +175,14 @@ export default function TeacherLessons() {
         setCourses({});
       }
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : "Erro desconhecido";
-      console.error("[teacher-lessons] erro ao carregar área do professor", { userId: user.id, error: e });
+      const message = getErrorMessage(e);
+      setLoadError(message);
+      console.error("[teacher-lessons] erro ao carregar área do professor", {
+        userId: user.id,
+        error: e,
+        failedQuery: "school_teachers -> school_lessons -> school_classes/courses",
+        payload: { profile_id: user.id, filter },
+      });
       void logTeacherAppEvent({
         userId: user.id,
         event: "teacher_lessons_load_error",
@@ -323,10 +350,11 @@ export default function TeacherLessons() {
     return (
       <Card className="p-8 text-center max-w-md mx-auto mt-12">
         <AlertCircle className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-        <h2 className="font-bold mb-1">Perfil de professor não vinculado</h2>
-        <p className="text-sm text-muted-foreground">
-          Solicite ao administrador da sua unidade que vincule seu usuário ao cadastro de professor.
+        <h2 className="font-bold mb-1">{loadError ? "Erro ao carregar aulas" : "Perfil de professor não vinculado"}</h2>
+        <p className="text-sm text-muted-foreground break-words">
+          {loadError ?? "Solicite ao administrador da sua unidade que vincule seu usuário ao cadastro de professor."}
         </p>
+        {loadError && <Button className="mt-4" variant="outline" onClick={() => void load()}>Tentar novamente</Button>}
       </Card>
     );
   }
