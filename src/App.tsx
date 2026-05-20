@@ -41,6 +41,7 @@ import AdminSchoolClasses from "./pages/admin/school/AdminSchoolClasses";
 import AdminSchoolCalendar from "./pages/admin/school/AdminSchoolCalendar";
 import AdminSchoolValidation from "./pages/admin/school/AdminSchoolValidation";
 import AdminSchoolPayroll from "./pages/admin/school/AdminSchoolPayroll";
+import AdminSchoolHealth from "./pages/admin/school/AdminSchoolHealth";
 import TeacherLayout from "./components/layouts/TeacherLayout";
 import TeacherLessons from "./pages/teacher/TeacherLessons";
 import TeacherPayroll from "./pages/teacher/TeacherPayroll";
