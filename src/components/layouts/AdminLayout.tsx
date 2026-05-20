@@ -54,7 +54,7 @@ const schoolMenuItems = [
   { path: "/admin/escola/turmas", icon: GraduationCap, label: "Turmas", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
   { path: "/admin/escola/validacao", icon: ShieldCheck, label: "Validação de Aulas", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
   { path: "/admin/escola/folha", icon: Banknote, label: "Folha Escolar", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
-  { path: "/admin/escola/saude", icon: Activity, label: "Saúde Escolar", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
+  
 ];
 
 const AdminLayout = () => {
