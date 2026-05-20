@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card } from "@/components/ui/card";
@@ -66,6 +66,7 @@ export default function TeacherLessons() {
   const [cancelOpen, setCancelOpen] = useState<Lesson | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const reloadTimerRef = useRef<number | null>(null);
 
   const load = async () => {
     if (!user) return;
@@ -163,6 +164,43 @@ export default function TeacherLessons() {
     load();
   }, [user?.id]);
 
+  const teacherIdsKey = useMemo(() => teachers.map((t) => t.id).sort().join(","), [teachers]);
+
+  useEffect(() => {
+    if (!user || teachers.length === 0) return;
+    const teacherIds = teachers.map((t) => t.id);
+    const channel = supabase
+      .channel(`teacher-lessons-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "school_lessons" },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as Partial<Lesson> | null;
+          if (!row?.teacher_id || !teacherIds.includes(row.teacher_id)) return;
+          console.info("[teacher-lessons] atualização em tempo real", { userId: user.id, teacherId: row.teacher_id, event: payload.eventType });
+          if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
+          reloadTimerRef.current = window.setTimeout(() => void load(), 300);
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "school_teachers" },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as { profile_id?: string } | null;
+          if (row?.profile_id !== user.id) return;
+          console.info("[teacher-lessons] vínculo de professor atualizado", { userId: user.id, event: payload.eventType });
+          if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
+          reloadTimerRef.current = window.setTimeout(() => void load(), 300);
+        },
+      )
+      .subscribe((status) => console.info("[teacher-lessons] realtime", { userId: user.id, status }));
+
+    return () => {
+      if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, teacherIdsKey]);
+
   const unitNameById = useMemo(
     () => Object.fromEntries(teachers.map((t) => [t.unit_id, t.unit_name])),
     [teachers]
@@ -206,12 +244,18 @@ export default function TeacherLessons() {
 
   const confirm = async (l: Lesson) => {
     setBusy(l.id);
+    console.info("[teacher-lessons] confirmando aula", { userId: user?.id, lessonId: l.id, teacherId: l.teacher_id, unitId: l.unit_id });
     const { error } = await supabase
       .from("school_lessons")
       .update({ status: "CONFIRMED", teacher_confirmed_at: new Date().toISOString() })
       .eq("id", l.id);
     setBusy(null);
-    if (error) return toast({ title: "Erro", description: error.message, variant: "destructive" });
+    if (error) {
+      console.error("[teacher-lessons] erro ao confirmar aula", { userId: user?.id, lessonId: l.id, error });
+      if (user) void logTeacherAppEvent({ userId: user.id, event: "teacher_lesson_confirm_error", status: "ERROR", message: error.message, teacherId: l.teacher_id, unitId: l.unit_id, details: { lesson_id: l.id } });
+      return toast({ title: "Erro", description: error.message, variant: "destructive" });
+    }
+    if (user) void logTeacherAppEvent({ userId: user.id, event: "teacher_lesson_confirmed", teacherId: l.teacher_id, unitId: l.unit_id, details: { lesson_id: l.id } });
     toast({ title: "Aula confirmada", description: "Aguardando validação do administrador." });
     load();
   };
@@ -228,7 +272,12 @@ export default function TeacherLessons() {
       })
       .eq("id", cancelOpen.id);
     setBusy(null);
-    if (error) return toast({ title: "Erro", description: error.message, variant: "destructive" });
+    if (error) {
+      console.error("[teacher-lessons] erro ao cancelar aula", { userId: user?.id, lessonId: cancelOpen.id, error });
+      if (user) void logTeacherAppEvent({ userId: user.id, event: "teacher_lesson_cancel_error", status: "ERROR", message: error.message, teacherId: cancelOpen.teacher_id, unitId: cancelOpen.unit_id, details: { lesson_id: cancelOpen.id } });
+      return toast({ title: "Erro", description: error.message, variant: "destructive" });
+    }
+    if (user) void logTeacherAppEvent({ userId: user.id, event: "teacher_lesson_canceled", teacherId: cancelOpen.teacher_id, unitId: cancelOpen.unit_id, details: { lesson_id: cancelOpen.id, has_reason: !!cancelReason } });
     toast({ title: "Aula cancelada" });
     setCancelOpen(null);
     setCancelReason("");
