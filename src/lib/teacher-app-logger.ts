@@ -34,7 +34,7 @@ export const logTeacherAppEvent = async ({
       details,
     };
 
-    const { error } = await supabase.from("teacher_app_logs").insert(payload as never);
+    const { error } = await (supabase as any).from("teacher_app_logs").insert(payload);
     if (error) console.warn("[teacher-app] falha ao registrar log", { event, error });
   } catch (error) {
     console.warn("[teacher-app] erro inesperado ao registrar log", { event, error });
