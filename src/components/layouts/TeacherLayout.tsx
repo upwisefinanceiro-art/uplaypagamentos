@@ -13,7 +13,8 @@ const menu = [
 ];
 
 export default function TeacherLayout() {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, user } = useAuth();
+  useSessionGuard(user?.id);
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
