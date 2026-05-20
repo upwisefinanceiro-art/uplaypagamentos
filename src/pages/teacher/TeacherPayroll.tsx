@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card } from "@/components/ui/card";
@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Wallet, CheckCircle2, Clock, Building2 } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+import { logTeacherAppEvent } from "@/lib/teacher-app-logger";
 
 interface Closure {
   id: string;
@@ -35,6 +37,7 @@ interface PaymentRow {
 interface TeacherRow {
   id: string;
   unit_id: string;
+  company_id: string | null;
   unit_name: string;
 }
 
@@ -73,24 +76,39 @@ export default function TeacherPayroll() {
   const [closures, setClosures] = useState<Closure[]>([]);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const reloadTimerRef = useRef<number | null>(null);
 
-  useEffect(() => {
+  const load = async () => {
     if (!user) return;
-    (async () => {
-      const { data: teacherRows } = await supabase
+    setLoading(true);
+    try {
+      console.info("[teacher-payroll] carregando vínculos", { userId: user.id });
+      const { data: teacherRows, error: teacherError } = await supabase
         .from("school_teachers")
-        .select("id,unit_id,units(name)")
-        .eq("profile_id", user.id);
+        .select("id,unit_id,company_id,active,units(name)")
+        .eq("profile_id", user.id)
+        .eq("active", true);
+      if (teacherError) throw teacherError;
+
       const list: TeacherRow[] = (teacherRows ?? []).map((t: any) => ({
         id: t.id,
         unit_id: t.unit_id,
+        company_id: t.company_id ?? null,
         unit_name: t.units?.name ?? "Unidade",
       }));
       setTeachers(list);
       if (list.length === 0) {
-        setLoading(false);
+        setClosures([]);
+        setPayments([]);
+        void logTeacherAppEvent({
+          userId: user.id,
+          event: "teacher_payroll_no_active_link",
+          status: "WARN",
+          message: "Usuário sem vínculo ativo de professor ao abrir folha",
+        });
         return;
       }
+
       const ids = list.map((t) => t.id);
       const [cRes, pRes] = await Promise.all([
         supabase
@@ -104,11 +122,74 @@ export default function TeacherPayroll() {
           .in("teacher_id", ids)
           .order("payment_date", { ascending: false }),
       ]);
+      if (cRes.error) throw cRes.error;
+      if (pRes.error) throw pRes.error;
+
       setClosures((cRes.data ?? []) as Closure[]);
       setPayments((pRes.data ?? []) as PaymentRow[]);
+      void logTeacherAppEvent({
+        userId: user.id,
+        event: "teacher_payroll_loaded",
+        teacherId: ids[0] ?? null,
+        unitId: list[0]?.unit_id ?? null,
+        companyId: list[0]?.company_id ?? null,
+        details: {
+          teacher_ids: ids,
+          unit_ids: list.map((t) => t.unit_id),
+          closures_count: cRes.data?.length ?? 0,
+          payments_count: pRes.data?.length ?? 0,
+        },
+      });
+    } catch (e: any) {
+      console.error("[teacher-payroll] erro ao carregar folha", { userId: user.id, error: e });
+      void logTeacherAppEvent({
+        userId: user.id,
+        event: "teacher_payroll_load_error",
+        status: "ERROR",
+        message: e.message,
+        details: { error: e },
+      });
+      toast({ title: "Erro ao carregar folha", description: e.message, variant: "destructive" });
+    } finally {
       setLoading(false);
-    })();
+    }
+  };
+
+  useEffect(() => {
+    void load();
   }, [user?.id]);
+
+  const teacherIdsKey = useMemo(() => teachers.map((t) => t.id).sort().join(","), [teachers]);
+
+  useEffect(() => {
+    if (!user || teachers.length === 0) return;
+    const teacherIds = teachers.map((t) => t.id);
+    const scheduleReload = (source: string, row: { teacher_id?: string; profile_id?: string } | null, eventType: string) => {
+      if (row?.teacher_id && !teacherIds.includes(row.teacher_id)) return;
+      if (row?.profile_id && row.profile_id !== user.id) return;
+      console.info("[teacher-payroll] atualização em tempo real", { userId: user.id, source, eventType });
+      if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
+      reloadTimerRef.current = window.setTimeout(() => void load(), 300);
+    };
+
+    const channel = supabase
+      .channel(`teacher-payroll-${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "school_payroll_closures" }, (payload) =>
+        scheduleReload("school_payroll_closures", (payload.new ?? payload.old) as any, payload.eventType),
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "school_teacher_payments" }, (payload) =>
+        scheduleReload("school_teacher_payments", (payload.new ?? payload.old) as any, payload.eventType),
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "school_teachers" }, (payload) =>
+        scheduleReload("school_teachers", (payload.new ?? payload.old) as any, payload.eventType),
+      )
+      .subscribe((status) => console.info("[teacher-payroll] realtime", { userId: user.id, status }));
+
+    return () => {
+      if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, teacherIdsKey]);
 
   const teacherUnitById = useMemo(
     () => Object.fromEntries(teachers.map((t) => [t.id, t])),
