@@ -1,0 +1,1 @@
+DELETE FROM payments WHERE id IN ('38cecdb1-8f28-4546-94e6-e8252b2e9828','41cacbb9-7bf9-4d14-8f27-c55619190f53') AND status = 'PENDING';
