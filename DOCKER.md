@@ -1,100 +1,116 @@
-# UPLAY Pagamentos — Deploy com Docker
+# UPLAY Pagamentos — Deploy Docker (VPS Ubuntu + Portainer)
 
-Build de produção do frontend (React + Vite + PWA) servido por **Nginx** dentro de um container Docker, orquestrado por **docker compose**.
-
-> **Backend**: o app usa Lovable Cloud (Supabase gerenciado). As Edge Functions, banco e Auth continuam rodando na nuvem — o Docker empacota **apenas o frontend**.
+Stack: **Vite + React + PWA** buildado e servido por **Nginx 1.27** dentro de container Docker.
+Backend (Supabase / Lovable Cloud) continua na nuvem — o Docker empacota apenas o **frontend**.
 
 ---
 
-## 1. Pré-requisitos
-
-- Docker 24+
-- Docker Compose v2 (`docker compose`, sem hífen)
-- Servidor Linux (Ubuntu 22.04+ recomendado) para produção
-
-## 2. Configuração
+## 1. Pré-requisitos na VPS
 
 ```bash
-cp .env.docker.example .env
-# edite .env se quiser apontar para outro projeto Supabase
+# Docker + Compose plugin
+curl -fsSL https://get.docker.com | sh
+sudo apt install -y docker-compose-plugin
+sudo usermod -aG docker $USER
+# (logout/login para aplicar o grupo)
 ```
 
-As variáveis `VITE_*` são **públicas** (embutidas no bundle) — seguras para versionar.
-
-## 3. Build & Run local
+## 2. Subir o projeto na VPS
 
 ```bash
+git clone <seu-repo> uplay
+cd uplay
+cp .env.docker.example .env        # opcional; já tem defaults
 docker compose up -d --build
 ```
 
-Acesse: <http://localhost:8080>
-
-Healthcheck: <http://localhost:8080/healthz>
-
-Logs:
-```bash
-docker compose logs -f web
+Acesse pelo IP da VPS:
+```
+http://SEU_IP_DA_VPS:8080
+http://SEU_IP_DA_VPS:8080/healthz    -> "ok"
 ```
 
-Parar:
+Libere a porta no firewall se necessário:
 ```bash
-docker compose down
+sudo ufw allow 8080/tcp
 ```
 
-## 4. Deploy em produção
+## 3. Deploy via Portainer
 
-### Opção A — Container exposto direto na porta 80/443
+1. **Stacks → Add stack**
+2. Nome: `uplay`
+3. **Build method**: *Repository* (cole a URL do seu git) **ou** *Web editor* (cole o conteúdo de `docker-compose.yml`)
+4. Em **Environment variables** (opcional, já tem defaults):
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_PUBLISHABLE_KEY`
+   - `VITE_SUPABASE_PROJECT_ID`
+5. **Deploy the stack**
 
-Edite `docker-compose.yml` e troque `"8080:80"` por `"80:80"`. Para HTTPS, coloque um Nginx host na frente (Opção B) ou use Traefik/Caddy.
+Portainer fará `docker compose build` + `up` automaticamente.
 
-### Opção B — Reverse proxy com Nginx + Let's Encrypt (recomendado)
+## 4. Atualizar versão
 
-1. Mantenha o container na porta `8080` (default do compose).
-2. No servidor host, instale Nginx + Certbot:
-   ```bash
-   sudo apt install nginx certbot python3-certbot-nginx
-   ```
-3. Use o exemplo em `nginx/nginx.proxy.conf.example` como base:
-   ```bash
-   sudo cp nginx/nginx.proxy.conf.example /etc/nginx/sites-available/uplay.conf
-   sudo ln -s /etc/nginx/sites-available/uplay.conf /etc/nginx/sites-enabled/
-   sudo certbot --nginx -d uplaypagamento.com.br -d www.uplaypagamento.com.br
-   sudo systemctl reload nginx
-   ```
-
-### Atualizar nova versão
 ```bash
+cd uplay
 git pull
 docker compose up -d --build
 docker image prune -f
 ```
 
-## 5. Estrutura criada
+No Portainer: **Stacks → uplay → Pull and redeploy**.
+
+## 5. HTTPS (opcional, recomendado para PWA em produção)
+
+Coloque um Nginx host ou Traefik/Caddy na frente:
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name seu-dominio.com.br;
+    ssl_certificate     /etc/letsencrypt/live/seu-dominio.com.br/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/seu-dominio.com.br/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+Gere o cert: `sudo certbot --nginx -d seu-dominio.com.br`
+
+## 6. Estrutura
 
 ```
 .
-├── Dockerfile                       # multi-stage: build (Node) → runtime (Nginx)
-├── .dockerignore
-├── docker-compose.yml
+├── Dockerfile               # multi-stage Node 20 -> Nginx 1.27
+├── .dockerignore            # mantém package.json, exclui node_modules/dist/.git
+├── docker-compose.yml       # serviço web na porta 8080:80
 ├── .env.docker.example
 ├── nginx/
-│   ├── nginx.conf                   # config do Nginx DENTRO do container
-│   └── nginx.proxy.conf.example     # reverse proxy + SSL no host
+│   └── nginx.conf           # SPA fallback, gzip, cache PWA-safe, /healthz
 └── DOCKER.md
 ```
 
-## 6. Detalhes do Nginx
+## 7. Correções aplicadas
 
-- **SPA fallback**: todas as rotas caem em `index.html` (React Router).
-- **PWA-safe cache**: `sw.js`, `index.html` e `.webmanifest` nunca cacheados; assets com hash em `/assets/` cacheados por 1 ano (`immutable`).
-- **Gzip** habilitado para JS/CSS/JSON/SVG/fontes.
-- **Headers de segurança**: X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy.
-- **Healthcheck**: `GET /healthz` retorna `200 ok`.
-- **`/.well-known/`** liberado (Android TWA assetlinks).
+- ✅ **`Dockerfile not found`** → Dockerfile na raiz, nome exato `Dockerfile`.
+- ✅ **`ENOENT package.json`** → `.dockerignore` mantém `package.json` + `package-lock.json`.
+- ✅ **Container vazio** → multi-stage copia `/app/dist` para `/usr/share/nginx/html`.
+- ✅ **`npm ci` falhando** → instala **todas** as deps (inclui devDeps para Vite); `package-lock.json` versionado.
+- ✅ **Env vars ausentes** → ARGs com defaults; build nunca quebra por falta de env.
+- ✅ **Porta externa** → `8080:80` (mude para `80:80` se quiser direto).
+- ✅ **Healthcheck** → `wget /healthz` (Portainer mostra status `healthy`).
+- ✅ **SPA refresh 404** → `try_files $uri /index.html` no Nginx.
+- ✅ **PWA cache** → `sw.js`/`index.html`/`.webmanifest` no-cache; `/assets/*` imutável 1y.
 
-## 7. Observações importantes
+## 8. Debug rápido
 
-- **Edge Functions** continuam deployadas via Lovable/Supabase — Docker **não** roda backend.
-- **Service Worker**: já configurado em `vite.config.ts` para auto-update; o Nginx reforça `no-cache` no `sw.js`.
-- **Service Worker em iframe**: `src/main.tsx` desabilita SW em hosts de preview Lovable. Em produção (seu domínio) ele é ativado normalmente.
-- **HTTPS é obrigatório** para PWA + Service Worker em produção. Use Opção B acima.
+```bash
+docker compose logs -f web                  # logs nginx
+docker compose ps                           # status + healthcheck
+docker exec -it uplay-web sh                # shell no container
+docker exec uplay-web ls /usr/share/nginx/html   # confirmar dist copiado
+```
