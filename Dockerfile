@@ -42,8 +42,17 @@ WORKDIR /app
 RUN rm -f /etc/nginx/conf.d/default.conf
 COPY nginx/nginx.conf /etc/nginx/conf.d/default.conf
 
-COPY package.json package-lock.json ./
+COPY --from=builder /app/package.json /app/package-lock.json ./
+COPY --from=builder /app/index.html /app/vite.config.ts /app/tsconfig.json /app/tsconfig.app.json /app/tsconfig.node.json /app/tailwind.config.ts /app/postcss.config.js ./
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/src ./src
 COPY --from=builder /app/dist ./dist
+
+RUN test -f /app/package.json \
+  && test -d /app/src \
+  && test -d /app/public \
+  && test -f /app/vite.config.ts \
+  && test -f /app/dist/index.html
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -qO- http://127.0.0.1/healthz || exit 1
