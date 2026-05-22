@@ -1,0 +1,17 @@
+node_modules
+dist
+.git
+.github
+.lovable
+.vscode
+.idea
+tmp
+mem
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+supabase/.branches
+supabase/.temp
+coverage
