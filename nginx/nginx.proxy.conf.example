@@ -30,9 +30,10 @@ server {
     # HSTS
     add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
 
-    # Proxy para o container Docker
+    # Proxy para o container Docker publicado na porta 80 do host.
+    # Se este Nginx estiver dentro da mesma rede Docker, use: http://upplay_app:80
     location / {
-        proxy_pass http://127.0.0.1:8080;
+        proxy_pass http://127.0.0.1:80;
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
