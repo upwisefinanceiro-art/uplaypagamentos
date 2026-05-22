@@ -1,7 +1,6 @@
 # UPLAY Pagamentos — Deploy Docker (VPS Ubuntu + Portainer)
 
-Stack: **Vite + React + PWA** buildado e servido por **Nginx 1.27** dentro de container Docker.
-Backend (Supabase / Lovable Cloud) continua na nuvem — o Docker empacota apenas o **frontend**.
+Stack: **Vite + React + PWA** buildado em multi-stage e servido por **Nginx 1.27** dentro do container `upplay_app` na porta **80**. Não usa `npm run dev`, não usa Vite preview e não possui volume bind sobrescrevendo `/app`.
 
 ---
 
@@ -20,19 +19,19 @@ sudo usermod -aG docker $USER
 ```bash
 git clone <seu-repo> uplay
 cd uplay
-cp .env.docker.example .env        # opcional; já tem defaults
+cp .env.example .env        # opcional; já tem defaults
 docker compose up -d --build
 ```
 
 Acesse pelo IP da VPS:
 ```
-http://SEU_IP_DA_VPS:8080
-http://SEU_IP_DA_VPS:8080/healthz    -> "ok"
+http://SEU_IP_DA_VPS
+http://SEU_IP_DA_VPS/healthz    -> "ok"
 ```
 
 Libere a porta no firewall se necessário:
 ```bash
-sudo ufw allow 8080/tcp
+sudo ufw allow 80/tcp
 ```
 
 ## 3. Deploy via Portainer
@@ -71,7 +70,7 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/seu-dominio.com.br/privkey.pem;
 
     location / {
-        proxy_pass http://127.0.0.1:8080;
+        proxy_pass http://127.0.0.1:80;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -87,7 +86,7 @@ Gere o cert: `sudo certbot --nginx -d seu-dominio.com.br`
 .
 ├── Dockerfile               # multi-stage Node 20 -> Nginx 1.27
 ├── .dockerignore            # mantém package.json, exclui node_modules/dist/.git
-├── docker-compose.yml       # serviço web na porta 8080:80
+├── docker-compose.yml       # serviço upplay_app na porta 80:80
 ├── .env.docker.example
 ├── nginx/
 │   └── nginx.conf           # SPA fallback, gzip, cache PWA-safe, /healthz
@@ -98,10 +97,10 @@ Gere o cert: `sudo certbot --nginx -d seu-dominio.com.br`
 
 - ✅ **`Dockerfile not found`** → Dockerfile na raiz, nome exato `Dockerfile`.
 - ✅ **`ENOENT package.json`** → `.dockerignore` mantém `package.json` + `package-lock.json`.
-- ✅ **Container vazio** → multi-stage copia `/app/dist` para `/usr/share/nginx/html`.
+- ✅ **Container vazio** → multi-stage gera `/app/dist`; compose não possui `volumes:` para sobrescrever `/app`.
 - ✅ **`npm ci` falhando** → instala **todas** as deps (inclui devDeps para Vite); `package-lock.json` versionado.
 - ✅ **Env vars ausentes** → ARGs com defaults; build nunca quebra por falta de env.
-- ✅ **Porta externa** → `8080:80` (mude para `80:80` se quiser direto).
+- ✅ **Porta externa** → `80:80` direto para VPS/Portainer.
 - ✅ **Healthcheck** → `wget /healthz` (Portainer mostra status `healthy`).
 - ✅ **SPA refresh 404** → `try_files $uri /index.html` no Nginx.
 - ✅ **PWA cache** → `sw.js`/`index.html`/`.webmanifest` no-cache; `/assets/*` imutável 1y.
@@ -109,8 +108,9 @@ Gere o cert: `sudo certbot --nginx -d seu-dominio.com.br`
 ## 8. Debug rápido
 
 ```bash
-docker compose logs -f web                  # logs nginx
+docker compose logs -f upplay_app           # logs nginx
 docker compose ps                           # status + healthcheck
-docker exec -it uplay-web sh                # shell no container
-docker exec uplay-web ls /usr/share/nginx/html   # confirmar dist copiado
+docker exec -it upplay_app sh               # shell no container
+docker exec upplay_app ls -la /app          # deve mostrar dist + package*.json
+docker exec upplay_app test -f /app/dist/index.html
 ```
