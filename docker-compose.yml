@@ -10,8 +10,12 @@ services:
     image: uplay-pagamentos:latest
     container_name: uplay-web
     restart: unless-stopped
+    # Porta 80 do host -> porta 80 do nginx no container
+    # Para acessar via http://2.24.117.9 (sem :8080)
     ports:
-      - "8080:80"
+      - "80:80"
+    expose:
+      - "80"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
       interval: 30s
