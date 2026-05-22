@@ -150,7 +150,8 @@ sudo ufw status                               # firewall liberado?
 |---|---|---|
 | `Could not read package.json` | `.dockerignore` ignorava o arquivo | Já corrigido — `.dockerignore` preserva `package.json` e `package-lock.json` |
 | `Dockerfile not found` | Dockerfile fora da raiz | Já corrigido — está em `./Dockerfile` |
-| Container sobe mas não abre externo | Porta 8080 fechada no firewall, ou porta 80 já ocupada por outro serviço (apache, nginx host) | `sudo ss -tlnp | grep :80` e pare o concorrente: `sudo systemctl disable --now apache2 nginx` |
+| Container com `/app` vazio | Build feito sem contexto Git completo ou volume bind sobrescrevendo `/app` | Já corrigido: compose não tem `volumes`; use Portainer com Repository/Git e rebuild sem cache |
+| Container sobe mas não abre externo | Porta 80 já ocupada ou firewall bloqueando | `sudo ss -tlnp | grep :80` e `sudo ufw allow 80/tcp` |
 | `bind: address already in use` | Outro container/serviço na porta 80 | Pare o conflitante ou troque para `"8080:80"` |
 | Vite "bind host" | **Não se aplica em produção** — Vite só roda em build. O runtime é Nginx | Ignorar |
 | 404 ao recarregar rota interna | SPA fallback | Já corrigido — `try_files $uri /index.html` |
@@ -201,8 +202,9 @@ Não há nada para configurar no container além das variáveis `VITE_*` — tod
 
 - [x] `Dockerfile` multi-stage Node 20 → Nginx 1.27
 - [x] `npm ci` com devDeps (Vite precisa) e `npm run build`
-- [x] Nginx servindo `/usr/share/nginx/html` com SPA fallback
+- [x] Nginx servindo `/app/dist` com SPA fallback
 - [x] Container publicando porta **80** do host
+- [x] Sem `volumes:` no compose para não sobrescrever `/app`
 - [x] Healthcheck `/healthz` para Portainer
 - [x] Variáveis `VITE_*` com defaults — build não quebra sem `.env`
 - [x] `.dockerignore` preserva `package.json`/`package-lock.json`
