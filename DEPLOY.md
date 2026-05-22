@@ -95,7 +95,7 @@ Via Portainer:
 ## 5. Reiniciar / parar
 
 ```bash
-docker compose restart web          # reinicia
+docker compose restart upplay_app   # reinicia
 docker compose down                 # para e remove
 docker compose up -d                # sobe novamente (sem rebuild)
 docker compose up -d --build        # sobe forçando rebuild
@@ -110,8 +110,8 @@ Como o container já ocupa a porta 80, a forma mais limpa é:
 **Opção A — Caddy na frente (1 comando, SSL automático):**
 
 ```bash
-# parar o container web da porta 80 e religar em 8080
-# edite docker-compose.yml: trocar "80:80" por "8080:80" e:
+# se usar Caddy no host, libere a porta 80/443 para ele e publique o app em 127.0.0.1:8080:80
+# alternativa: editar ports para "127.0.0.1:8080:80" e subir novamente:
 docker compose up -d
 
 # instalar Caddy no host
@@ -134,9 +134,10 @@ Aponte o DNS A do domínio para **2.24.117.9** e o Caddy emite o cert Let's Encr
 
 ```bash
 docker compose ps                             # status + healthcheck
-docker compose logs -f web                    # logs nginx + build
-docker exec -it uplay-web sh                  # shell dentro
-docker exec uplay-web ls /usr/share/nginx/html  # confirmar dist copiado
+docker compose logs -f upplay_app             # logs nginx/runtime
+docker exec -it upplay_app sh                 # shell dentro
+docker exec upplay_app ls -la /app            # deve mostrar dist + package*.json
+docker exec upplay_app test -f /app/dist/index.html
 curl -I http://127.0.0.1/healthz              # no host: deve dar 200
 curl -I http://2.24.117.9/                    # de fora: deve dar 200
 sudo ss -tlnp | grep :80                      # quem está na porta 80
