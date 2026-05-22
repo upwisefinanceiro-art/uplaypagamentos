@@ -1,8 +1,8 @@
-# UPLAY Pagamentos — Deploy Definitivo (VPS Hostinger Ubuntu 24 + Portainer)
+# UPLAY Pagamentos — Deploy Docker Produção (VPS Hostinger + Portainer)
 
 VPS alvo: **2.24.117.9** · Acesso final: **http://2.24.117.9**
 
-> Stack final: **Vite + React + PWA** buildados em multi-stage e servidos pelo **Nginx 1.27** dentro de um único container Docker. O backend (Supabase / Lovable Cloud) permanece em nuvem — o Docker empacota só o **frontend**.
+Stack final: **React/Vite buildado em multi-stage** e servido por **Nginx 1.27** dentro do container `upplay_app` na porta **80**. Não usa `npm run dev`, não usa Vite preview e não possui volume bind sobrescrevendo `/app`.
 
 ---
 
@@ -10,11 +10,11 @@ VPS alvo: **2.24.117.9** · Acesso final: **http://2.24.117.9**
 
 ```
 .
-├── Dockerfile               # multi-stage Node 20 -> Nginx 1.27 (FINAL)
-├── docker-compose.yml       # publica na porta 80 do host (FINAL)
-├── nginx/nginx.conf         # SPA fallback + PWA cache + /healthz (FINAL)
-├── .dockerignore            # preserva package.json e package-lock.json
-├── .env.docker.example      # variáveis públicas do Vite
+├── Dockerfile               # Node 20 build -> Nginx runtime em /app/dist
+├── docker-compose.yml       # upplay_app publicado em 80:80, sem volumes
+├── nginx/nginx.conf         # serve /app/dist + SPA fallback + /healthz
+├── .dockerignore            # não remove package.json/package-lock.json
+├── .env.example             # variáveis públicas do Vite
 └── DEPLOY.md                # este guia
 ```
 
@@ -42,15 +42,15 @@ cd /opt
 git clone <URL_DO_SEU_REPO> uplay
 cd uplay
 
-# 2) (Opcional) criar .env com valores públicos do Supabase
-cp .env.docker.example .env
+# 2) Opcional: criar .env com variáveis públicas do Vite
+cp .env.example .env
 
 # 3) Build + up
 docker compose up -d --build
 
 # 4) Conferir
 docker compose ps
-docker compose logs -f web
+docker compose logs -f upplay_app
 ```
 
 Acesse:
@@ -73,7 +73,7 @@ Se algo não responder, ver seção **Debug** abaixo.
    - `VITE_SUPABASE_PROJECT_ID`
 5. **Deploy the stack**
 
-Portainer executa `docker compose build && up -d` automaticamente. Container fica como **`uplay-web` (healthy)**.
+Portainer deve usar **Repository/Git** como método de build. Não use apenas Web editor se o código completo não estiver disponível, porque o build precisa de `package.json`, `src`, `public` e `vite.config.ts`. O container final fica como **`upplay_app` (healthy)**.
 
 ---
 
