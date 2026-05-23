@@ -1,6 +1,6 @@
-# syntax=docker/dockerfile:1.6
 # =========================================================
-# UPLAY Pagamentos — Production Dockerfile (Caddy-only, sem Nginx)
+# UPLAY Pagamentos — Production Dockerfile
+# 100% compatível com Docker Engine legacy (sem BuildKit obrigatório)
 # Stage 1: build Vite | Stage 2: Caddy servindo /srv (porta 80 interna)
 # =========================================================
 
@@ -10,12 +10,10 @@ WORKDIR /app
 
 RUN apk add --no-cache python3 make g++ libc6-compat
 
-# Copia package.json (lockfile é opcional — regenerado se incompatível)
 COPY package.json ./
 COPY package-lock.json* ./
 
-# Estratégia resiliente Linux: limpa lockfile cross-platform e instala do zero
-# Evita erros de @rollup/rollup-win32-* e dependências opcionais Windows-only
+# Estratégia resiliente Linux: evita erros de @rollup/rollup-win32-* (lockfile Windows)
 RUN rm -rf node_modules \
  && npm install --no-audit --no-fund --legacy-peer-deps \
  && npm cache clean --force
@@ -39,28 +37,10 @@ RUN npm run build && test -f dist/index.html
 FROM caddy:2.8-alpine AS runtime
 WORKDIR /srv
 
-# Caddyfile interno do app — serve SPA + healthcheck
-COPY <<'EOF' /etc/caddy/Caddyfile
-{
-  admin off
-  auto_https off
-  persist_config off
-}
-:80 {
-  root * /srv
-  encode zstd gzip
-  @static path *.js *.css *.png *.jpg *.jpeg *.svg *.webp *.woff *.woff2 *.ico
-  header @static Cache-Control "public, max-age=31536000, immutable"
-  header /index.html Cache-Control "no-cache"
-  header /sw.js Cache-Control "no-cache"
-  handle /healthz {
-    respond "ok" 200
-  }
-  try_files {path} /index.html
-  file_server
-}
-EOF
+# Caddyfile físico (sem heredoc — compatível Docker legacy)
+COPY docker/Caddyfile.app /etc/caddy/Caddyfile
 
+# Build estático Vite
 COPY --from=builder /app/dist /srv
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
