@@ -153,17 +153,24 @@ bash scripts/health.sh
 docker compose -f docker-compose.prod.yml logs -f upplay_app
 docker compose -f docker-compose.prod.yml logs -f caddy
 
-# Atualizar manualmente
+# Atualizar manualmente (git pull + rebuild + health)
 bash scripts/update.sh
+
+# Rollback rápido (volta 1 commit OU para um hash)
+bash scripts/rollback.sh
+bash scripts/rollback.sh 1a2b3c4
+
+# Backup sob demanda
+docker exec uplay_backup /usr/local/bin/backup.sh
+
+# Restore
+export SUPABASE_DB_URL='postgresql://...'
+bash scripts/restore.sh backups/uplay_YYYYMMDD_030000.sql.gz
 
 # Reiniciar apenas o app
 docker compose -f docker-compose.prod.yml restart upplay_app
-
-# Restaurar backup
-ls backups/
-export SUPABASE_DB_URL='postgresql://...'
-bash scripts/restore.sh backups/uplay_YYYYMMDD_030000.sql.gz
 ```
+
 
 ---
 
@@ -266,3 +273,48 @@ docker exec -it uplay_caddy caddy validate --config /etc/caddy/Caddyfile
 ```
 
 Pronto para produção enterprise.
+
+---
+
+## 14. Plano de manutenção (rotina enxuta)
+
+### Diário (automatizado — você não faz nada)
+- 03:00 BRT → `uplay_backup` gera `uplay_YYYYMMDD_030000.sql.gz` (retenção 14 dias)
+- A cada 5 min → `watchtower` checa nova imagem e re-deploya se houver
+- Healthcheck Docker reinicia container que falhar 3× seguidas
+
+### Semanal (5 minutos)
+- `bash scripts/health.sh` na VPS — confirma 4 containers `healthy` + endpoint HTTPS 200
+- Conferir UptimeRobot (zero downtime esperado)
+- `docker system df` — se >70%, rodar `docker system prune -af --volumes=false`
+
+### Mensal (15 minutos)
+- `apt update && apt upgrade -y && reboot` (unattended-upgrades já faz security patches)
+- Conferir tamanho do `backups/` (≈ 14 arquivos)
+- Testar restore em ambiente local com 1 backup recente
+- Rodar `security--run_security_scan` no Lovable e revisar findings
+- Revisar logs de erro: `docker compose -f docker-compose.prod.yml logs --since 720h | grep -iE 'error|fail' | tail -50`
+
+### Trimestral
+- Rotacionar chave SSH do GitHub Actions (`VPS_SSH_KEY`)
+- Revisar plano da VPS Hostinger (CPU/RAM/Disco) vs uso real (`docker stats`)
+- Atualizar imagens base manualmente: `docker compose -f docker-compose.prod.yml pull && bash scripts/update.sh`
+
+### Em caso de incidente
+1. `bash scripts/health.sh` — identifica container quebrado
+2. `docker compose -f docker-compose.prod.yml logs --tail=200 <container>`
+3. Se foi deploy ruim → `bash scripts/rollback.sh` (volta 1 commit, ~30s)
+4. Se foi banco → `bash scripts/restore.sh backups/<último_bom>.sql.gz`
+5. Avisar usuários via WhatsApp/in-app banner
+
+---
+
+## 15. Custo mínimo recomendado (Hostinger VPS)
+
+| Plano | Specs | Suficiente para |
+|---|---|---|
+| **KVM 2** | 2 vCPU · 8 GB RAM · 100 GB NVMe | até ~5k usuários ativos/mês (sobra) |
+| KVM 1 | 1 vCPU · 4 GB RAM · 50 GB NVMe | MVP / até ~1k usuários |
+
+Toda a carga pesada (DB, auth, edge, storage, realtime) roda na Lovable Cloud. A VPS só serve HTML/JS/CSS estático via Caddy+Nginx — consumo real esperado: **<200 MB RAM, <5% CPU**.
+
