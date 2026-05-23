@@ -75,9 +75,10 @@ Side-cars: uplay_watchtower (auto-update 5min) · uplay_backup (pg_dump 03:00 BR
 
 | Arquivo | Função |
 |---|---|
-| `Dockerfile` | Build Vite → Caddy alpine (porta 80 interna) |
+| `Dockerfile` | Build Vite → Caddy alpine interno, com `COPY Caddyfile /etc/caddy/Caddyfile` legacy |
 | `docker-compose.prod.yml` | Stack (app + caddy + watchtower + backup) |
-| `Caddyfile` | Reverse proxy público com HTTPS automático |
+| `Caddyfile` | Caddy interno do app, porta 80, sem TLS/BuildKit/heredoc |
+| `docker/Caddyfile.proxy` | Reverse proxy público com HTTPS automático |
 | `scripts/update.sh` | git pull + rebuild + health |
 | `scripts/rollback.sh` | Volta 1 commit (ou hash) |
 | `scripts/backup.sh` | pg_dump diário (executa dentro do container) |
