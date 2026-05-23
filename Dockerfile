@@ -28,6 +28,7 @@ FROM caddy:2.8-alpine AS runtime
 WORKDIR /srv
 
 COPY Caddyfile /etc/caddy/Caddyfile
+COPY docker/Caddyfile.app /etc/caddy/app.conf
 COPY --from=builder /app/dist /srv
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD wget -qO- http://127.0.0.1/healthz || exit 1
