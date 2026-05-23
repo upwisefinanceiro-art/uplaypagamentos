@@ -3,6 +3,9 @@
 Stack 100% Caddy (sem Nginx), comandos com `docker-compose` legacy.
 VPS Hostinger Ubuntu — IP `2.24.117.9` — domínio `uplaypagamento.com.br`.
 
+> **Fluxo enxuto:** `bash install-vps.sh` (uma vez) → `bash deploy-prod.sh` (toda vez).
+VPS Hostinger Ubuntu — IP `2.24.117.9` — domínio `uplaypagamento.com.br`.
+
 ---
 
 ## 1. Arquitetura
