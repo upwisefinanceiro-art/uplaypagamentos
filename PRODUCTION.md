@@ -3,10 +3,49 @@
 Stack 100% Caddy (sem Nginx), comandos com `docker-compose` legacy.
 VPS Hostinger Ubuntu — IP `2.24.117.9` — domínio `uplaypagamento.com.br`.
 
-> **Fluxo enxuto:** `bash install-vps.sh` (uma vez) → `bash deploy-prod.sh` (toda vez).
-VPS Hostinger Ubuntu — IP `2.24.117.9` — domínio `uplaypagamento.com.br`.
+> **Fluxo enxuto:**
+> - **Bootstrap (1x):** `bash install-vps.sh`
+> - **Deploy contínuo:** apenas `git push` no Lovable/GitHub → GitHub Actions → VPS atualiza sozinha
+> - **Deploy manual emergencial:** `bash deploy-prod.sh`
 
 ---
+
+## 0. CI/CD — Lovable → GitHub → VPS
+
+Fluxo 100% automático:
+
+```
+Lovable (edit)
+     │  (auto-sync 2-way)
+     ▼
+GitHub (push em main)
+     │  (GitHub Actions)
+     ▼
+SSH na VPS  →  bash deploy-prod.sh
+     │
+     ▼
+ Produção HTTPS (uplaypagamento.com.br)
+```
+
+### Segredos do GitHub (Settings → Secrets and variables → Actions)
+
+| Secret | Valor |
+|---|---|
+| `VPS_HOST` | `2.24.117.9` |
+| `VPS_USER` | `root` |
+| `VPS_SSH_KEY` | conteúdo da chave SSH privada (`~/.ssh/id_ed25519`) |
+| `VPS_PORT` | `22` (opcional) |
+
+Gerar chave na sua máquina e instalar na VPS:
+```bash
+ssh-keygen -t ed25519 -C "github-actions" -f ~/.ssh/uplay_deploy
+ssh-copy-id -i ~/.ssh/uplay_deploy.pub root@2.24.117.9
+cat ~/.ssh/uplay_deploy           # cole em VPS_SSH_KEY
+```
+
+Workflow: `.github/workflows/deploy.yml` — dispara em todo `push` para `main`.
+
+
 
 ## 1. Arquitetura
 
@@ -207,3 +246,59 @@ docker exec uplay_backup /usr/local/bin/backup.sh
 # Logs ao vivo
 docker-compose -f docker-compose.prod.yml logs -f --tail 100
 ```
+
+---
+
+## 16. Disaster Recovery — VPS perdida do zero
+
+Cenário: VPS apagada, hardware morreu, ou rebuild total. Tempo total: ~10 min.
+
+```bash
+# 1) Provisionar VPS Ubuntu nova (Hostinger KVM 2) e apontar DNS
+#    A @     -> NOVO_IP
+#    A www   -> NOVO_IP
+
+# 2) Acessar e bootstrap
+ssh root@NOVO_IP
+bash <(curl -fsSL https://raw.githubusercontent.com/<SEU_USER>/uplaypagamentos/main/install-vps.sh)
+
+# 3) Clonar repositório
+git clone https://github.com/<SEU_USER>/uplaypagamentos.git /root/uplaypagamentos
+cd /root/uplaypagamentos
+
+# 4) Restaurar .env (de backup local seguro / 1Password / cofre)
+nano .env
+chmod 600 .env
+
+# 5) Deploy
+bash deploy-prod.sh
+
+# 6) (Opcional) Restaurar backup do Supabase
+#    O banco fica no Lovable Cloud — só precisa restaurar se houve dano lógico
+bash scripts/restore.sh backups/uplay_YYYYMMDD_030000.sql.gz
+
+# 7) Atualizar secret VPS_HOST no GitHub para o NOVO_IP
+#    GitHub → Settings → Secrets → VPS_HOST = NOVO_IP
+```
+
+Tudo o mais (containers, Caddy, certificado SSL, watchtower, cron de backup) sobe automaticamente.
+
+---
+
+## 17. Único comando para deploy futuro
+
+Após o setup inicial, **o único comando que você precisa rodar é nenhum**:
+
+```bash
+# No Lovable: simplesmente faça as alterações
+# No GitHub: o push é automático
+# Na VPS:   GitHub Actions executa bash deploy-prod.sh sozinho
+```
+
+Para deploy manual emergencial (sem passar pelo GitHub):
+
+```bash
+ssh root@2.24.117.9 'cd /root/uplaypagamentos && bash deploy-prod.sh'
+```
+
+**Esse é o único comando que você precisa lembrar.**
