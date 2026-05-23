@@ -1,5 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.98.0";
-import { corsHeaders } from "https://esm.sh/@supabase/supabase-js@2.95.0/cors";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Max-Age": "86400",
+};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -12,7 +18,6 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Verify caller is SUPER_ADMIN
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Não autorizado" }), {
@@ -56,7 +61,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check if email already exists
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
     const emailExists = existingUsers?.users?.some(
       (u) => u.email?.toLowerCase() === admin_email.toLowerCase()
@@ -69,7 +73,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Create auth user with default password
     const defaultPassword = "12345678";
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email: admin_email,
@@ -91,7 +94,6 @@ Deno.serve(async (req) => {
 
     const userId = newUser.user.id;
 
-    // Update profile with unit_id and name
     await supabaseAdmin
       .from("profiles")
       .update({
@@ -101,7 +103,6 @@ Deno.serve(async (req) => {
       })
       .eq("id", userId);
 
-    // Assign ADMIN_MASTER role
     await supabaseAdmin.from("user_roles").insert({
       user_id: userId,
       role: "ADMIN_MASTER",
@@ -117,7 +118,7 @@ Deno.serve(async (req) => {
     );
   } catch (err) {
     return new Response(
-      JSON.stringify({ error: err.message || "Erro interno" }),
+      JSON.stringify({ error: err instanceof Error ? err.message : "Erro interno" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
