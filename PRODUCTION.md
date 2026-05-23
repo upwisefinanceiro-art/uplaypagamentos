@@ -58,43 +58,26 @@ SUPABASE_DB_URL=postgresql://postgres:<senha>@db.kfhjoffsqfnwiiwgelhl.supabase.c
 
 ---
 
-## 4. Deploy inicial (uma vez)
+## 4. Deploy inicial — DOIS COMANDOS
 
 ```bash
 ssh root@2.24.117.9
 
-# Pré-requisitos (caso ainda não tenha)
-curl -fsSL https://get.docker.com | sh
-apt-get install -y docker-compose git ufw fail2ban unattended-upgrades
+# (1) Bootstrap da VPS — instala docker, docker-compose, git, ufw, firewall
+bash install-vps.sh
 
-# Firewall
-ufw allow OpenSSH && ufw allow 80/tcp && ufw allow 443/tcp && ufw allow 443/udp
-ufw --force enable
+# Clonar o repositório (se ainda não estiver)
+[ -d /root/uplaypagamentos ] || git clone https://github.com/<SEU_USER>/uplaypagamentos.git /root/uplaypagamentos
+cd /root/uplaypagamentos
+cp -n .env.production.example .env && nano .env   # cole SUPABASE_DB_URL real
 
-# Repositório
-cd /root
-[ -d uplaypagamentos ] || git clone https://github.com/<SEU_USER>/uplaypagamentos.git
-cd uplaypagamentos
-git pull --ff-only
-
-# Variáveis
-cp .env.production.example .env
-nano .env                 # cole a SUPABASE_DB_URL real
-chmod 600 .env
-
-# Caddyfile — ajustar e-mail Let's Encrypt
-nano Caddyfile
-
-# Permissões scripts
-chmod +x scripts/*.sh
-
-# Subir stack
-docker-compose -f docker-compose.prod.yml down --remove-orphans || true
-docker-compose -f docker-compose.prod.yml up -d --build
-
-# Validar
-bash scripts/health.sh
+# (2) Deploy completo automático — git pull, build, up, healthcheck
+bash deploy-prod.sh
 ```
+
+Os dois scripts são **idempotentes** — podem rodar quantas vezes quiser.
+
+DNS: aponte `A @` e `A www` para `2.24.117.9` antes do `deploy-prod.sh`.
 
 DNS: aponte `A @` e `A www` para `2.24.117.9` antes do `up`.
 Acesso final: **https://uplaypagamento.com.br** (cert emitido automaticamente).
