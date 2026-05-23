@@ -1,0 +1,157 @@
+# =========================================================
+# UPLAY Pagamentos — Stack de PRODUÇÃO (VPS Hostinger)
+# Uso: docker compose -f docker-compose.prod.yml up -d --build
+#
+# Serviços:
+#   - upplay_app   : SPA React/Vite servido por Nginx interno (porta 80 do container)
+#   - caddy        : Reverse proxy + HTTPS automático (Let's Encrypt) nas portas 80/443
+#   - watchtower   : Atualização automática de imagens (opcional, intervalo 5min)
+#   - backup       : Cron diário de pg_dump do banco Supabase (Lovable Cloud)
+# =========================================================
+
+services:
+  upplay_app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}
+        VITE_SUPABASE_PROJECT_ID: ${VITE_SUPABASE_PROJECT_ID}
+    image: uplay-pagamentos:latest
+    container_name: upplay_app
+    hostname: upplay_app
+    restart: unless-stopped
+    expose:
+      - "80"
+    # Sem volumes bind — não sobrescrever /app
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          memory: 128M
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - uplay-net
+
+  caddy:
+    image: caddy:2.8-alpine
+    container_name: uplay_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - caddy_logs:/var/log/caddy
+    depends_on:
+      upplay_app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - uplay-net
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: uplay_watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_POLL_INTERVAL: "300"
+      WATCHTOWER_INCLUDE_RESTARTING: "true"
+      TZ: "America/Sao_Paulo"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+    networks:
+      - uplay-net
+
+  backup:
+    image: postgres:16-alpine
+    container_name: uplay_backup
+    restart: unless-stopped
+    environment:
+      SUPABASE_DB_URL: ${SUPABASE_DB_URL}
+      BACKUP_RETENTION_DAYS: "14"
+      TZ: "America/Sao_Paulo"
+    volumes:
+      - ./backups:/backups
+      - ./scripts/backup.sh:/usr/local/bin/backup.sh:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        apk add --no-cache bash gzip tzdata >/dev/null 2>&1
+        echo "0 3 * * * /usr/local/bin/backup.sh >> /backups/backup.log 2>&1" > /etc/crontabs/root
+        echo "[uplay_backup] cron registered (daily 03:00 America/Sao_Paulo)"
+        crond -f -l 2
+    deploy:
+      resources:
+        limits:
+          cpus: "0.3"
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+    networks:
+      - uplay-net
+
+networks:
+  uplay-net:
+    driver: bridge
+    name: uplay-net
+
+volumes:
+  caddy_data:
+    name: uplay_caddy_data
+  caddy_config:
+    name: uplay_caddy_config
+  caddy_logs:
+    name: uplay_caddy_logs
