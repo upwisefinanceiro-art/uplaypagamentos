@@ -162,4 +162,27 @@ export default defineConfig(({ mode }) => ({
   optimizeDeps: {
     include: ["react", "react-dom"],
   },
+  build: {
+    target: "es2020",
+    cssCodeSplit: true,
+    sourcemap: false,
+    chunkSizeWarningLimit: 1200,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+          if (id.includes("@radix-ui")) return "vendor-radix";
+          if (id.includes("recharts") || id.includes("d3-")) return "vendor-charts";
+          if (id.includes("html2canvas") || id.includes("jspdf") || id.includes("dompurify")) return "vendor-pdf";
+          if (id.includes("@tanstack")) return "vendor-query";
+          if (id.includes("@supabase")) return "vendor-supabase";
+          if (id.includes("react-router")) return "vendor-router";
+          if (id.includes("lucide-react")) return "vendor-icons";
+          if (id.includes("date-fns")) return "vendor-date";
+          if (id.includes("react-dom") || id.includes("/react/") || id.includes("scheduler")) return "vendor-react";
+          return "vendor";
+        },
+      },
+    },
+  },
 }));
