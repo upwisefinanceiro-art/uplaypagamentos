@@ -153,17 +153,24 @@ bash scripts/health.sh
 docker compose -f docker-compose.prod.yml logs -f upplay_app
 docker compose -f docker-compose.prod.yml logs -f caddy
 
-# Atualizar manualmente
+# Atualizar manualmente (git pull + rebuild + health)
 bash scripts/update.sh
+
+# Rollback rápido (volta 1 commit OU para um hash)
+bash scripts/rollback.sh
+bash scripts/rollback.sh 1a2b3c4
+
+# Backup sob demanda
+docker exec uplay_backup /usr/local/bin/backup.sh
+
+# Restore
+export SUPABASE_DB_URL='postgresql://...'
+bash scripts/restore.sh backups/uplay_YYYYMMDD_030000.sql.gz
 
 # Reiniciar apenas o app
 docker compose -f docker-compose.prod.yml restart upplay_app
-
-# Restaurar backup
-ls backups/
-export SUPABASE_DB_URL='postgresql://...'
-bash scripts/restore.sh backups/uplay_YYYYMMDD_030000.sql.gz
 ```
+
 
 ---
 
