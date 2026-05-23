@@ -1,10 +1,8 @@
-# UPLAY Pagamentos — Reverse proxy + HTTPS automático (Let's Encrypt)
-# Edite os domínios abaixo conforme necessário.
+# UPLAY Pagamentos — Reverse proxy público (HTTPS automático Let's Encrypt)
+# Domínio: uplaypagamento.com.br | VPS: 2.24.117.9
 
 {
-	# Email obrigatório para Let's Encrypt — troque pelo seu antes do 1º deploy
 	email admin@uplaypagamento.com.br
-	# Logs estruturados em JSON
 	log {
 		output file /var/log/caddy/access.log {
 			roll_size 10mb
@@ -17,11 +15,9 @@
 	}
 }
 
-# ---------- Produção (HTTPS automático) ----------
 uplaypagamento.com.br, www.uplaypagamento.com.br {
 	encode zstd gzip
 
-	# Headers de segurança
 	header {
 		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
 		X-Content-Type-Options "nosniff"
@@ -31,7 +27,6 @@ uplaypagamento.com.br, www.uplaypagamento.com.br {
 		-Server
 	}
 
-	# Healthcheck público (curl/uptime)
 	handle /healthz {
 		respond "ok" 200
 	}
@@ -47,8 +42,7 @@ uplaypagamento.com.br, www.uplaypagamento.com.br {
 	}
 }
 
-# ---------- Fallback HTTP direto via IP (sem TLS) ----------
-# Útil para teste rápido com IP da VPS antes do DNS propagar.
+# Fallback HTTP direto via IP (sem TLS) — útil antes do DNS propagar
 :80 {
 	@notACME not path /.well-known/acme-challenge/*
 	handle /healthz {
