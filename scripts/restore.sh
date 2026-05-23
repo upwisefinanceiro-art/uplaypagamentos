@@ -1,20 +1,18 @@
 #!/usr/bin/env bash
-# UPLAY Pagamentos — Restore manual de um backup
-# Uso: bash scripts/restore.sh ./backups/uplay_20260101_030000.sql.gz
+# UPLAY Pagamentos — Restore manual
+# Uso: SUPABASE_DB_URL='postgresql://...' bash scripts/restore.sh backups/uplay_YYYYMMDD_HHMMSS.sql.gz
 set -euo pipefail
 
-FILE="${1:-}"
-if [[ -z "$FILE" || ! -f "$FILE" ]]; then
-  echo "Uso: $0 <arquivo.sql.gz>"
-  ls -lh backups/ 2>/dev/null || true
-  exit 1
-fi
+FILE="${1:?Informe o arquivo .sql.gz}"
+: "${SUPABASE_DB_URL:?Exporte SUPABASE_DB_URL antes (postgresql://...)}"
+[[ -f "$FILE" ]] || { echo "Arquivo não encontrado: $FILE"; exit 1; }
 
-: "${SUPABASE_DB_URL:?Defina SUPABASE_DB_URL no shell antes de rodar}"
+echo "==> Restaurando $FILE no banco Supabase"
+read -r -p "ATENÇÃO: isto sobrescreve o schema public. Digite RESTORE: " C
+[[ "$C" == "RESTORE" ]] || { echo "Abortado."; exit 1; }
 
-echo ">>> ATENÇÃO: vai restaurar ${FILE} sobre o banco de produção."
-read -r -p "Digite 'RESTORE' para confirmar: " CONFIRM
-[[ "$CONFIRM" == "RESTORE" ]] || { echo "Abortado."; exit 1; }
+gunzip -c "$FILE" | docker run --rm -i \
+  -e PGPASSWORD \
+  postgres:16-alpine psql "$SUPABASE_DB_URL"
 
-gunzip -c "$FILE" | psql "$SUPABASE_DB_URL"
-echo "<<< Restore concluído."
+echo "==> Restore concluído."

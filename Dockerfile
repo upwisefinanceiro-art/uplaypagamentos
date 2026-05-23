@@ -1,12 +1,11 @@
 # syntax=docker/dockerfile:1.6
 # =========================================================
-# UPLAY Pagamentos - Production Dockerfile
-# Multi-stage: Node build -> Nginx runtime (porta 80)
+# UPLAY Pagamentos — Production Dockerfile (Caddy-only, sem Nginx)
+# Stage 1: build Vite | Stage 2: Caddy servindo /srv (porta 80 interna)
 # =========================================================
 
 # ---------- Stage 1: Build ----------
 FROM node:20-alpine AS builder
-
 WORKDIR /app
 
 RUN apk add --no-cache python3 make g++
@@ -27,36 +26,38 @@ ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
     VITE_SUPABASE_PROJECT_ID=$VITE_SUPABASE_PROJECT_ID \
     NODE_ENV=production
 
-RUN test -f package.json \
-  && test -f vite.config.ts \
-  && test -d src \
-  && test -d public \
-  && npm run build \
-  && test -f dist/index.html
+RUN npm run build && test -f dist/index.html
 
-# ---------- Stage 2: Runtime (Nginx) ----------
-FROM nginx:1.27-alpine AS runtime
+# ---------- Stage 2: Runtime (Caddy interno, sem TLS) ----------
+FROM caddy:2.8-alpine AS runtime
+WORKDIR /srv
 
-WORKDIR /app
+# Caddyfile interno do app — serve SPA + healthcheck
+COPY <<'EOF' /etc/caddy/Caddyfile
+{
+  admin off
+  auto_https off
+  persist_config off
+}
+:80 {
+  root * /srv
+  encode zstd gzip
+  @static path *.js *.css *.png *.jpg *.jpeg *.svg *.webp *.woff *.woff2 *.ico
+  header @static Cache-Control "public, max-age=31536000, immutable"
+  header /index.html Cache-Control "no-cache"
+  header /sw.js Cache-Control "no-cache"
+  handle /healthz {
+    respond "ok" 200
+  }
+  try_files {path} /index.html
+  file_server
+}
+EOF
 
-RUN rm -f /etc/nginx/conf.d/default.conf
-COPY nginx/nginx.conf /etc/nginx/conf.d/default.conf
-
-COPY --from=builder /app/package.json /app/package-lock.json ./
-COPY --from=builder /app/index.html /app/vite.config.ts /app/tsconfig.json /app/tsconfig.app.json /app/tsconfig.node.json /app/tailwind.config.ts /app/postcss.config.js ./
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/src ./src
-COPY --from=builder /app/dist ./dist
-
-RUN test -f /app/package.json \
-  && test -d /app/src \
-  && test -d /app/public \
-  && test -f /app/vite.config.ts \
-  && test -f /app/dist/index.html
+COPY --from=builder /app/dist /srv
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -qO- http://127.0.0.1/healthz || exit 1
 
 EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
