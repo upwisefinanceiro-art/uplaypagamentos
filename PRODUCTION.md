@@ -3,10 +3,49 @@
 Stack 100% Caddy (sem Nginx), comandos com `docker-compose` legacy.
 VPS Hostinger Ubuntu — IP `2.24.117.9` — domínio `uplaypagamento.com.br`.
 
-> **Fluxo enxuto:** `bash install-vps.sh` (uma vez) → `bash deploy-prod.sh` (toda vez).
-VPS Hostinger Ubuntu — IP `2.24.117.9` — domínio `uplaypagamento.com.br`.
+> **Fluxo enxuto:**
+> - **Bootstrap (1x):** `bash install-vps.sh`
+> - **Deploy contínuo:** apenas `git push` no Lovable/GitHub → GitHub Actions → VPS atualiza sozinha
+> - **Deploy manual emergencial:** `bash deploy-prod.sh`
 
 ---
+
+## 0. CI/CD — Lovable → GitHub → VPS
+
+Fluxo 100% automático:
+
+```
+Lovable (edit)
+     │  (auto-sync 2-way)
+     ▼
+GitHub (push em main)
+     │  (GitHub Actions)
+     ▼
+SSH na VPS  →  bash deploy-prod.sh
+     │
+     ▼
+ Produção HTTPS (uplaypagamento.com.br)
+```
+
+### Segredos do GitHub (Settings → Secrets and variables → Actions)
+
+| Secret | Valor |
+|---|---|
+| `VPS_HOST` | `2.24.117.9` |
+| `VPS_USER` | `root` |
+| `VPS_SSH_KEY` | conteúdo da chave SSH privada (`~/.ssh/id_ed25519`) |
+| `VPS_PORT` | `22` (opcional) |
+
+Gerar chave na sua máquina e instalar na VPS:
+```bash
+ssh-keygen -t ed25519 -C "github-actions" -f ~/.ssh/uplay_deploy
+ssh-copy-id -i ~/.ssh/uplay_deploy.pub root@2.24.117.9
+cat ~/.ssh/uplay_deploy           # cole em VPS_SSH_KEY
+```
+
+Workflow: `.github/workflows/deploy.yml` — dispara em todo `push` para `main`.
+
+
 
 ## 1. Arquitetura
 
