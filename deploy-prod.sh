@@ -79,7 +79,8 @@ done
 DEPLOY_STAGE="validate-dockerfile"
 step "5/10 Validando sintaxe legacy do Dockerfile"
 grep -Eq "^COPY Caddyfile /etc/caddy/Caddyfile$" Dockerfile || { err "Dockerfile deve conter exatamente: COPY Caddyfile /etc/caddy/Caddyfile"; exit 1; }
-if grep -RInE "COPY[[:space:]]+<<|RUN[[:space:]]+<<|# syntax=docker/dockerfile|--mount=type=" Dockerfile docker-compose.prod.yml Caddyfile docker/Caddyfile.proxy deploy-prod.sh scripts 2>/dev/null; then
+legacy_forbidden_pattern='(COPY|RUN)[[:space:]]+<<|#[[:space:]]*syntax=docker/dockerfile|--mount=type='
+if grep -RInE "$legacy_forbidden_pattern" Dockerfile docker-compose.prod.yml Caddyfile docker/Caddyfile.proxy scripts 2>/dev/null; then
   err "BuildKit/heredoc encontrado. Remova antes do deploy."
   exit 1
 fi
