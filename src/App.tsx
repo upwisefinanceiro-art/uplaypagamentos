@@ -54,6 +54,7 @@ import { CompanyBrandingProvider } from "./contexts/CompanyBrandingContext";
 import NotFound from "./pages/NotFound";
 import Instalar from "./pages/Instalar";
 import SplashScreen from "./components/SplashScreen";
+import AppErrorBoundary from "@/components/AppErrorBoundary";
 
 const queryClient = new QueryClient();
 
@@ -79,9 +80,11 @@ const App = () => {
 
               {/* App do Responsável */}
               <Route path="/app" element={
-                <ProtectedRoute requiredRoles={["RESPONSAVEL", "ADMIN_MASTER", "ADMIN_UNIDADE"]}>
-                  <AppLayout />
-                </ProtectedRoute>
+                <AppErrorBoundary>
+                  <ProtectedRoute requiredRoles={["RESPONSAVEL", "ADMIN_MASTER", "ADMIN_UNIDADE"]}>
+                    <AppLayout />
+                  </ProtectedRoute>
+                </AppErrorBoundary>
               }>
                 <Route index element={<AppHome />} />
                 <Route path="pagamentos" element={<AppPayments />} />
@@ -93,9 +96,11 @@ const App = () => {
 
               {/* Painel Admin */}
               <Route path="/admin" element={
-                <ProtectedRoute requiredRoles={["ADMIN_MASTER", "ADMIN_UNIDADE"]}>
-                  <AdminLayout />
-                </ProtectedRoute>
+                <AppErrorBoundary>
+                  <ProtectedRoute requiredRoles={["ADMIN_MASTER", "ADMIN_UNIDADE"]}>
+                    <AdminLayout />
+                  </ProtectedRoute>
+                </AppErrorBoundary>
               }>
                 <Route index element={<AdminDashboard />} />
                 <Route path="empresa" element={<AdminCompanies />} />
@@ -127,9 +132,11 @@ const App = () => {
 
               {/* Área do Professor */}
               <Route path="/professor" element={
-                <ProtectedRoute requiredRoles={["PROFESSOR", "ADMIN_MASTER", "ADMIN_UNIDADE", "SUPER_ADMIN"]}>
-                  <TeacherLayout />
-                </ProtectedRoute>
+                <AppErrorBoundary>
+                  <ProtectedRoute requiredRoles={["PROFESSOR", "ADMIN_MASTER", "ADMIN_UNIDADE", "SUPER_ADMIN"]}>
+                    <TeacherLayout />
+                  </ProtectedRoute>
+                </AppErrorBoundary>
               }>
                 <Route index element={<TeacherLessons />} />
                 <Route path="folha" element={<TeacherPayroll />} />
@@ -139,9 +146,11 @@ const App = () => {
 
               {/* Painel Super Admin */}
               <Route path="/super" element={
-                <ProtectedRoute requiredRoles={["SUPER_ADMIN"]}>
-                  <SuperAdminLayout />
-                </ProtectedRoute>
+                <AppErrorBoundary>
+                  <ProtectedRoute requiredRoles={["SUPER_ADMIN"]}>
+                    <SuperAdminLayout />
+                  </ProtectedRoute>
+                </AppErrorBoundary>
               }>
                 <Route index element={<SuperDashboard />} />
                 <Route path="empresas" element={<SuperCompanies />} />
