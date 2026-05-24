@@ -10,13 +10,20 @@ const showBootstrapError = (error: unknown) => {
   if (!root) return;
 
   const message = error instanceof Error ? error.message : "Erro inesperado ao iniciar o aplicativo.";
+  const escapedMessage = message.replace(/[&<>'"]/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "'": "&#39;",
+    '"': "&quot;",
+  }[char] ?? char));
   root.innerHTML = `
     <main class="min-h-screen bg-background text-foreground flex items-center justify-center p-6">
       <section class="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-lg">
         <p class="text-sm font-semibold text-primary">UPLAY Pagamentos</p>
         <h1 class="mt-3 text-2xl font-bold">Falha ao iniciar o aplicativo</h1>
         <p class="mt-3 text-sm text-muted-foreground">Recarregue a página. Se o problema persistir, limpe o cache do app no navegador.</p>
-        <p class="mt-4 rounded-md bg-muted p-3 text-xs text-muted-foreground break-words">${message}</p>
+        <p class="mt-4 rounded-md bg-muted p-3 text-xs text-muted-foreground break-words">${escapedMessage}</p>
         <button class="mt-6 h-10 w-full rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground" onclick="window.location.reload()">Recarregar aplicativo</button>
       </section>
     </main>
