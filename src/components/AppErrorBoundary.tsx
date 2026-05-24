@@ -1,5 +1,4 @@
 import { Component, ErrorInfo, ReactNode } from "react";
-import { Button } from "@/components/ui/button";
 
 interface AppErrorBoundaryProps {
   children: ReactNode;
@@ -45,9 +44,12 @@ class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorBoundary
               </p>
             )}
           </div>
-          <Button className="mt-6 w-full" onClick={() => window.location.reload()}>
+          <button
+            className="mt-6 h-10 w-full rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            onClick={() => window.location.reload()}
+          >
             Recarregar aplicativo
-          </Button>
+          </button>
         </section>
       </main>
     );
