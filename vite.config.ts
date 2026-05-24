@@ -167,27 +167,5 @@ export default defineConfig(({ mode }) => ({
     cssCodeSplit: true,
     sourcemap: false,
     chunkSizeWarningLimit: 1200,
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          const normalizedId = id.replace(/\\/g, "/");
-          if (!normalizedId.includes("/node_modules/")) return;
-          if (
-            normalizedId.includes("/node_modules/react/") ||
-            normalizedId.includes("/node_modules/react-dom/") ||
-            normalizedId.includes("/node_modules/scheduler/")
-          ) return "vendor-react";
-          if (normalizedId.includes("/node_modules/@radix-ui/") || normalizedId.includes("/node_modules/@floating-ui/")) return "vendor-ui";
-          if (id.includes("recharts") || id.includes("d3-")) return "vendor-charts";
-          if (id.includes("html2canvas") || id.includes("jspdf") || id.includes("dompurify")) return "vendor-pdf";
-          if (id.includes("@tanstack")) return "vendor-query";
-          if (id.includes("@supabase")) return "vendor-supabase";
-          if (id.includes("react-router")) return "vendor-router";
-          if (id.includes("lucide-react")) return "vendor-icons";
-          if (id.includes("date-fns")) return "vendor-date";
-          return "vendor";
-        },
-      },
-    },
   },
 }));
