@@ -274,12 +274,18 @@ export default function TeacherLessons() {
           if (status === "SUBSCRIBED") {
             reconnectAttempts = 0;
             void logTeacherAppEvent({ userId: user.id, event: "REALTIME_CONNECTED", details: { source: "lessons" } });
-          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+            return;
+          }
+          // CLOSED é emitido pelo próprio removeChannel/cleanup — NÃO tratar como erro,
+          // ou geramos um loop de disconnect→reconnect a cada ~2s que satura a aba.
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
             void logTeacherAppEvent({ userId: user.id, event: "REALTIME_DISCONNECTED", status: "WARN", details: { source: "lessons", status } });
             const backoff = Math.min(30000, 2000 * Math.pow(2, reconnectAttempts++));
             if (reconnectTimer) window.clearTimeout(reconnectTimer);
             reconnectTimer = window.setTimeout(() => {
-              if (channel) void supabase.removeChannel(channel);
+              const stale = channel;
+              channel = null;
+              if (stale) void supabase.removeChannel(stale);
               setup();
             }, backoff);
           }
