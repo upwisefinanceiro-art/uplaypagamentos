@@ -202,11 +202,11 @@ export default function TeacherLessons() {
         setCourses({});
       }
     } catch (e: unknown) {
-      if (attempt === 0) {
-        console.warn("[teacher-lessons] falha inicial; renovando sessão e tentando novamente", { userId: user.id, error: e });
+      if (attempt < 2) {
+        console.warn("[teacher-lessons] falha; renovando sessão e tentando novamente", { userId: user.id, attempt, error: e });
         await supabase.auth.refreshSession();
-        await wait(700);
-        return load(1);
+        await wait(700 + attempt * 400);
+        return load(attempt + 1);
       }
       const message = getErrorMessage(e);
       setLoadError(message);
@@ -221,9 +221,13 @@ export default function TeacherLessons() {
         event: "teacher_lessons_load_error",
         status: "ERROR",
         message,
-        details: { error: message, filter },
+        details: { error: message, filter, attempt },
       });
-      toast({ title: "Erro ao carregar aulas", description: message, variant: "destructive" });
+      // Só mostra toast se já existe dado prévio (não polui o mount inicial);
+      // caso contrário deixa a UI mostrar o card de erro com botão "Tentar novamente".
+      if (lessons.length > 0) {
+        toast({ title: "Erro ao carregar aulas", description: message, variant: "destructive" });
+      }
     } finally {
       setLoading(false);
     }
