@@ -143,13 +143,29 @@ Deno.serve(async (req) => {
       reason = "AUTH_CRIADO";
     }
 
-    const { data: updatedAuth, error: updErr } = await admin.auth.admin.updateUserById(targetUser.id, {
-      password: finalPassword,
+    // Só redefine a senha se foi enviada explicitamente OU se o auth acabou de ser criado.
+    // Evita falhas de HIBP (weak_password) ao apenas sincronizar professor já existente.
+    const shouldResetPassword = (typeof password === "string" && password.length >= 8) || reason === "AUTH_CRIADO";
+    const updatePayload: Record<string, unknown> = {
       email: normalizedEmail,
       email_confirm: true,
       ban_duration: "none",
       user_metadata: { full_name: String(full_name).trim(), role: "PROFESSOR" },
-    });
+    };
+    if (shouldResetPassword) updatePayload.password = finalPassword;
+
+    let { data: updatedAuth, error: updErr } = await admin.auth.admin.updateUserById(targetUser.id, updatePayload);
+
+    // Fallback: se Supabase rejeitar a senha (HIBP/weak), retenta sem alterar senha
+    if (updErr && ((updErr as { code?: string }).code === "weak_password" || /weak|pwned/i.test(updErr.message || "")) && shouldResetPassword) {
+      console.warn("[create-teacher-user] senha rejeitada (HIBP), mantendo senha atual", {
+        teacher_id,
+        auth_id: targetUser.id,
+      });
+      delete updatePayload.password;
+      ({ data: updatedAuth, error: updErr } = await admin.auth.admin.updateUserById(targetUser.id, updatePayload));
+    }
+
     if (updErr || !updatedAuth?.user) {
       console.error("[create-teacher-user] updateUser error", {
         teacher_id,
