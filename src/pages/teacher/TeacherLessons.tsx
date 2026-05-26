@@ -94,11 +94,18 @@ export default function TeacherLessons() {
     setLoading(true);
     setLoadError(null);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session && attempt === 0) {
+      // Aguarda sessão ficar pronta (até 3 tentativas silenciosas) para evitar
+      // race condition no mount inicial que gerava "Erro desconhecido".
+      let sessionReady = false;
+      for (let i = 0; i < 3; i++) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData.session) { sessionReady = true; break; }
         await supabase.auth.refreshSession();
+        await wait(400 + i * 300);
+      }
+      if (!sessionReady && attempt < 2) {
         await wait(500);
-        return load(1);
+        return load(attempt + 1);
       }
 
       const { data: authData, error: authError } = await supabase.auth.getUser();
