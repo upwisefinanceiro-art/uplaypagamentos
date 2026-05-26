@@ -24,6 +24,26 @@ class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorBoundary
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("[app] React render crash captured", { error, errorInfo });
+    const msg = `${error?.name ?? ""} ${error?.message ?? ""}`;
+    if (/ChunkLoadError|Loading chunk|dynamically imported module|preload CSS/i.test(msg)) {
+      // Bundle obsoleto em cache → limpa SW/caches e recarrega 1x
+      const FLAG = "uplay_sw_recovery_v1";
+      if (!sessionStorage.getItem(FLAG)) {
+        sessionStorage.setItem(FLAG, "boundary-chunk");
+        (async () => {
+          try {
+            const regs = (await navigator.serviceWorker?.getRegistrations()) ?? [];
+            await Promise.all(regs.map((r) => r.unregister().catch(() => false)));
+            const keys = (await caches?.keys()) ?? [];
+            await Promise.all(keys.map((k) => caches.delete(k).catch(() => false)));
+          } finally {
+            const url = new URL(window.location.href);
+            url.searchParams.set("_r", Date.now().toString());
+            window.location.replace(url.toString());
+          }
+        })();
+      }
+    }
   }
 
   render() {
