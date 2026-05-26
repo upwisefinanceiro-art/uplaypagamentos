@@ -49,7 +49,7 @@ type TeacherAccessResponse = {
   synced_at?: string;
 };
 
-const DEFAULT_PASSWORD = "12345678";
+const DEFAULT_PASSWORD = "Uplay#Prof2026";
 const WHATSAPP_TAB_TARGET = "uplay_teacher_app_whatsapp";
 
 const resolveWhatsAppPhone = (rawPhone: string | null | undefined) => {
