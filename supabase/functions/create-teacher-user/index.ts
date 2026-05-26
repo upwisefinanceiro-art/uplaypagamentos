@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       return jsonResponse({ error: "E-mail inválido" }, 400);
     }
-    const finalPassword = (typeof password === "string" && password.length >= 6) ? password : "12345678";
+    const finalPassword = (typeof password === "string" && password.length >= 8) ? password : "Uplay#Prof2026";
 
     console.info("[create-teacher-user] sync started", {
       teacher_id,
