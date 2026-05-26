@@ -175,7 +175,7 @@ export default function AdminSchoolTeachers() {
         toast({
           title: data.login_valid ? "Login funcional ✓" : "Acesso sincronizado",
           description: data.login_valid
-            ? "Validado automaticamente com a senha padrão 12345678."
+            ? `Validado automaticamente com a senha padrão ${DEFAULT_PASSWORD}.`
             : "Dados sincronizados, login ainda não confirmado.",
         });
         fetchTeachers();
