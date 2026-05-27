@@ -8,10 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Search, MessageCircle, Phone, Instagram, Globe, Loader2 } from "lucide-react";
+import { Send, Search, MessageCircle, Phone, Instagram, Globe, Loader2, type LucideIcon } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
-const channelIcon: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
+const channelIcon: Record<string, LucideIcon> = {
   WHATSAPP: Phone,
   INSTAGRAM: Instagram,
   LANDING_PAGE: Globe,
