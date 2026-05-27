@@ -633,6 +633,807 @@ export type Database = {
         }
         Relationships: []
       }
+      omni_agent_status: {
+        Row: {
+          company_id: string | null
+          current_load: number
+          last_seen_at: string
+          max_load: number
+          presence: Database["public"]["Enums"]["omni_agent_presence"]
+          profile_id: string
+          unit_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          current_load?: number
+          last_seen_at?: string
+          max_load?: number
+          presence?: Database["public"]["Enums"]["omni_agent_presence"]
+          profile_id: string
+          unit_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          current_load?: number
+          last_seen_at?: string
+          max_load?: number
+          presence?: Database["public"]["Enums"]["omni_agent_presence"]
+          profile_id?: string
+          unit_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      omni_ai_contexts: {
+        Row: {
+          conversation_id: string
+          last_compacted_at: string | null
+          memory: Json | null
+          summary: string | null
+          updated_at: string
+        }
+        Insert: {
+          conversation_id: string
+          last_compacted_at?: string | null
+          memory?: Json | null
+          summary?: string | null
+          updated_at?: string
+        }
+        Update: {
+          conversation_id?: string
+          last_compacted_at?: string | null
+          memory?: Json | null
+          summary?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "omni_ai_contexts_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: true
+            referencedRelation: "omni_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      omni_ai_prompts: {
+        Row: {
+          active: boolean | null
+          company_id: string
+          created_at: string
+          id: string
+          max_tokens: number | null
+          model: string | null
+          name: string
+          system_prompt: string
+          temperature: number | null
+          tools: Json | null
+          unit_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean | null
+          company_id: string
+          created_at?: string
+          id?: string
+          max_tokens?: number | null
+          model?: string | null
+          name: string
+          system_prompt: string
+          temperature?: number | null
+          tools?: Json | null
+          unit_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          max_tokens?: number | null
+          model?: string | null
+          name?: string
+          system_prompt?: string
+          temperature?: number | null
+          tools?: Json | null
+          unit_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      omni_ai_sessions: {
+        Row: {
+          conversation_id: string | null
+          cost: number | null
+          created_at: string
+          ended_at: string | null
+          id: string
+          prompt_id: string | null
+          started_at: string | null
+          status: string | null
+          tokens_in: number | null
+          tokens_out: number | null
+          unit_id: string | null
+        }
+        Insert: {
+          conversation_id?: string | null
+          cost?: number | null
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          prompt_id?: string | null
+          started_at?: string | null
+          status?: string | null
+          tokens_in?: number | null
+          tokens_out?: number | null
+          unit_id?: string | null
+        }
+        Update: {
+          conversation_id?: string | null
+          cost?: number | null
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          prompt_id?: string | null
+          started_at?: string | null
+          status?: string | null
+          tokens_in?: number | null
+          tokens_out?: number | null
+          unit_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "omni_ai_sessions_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "omni_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "omni_ai_sessions_prompt_id_fkey"
+            columns: ["prompt_id"]
+            isOneToOne: false
+            referencedRelation: "omni_ai_prompts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      omni_ai_training: {
+        Row: {
+          company_id: string
+          content: string
+          created_at: string
+          embedding_status: string | null
+          id: string
+          metadata: Json | null
+          source: string | null
+          unit_id: string | null
+        }
+        Insert: {
+          company_id: string
+          content: string
+          created_at?: string
+          embedding_status?: string | null
+          id?: string
+          metadata?: Json | null
+          source?: string | null
+          unit_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          content?: string
+          created_at?: string
+          embedding_status?: string | null
+          id?: string
+          metadata?: Json | null
+          source?: string | null
+          unit_id?: string | null
+        }
+        Relationships: []
+      }
+      omni_automation_rules: {
+        Row: {
+          actions: Json | null
+          active: boolean | null
+          channel: Database["public"]["Enums"]["omni_channel"] | null
+          company_id: string
+          conditions: Json | null
+          created_at: string
+          id: string
+          name: string
+          priority: number | null
+          trigger: Database["public"]["Enums"]["omni_automation_trigger"]
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          actions?: Json | null
+          active?: boolean | null
+          channel?: Database["public"]["Enums"]["omni_channel"] | null
+          company_id: string
+          conditions?: Json | null
+          created_at?: string
+          id?: string
+          name: string
+          priority?: number | null
+          trigger: Database["public"]["Enums"]["omni_automation_trigger"]
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          actions?: Json | null
+          active?: boolean | null
+          channel?: Database["public"]["Enums"]["omni_channel"] | null
+          company_id?: string
+          conditions?: Json | null
+          created_at?: string
+          id?: string
+          name?: string
+          priority?: number | null
+          trigger?: Database["public"]["Enums"]["omni_automation_trigger"]
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      omni_automation_runs: {
+        Row: {
+          conversation_id: string | null
+          created_at: string
+          id: string
+          result: Json | null
+          rule_id: string | null
+          status: string | null
+          unit_id: string | null
+        }
+        Insert: {
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          result?: Json | null
+          rule_id?: string | null
+          status?: string | null
+          unit_id?: string | null
+        }
+        Update: {
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          result?: Json | null
+          rule_id?: string | null
+          status?: string | null
+          unit_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "omni_automation_runs_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "omni_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "omni_automation_runs_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "omni_automation_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      omni_contacts: {
+        Row: {
+          avatar_url: string | null
+          company_id: string
+          created_at: string
+          email: string | null
+          full_name: string
+          id: string
+          instagram_handle: string | null
+          metadata: Json | null
+          notes: string | null
+          origin: Database["public"]["Enums"]["omni_channel"] | null
+          phone_e164: string | null
+          profile_id: string | null
+          tags: string[] | null
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          company_id: string
+          created_at?: string
+          email?: string | null
+          full_name: string
+          id?: string
+          instagram_handle?: string | null
+          metadata?: Json | null
+          notes?: string | null
+          origin?: Database["public"]["Enums"]["omni_channel"] | null
+          phone_e164?: string | null
+          profile_id?: string | null
+          tags?: string[] | null
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          company_id?: string
+          created_at?: string
+          email?: string | null
+          full_name?: string
+          id?: string
+          instagram_handle?: string | null
+          metadata?: Json | null
+          notes?: string | null
+          origin?: Database["public"]["Enums"]["omni_channel"] | null
+          phone_e164?: string | null
+          profile_id?: string | null
+          tags?: string[] | null
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      omni_conversation_assignments: {
+        Row: {
+          by_agent: string | null
+          company_id: string | null
+          conversation_id: string
+          created_at: string
+          from_agent: string | null
+          id: string
+          reason: string | null
+          to_agent: string | null
+          unit_id: string | null
+        }
+        Insert: {
+          by_agent?: string | null
+          company_id?: string | null
+          conversation_id: string
+          created_at?: string
+          from_agent?: string | null
+          id?: string
+          reason?: string | null
+          to_agent?: string | null
+          unit_id?: string | null
+        }
+        Update: {
+          by_agent?: string | null
+          company_id?: string | null
+          conversation_id?: string
+          created_at?: string
+          from_agent?: string | null
+          id?: string
+          reason?: string | null
+          to_agent?: string | null
+          unit_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "omni_conversation_assignments_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "omni_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      omni_conversation_tags: {
+        Row: {
+          color: string | null
+          company_id: string
+          created_at: string
+          id: string
+          name: string
+          unit_id: string
+        }
+        Insert: {
+          color?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          name: string
+          unit_id: string
+        }
+        Update: {
+          color?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          unit_id?: string
+        }
+        Relationships: []
+      }
+      omni_conversations: {
+        Row: {
+          assigned_to: string | null
+          channel: Database["public"]["Enums"]["omni_channel"]
+          closed_at: string | null
+          closed_by: string | null
+          company_id: string
+          contact_id: string
+          created_at: string
+          id: string
+          integration_id: string | null
+          last_message_at: string | null
+          last_message_preview: string | null
+          metadata: Json | null
+          opened_at: string | null
+          priority: number | null
+          queue_id: string | null
+          status: Database["public"]["Enums"]["omni_conversation_status"]
+          tags: string[] | null
+          unit_id: string
+          unread_count: number
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          channel: Database["public"]["Enums"]["omni_channel"]
+          closed_at?: string | null
+          closed_by?: string | null
+          company_id: string
+          contact_id: string
+          created_at?: string
+          id?: string
+          integration_id?: string | null
+          last_message_at?: string | null
+          last_message_preview?: string | null
+          metadata?: Json | null
+          opened_at?: string | null
+          priority?: number | null
+          queue_id?: string | null
+          status?: Database["public"]["Enums"]["omni_conversation_status"]
+          tags?: string[] | null
+          unit_id: string
+          unread_count?: number
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          channel?: Database["public"]["Enums"]["omni_channel"]
+          closed_at?: string | null
+          closed_by?: string | null
+          company_id?: string
+          contact_id?: string
+          created_at?: string
+          id?: string
+          integration_id?: string | null
+          last_message_at?: string | null
+          last_message_preview?: string | null
+          metadata?: Json | null
+          opened_at?: string | null
+          priority?: number | null
+          queue_id?: string | null
+          status?: Database["public"]["Enums"]["omni_conversation_status"]
+          tags?: string[] | null
+          unit_id?: string
+          unread_count?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "omni_conversations_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "omni_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "omni_conversations_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "omni_integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "omni_conversations_queue_id_fkey"
+            columns: ["queue_id"]
+            isOneToOne: false
+            referencedRelation: "omni_queues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      omni_integration_logs: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          direction: string | null
+          error_message: string | null
+          event: string
+          http_status: number | null
+          id: string
+          integration_id: string | null
+          payload: Json | null
+          response: Json | null
+          unit_id: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          direction?: string | null
+          error_message?: string | null
+          event: string
+          http_status?: number | null
+          id?: string
+          integration_id?: string | null
+          payload?: Json | null
+          response?: Json | null
+          unit_id?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          direction?: string | null
+          error_message?: string | null
+          event?: string
+          http_status?: number | null
+          id?: string
+          integration_id?: string | null
+          payload?: Json | null
+          response?: Json | null
+          unit_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "omni_integration_logs_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "omni_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      omni_integrations: {
+        Row: {
+          active: boolean | null
+          ai_enabled: boolean | null
+          channel: Database["public"]["Enums"]["omni_channel"]
+          company_id: string
+          created_at: string
+          credentials: Json | null
+          display_name: string
+          error_message: string | null
+          id: string
+          last_event_at: string | null
+          last_sync_at: string | null
+          provider: Database["public"]["Enums"]["omni_integration_provider"]
+          qr_code: string | null
+          session_started_at: string | null
+          status: Database["public"]["Enums"]["omni_integration_status"]
+          unit_id: string
+          updated_at: string
+          webhook_secret: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          ai_enabled?: boolean | null
+          channel: Database["public"]["Enums"]["omni_channel"]
+          company_id: string
+          created_at?: string
+          credentials?: Json | null
+          display_name: string
+          error_message?: string | null
+          id?: string
+          last_event_at?: string | null
+          last_sync_at?: string | null
+          provider: Database["public"]["Enums"]["omni_integration_provider"]
+          qr_code?: string | null
+          session_started_at?: string | null
+          status?: Database["public"]["Enums"]["omni_integration_status"]
+          unit_id: string
+          updated_at?: string
+          webhook_secret?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          ai_enabled?: boolean | null
+          channel?: Database["public"]["Enums"]["omni_channel"]
+          company_id?: string
+          created_at?: string
+          credentials?: Json | null
+          display_name?: string
+          error_message?: string | null
+          id?: string
+          last_event_at?: string | null
+          last_sync_at?: string | null
+          provider?: Database["public"]["Enums"]["omni_integration_provider"]
+          qr_code?: string | null
+          session_started_at?: string | null
+          status?: Database["public"]["Enums"]["omni_integration_status"]
+          unit_id?: string
+          updated_at?: string
+          webhook_secret?: string | null
+        }
+        Relationships: []
+      }
+      omni_message_attachments: {
+        Row: {
+          created_at: string
+          filename: string | null
+          id: string
+          message_id: string
+          mime: string | null
+          size_bytes: number | null
+          thumbnail_url: string | null
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          filename?: string | null
+          id?: string
+          message_id: string
+          mime?: string | null
+          size_bytes?: number | null
+          thumbnail_url?: string | null
+          url: string
+        }
+        Update: {
+          created_at?: string
+          filename?: string | null
+          id?: string
+          message_id?: string
+          mime?: string | null
+          size_bytes?: number | null
+          thumbnail_url?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "omni_message_attachments_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "omni_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      omni_messages: {
+        Row: {
+          company_id: string
+          content: string | null
+          conversation_id: string
+          created_at: string
+          delivery_status: string | null
+          error_message: string | null
+          external_id: string | null
+          id: string
+          integration_id: string | null
+          is_read: boolean
+          media_mime: string | null
+          media_url: string | null
+          message_type: Database["public"]["Enums"]["omni_message_type"]
+          metadata: Json | null
+          read_at: string | null
+          reply_to_id: string | null
+          sender_id: string | null
+          sender_type: Database["public"]["Enums"]["omni_sender_type"]
+          unit_id: string
+        }
+        Insert: {
+          company_id: string
+          content?: string | null
+          conversation_id: string
+          created_at?: string
+          delivery_status?: string | null
+          error_message?: string | null
+          external_id?: string | null
+          id?: string
+          integration_id?: string | null
+          is_read?: boolean
+          media_mime?: string | null
+          media_url?: string | null
+          message_type?: Database["public"]["Enums"]["omni_message_type"]
+          metadata?: Json | null
+          read_at?: string | null
+          reply_to_id?: string | null
+          sender_id?: string | null
+          sender_type: Database["public"]["Enums"]["omni_sender_type"]
+          unit_id: string
+        }
+        Update: {
+          company_id?: string
+          content?: string | null
+          conversation_id?: string
+          created_at?: string
+          delivery_status?: string | null
+          error_message?: string | null
+          external_id?: string | null
+          id?: string
+          integration_id?: string | null
+          is_read?: boolean
+          media_mime?: string | null
+          media_url?: string | null
+          message_type?: Database["public"]["Enums"]["omni_message_type"]
+          metadata?: Json | null
+          read_at?: string | null
+          reply_to_id?: string | null
+          sender_id?: string | null
+          sender_type?: Database["public"]["Enums"]["omni_sender_type"]
+          unit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "omni_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "omni_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "omni_messages_reply_to_id_fkey"
+            columns: ["reply_to_id"]
+            isOneToOne: false
+            referencedRelation: "omni_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      omni_queues: {
+        Row: {
+          active: boolean | null
+          color: string | null
+          company_id: string
+          created_at: string
+          id: string
+          max_concurrent_per_agent: number | null
+          name: string
+          position: number | null
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean | null
+          color?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          max_concurrent_per_agent?: number | null
+          name: string
+          position?: number | null
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean | null
+          color?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          max_concurrent_per_agent?: number | null
+          name?: string
+          position?: number | null
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      omni_typing_status: {
+        Row: {
+          agent_id: string
+          conversation_id: string
+          started_at: string
+          unit_id: string | null
+        }
+        Insert: {
+          agent_id: string
+          conversation_id: string
+          started_at?: string
+          unit_id?: string | null
+        }
+        Update: {
+          agent_id?: string
+          conversation_id?: string
+          started_at?: string
+          unit_id?: string | null
+        }
+        Relationships: []
+      }
       payment_inconsistencies: {
         Row: {
           asaas_due_date: string | null
@@ -2352,6 +3153,10 @@ export type Database = {
       }
       get_company_secrets: { Args: { _company_id: string }; Returns: Json }
       get_email_by_cpf: { Args: { _cpf: string }; Returns: string }
+      get_omni_integration_secrets: {
+        Args: { _integration_id: string }
+        Returns: Json
+      }
       get_teacher_id_for: { Args: { _user_id: string }; Returns: string }
       get_teacher_ids_for: { Args: { _user_id: string }; Returns: string[] }
       get_unit_secrets: { Args: { _unit_id: string }; Returns: Json }
@@ -2364,12 +3169,17 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_omni_agent: { Args: { _user_id: string }; Returns: boolean }
       is_teacher_of: {
         Args: { _teacher_id: string; _user_id: string }
         Returns: boolean
       }
       mark_school_payroll_paid: {
         Args: { _closure_id: string; _notes?: string; _proof_url?: string }
+        Returns: undefined
+      }
+      omni_seed_default_queues: {
+        Args: { _company_id: string; _unit_id: string }
         Returns: undefined
       }
       payroll_cycle_end: { Args: { _start: string }; Returns: string }
@@ -2398,6 +3208,44 @@ export type Database = {
         | "RESPONSAVEL"
         | "SUPER_ADMIN"
         | "PROFESSOR"
+      omni_agent_presence: "online" | "offline" | "away" | "reconnecting"
+      omni_automation_trigger:
+        | "message_received"
+        | "conversation_opened"
+        | "keyword_match"
+        | "no_reply_timeout"
+        | "tag_added"
+      omni_channel:
+        | "WHATSAPP"
+        | "INSTAGRAM"
+        | "LANDING_PAGE"
+        | "EMAIL"
+        | "WEBCHAT"
+      omni_conversation_status:
+        | "open"
+        | "pending"
+        | "closed"
+        | "bot"
+        | "waiting"
+      omni_integration_provider:
+        | "EVOLUTION_API"
+        | "META_WHATSAPP_CLOUD"
+        | "META_INSTAGRAM"
+        | "LANDING_FORM"
+      omni_integration_status:
+        | "connected"
+        | "disconnected"
+        | "qr_pending"
+        | "error"
+        | "connecting"
+      omni_message_type:
+        | "text"
+        | "image"
+        | "audio"
+        | "video"
+        | "document"
+        | "system"
+      omni_sender_type: "contact" | "agent" | "bot" | "system"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2532,6 +3380,44 @@ export const Constants = {
         "SUPER_ADMIN",
         "PROFESSOR",
       ],
+      omni_agent_presence: ["online", "offline", "away", "reconnecting"],
+      omni_automation_trigger: [
+        "message_received",
+        "conversation_opened",
+        "keyword_match",
+        "no_reply_timeout",
+        "tag_added",
+      ],
+      omni_channel: [
+        "WHATSAPP",
+        "INSTAGRAM",
+        "LANDING_PAGE",
+        "EMAIL",
+        "WEBCHAT",
+      ],
+      omni_conversation_status: ["open", "pending", "closed", "bot", "waiting"],
+      omni_integration_provider: [
+        "EVOLUTION_API",
+        "META_WHATSAPP_CLOUD",
+        "META_INSTAGRAM",
+        "LANDING_FORM",
+      ],
+      omni_integration_status: [
+        "connected",
+        "disconnected",
+        "qr_pending",
+        "error",
+        "connecting",
+      ],
+      omni_message_type: [
+        "text",
+        "image",
+        "audio",
+        "video",
+        "document",
+        "system",
+      ],
+      omni_sender_type: ["contact", "agent", "bot", "system"],
     },
   },
 } as const

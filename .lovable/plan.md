@@ -1,126 +1,180 @@
 
-# Plano — Estabilidade da Área do Professor (Fases 1 + 2)
+# Módulo Omnichannel CRM Uplay — Arquitetura Completa
 
-Foco exclusivo em login, multiunidade, realtime, sessão, reconciliação, logs e botão "Reprocessar". Painel de saúde, alertas e dashboard ficam para a próxima rodada (após validação).
-
----
-
-## Fase 1 — Login, Sessão, Multiunidade e Realtime Híbrido
-
-### 1.1. Login do Professor (eliminar falhas)
-- **`resolve_auth_email`**: hoje busca em `profiles` ligado por `id`. Quando o professor não tem profile (só `school_teachers`), o login por CPF falha. Vou estender a função para:
-  - Procurar também em `school_teachers.cpf` → `profile_id` → `auth.users.email`.
-  - Aceitar e-mail digitado mesmo sem profile (fallback direto em `auth.users.email`).
-- **`Login.tsx`**: hoje bloqueia por `unit_id` do profile. Reescrever a checagem de bloqueio para professores:
-  - Carregar TODOS os vínculos ativos em `school_teachers` + status das unidades.
-  - Só bloquear se NENHUMA unidade ativa existir (hoje já tenta, mas a query é frágil; vou consolidar).
-  - Não exigir `profile.unit_id` para professores multiunidade — usar a primeira unidade ativa do vínculo como contexto.
-- **Mensagens de erro específicas** por categoria (CPF não encontrado, senha errada, todas as unidades bloqueadas, conta inativa) salvas em `teacher_app_logs`.
-
-### 1.2. Sessão persistente
-- Adicionar `detectSessionInUrl: true` e manter `autoRefreshToken: true` (já está). Garantir que `onAuthStateChange` em `AuthContext` trate `TOKEN_REFRESHED` sem disparar re-sync (já trata) e adicionar tratamento de `SIGNED_OUT` inesperado: tentar `supabase.auth.refreshSession()` 1x antes de limpar estado.
-- Criar hook `useSessionGuard` no `TeacherLayout` que:
-  - A cada 5 min chama `supabase.auth.getSession()` e, se o token expirar em <2 min, força `refreshSession()`.
-  - Em caso de `refreshSession` falhar 2x seguidas, mostra toast "Reconectando..." em vez de deslogar.
-
-### 1.3. Multiunidade nativa
-- Novo contexto `TeacherUnitContext` (`src/contexts/TeacherUnitContext.tsx`):
-  - Carrega todos os vínculos ativos do professor (`school_teachers` + `units_public`).
-  - Expõe `units`, `activeUnitId`, `setActiveUnitId`, `teacherIdsByUnit`.
-  - Persiste a unidade ativa em `localStorage` (`teacher_active_unit`).
-- **Seletor de unidade** no header do `TeacherLayout` (só aparece se >1 unidade).
-- `TeacherLessons` e `TeacherPayroll` passam a filtrar por `activeUnitId` + `teacher_id` correspondente, e expõem botão "Ver todas as unidades" para visão consolidada.
-- Troca de unidade NÃO faz logout — apenas refetch.
-
-### 1.4. Realtime híbrido
-- Criar hook `useTeacherRealtime(teacherIds: string[])`:
-  - Inscreve em `school_lessons`, `school_payroll_closures`, `school_teacher_payments` filtrando por `teacher_id=in.(...)`.
-  - Refetch automático ao receber INSERT/UPDATE/DELETE.
-  - Polling de segurança a cada 60s (`setInterval`) que invalida a query.
-  - Detecta perda de conexão (`channel.subscribe` status `CHANNEL_ERROR` / `TIMED_OUT`) e reconecta com backoff exponencial (2s, 5s, 10s, 30s).
-- Substitui os listeners ad-hoc atuais em `TeacherLessons.tsx` e `TeacherPayroll.tsx`.
+Construção real (sem mocks) do módulo de atendimento multicanal, com schema Supabase produtivo, RLS multi-tenant, Realtime, endpoints prontos para Evolution API e Meta Webhooks, e UI dark profissional estilo Kommo/Intercom.
 
 ---
 
-## Fase 2 — Reconciliação, Logs e Reprocessar
+## 1. Schema Supabase (migration única)
 
-### 2.1. Logs completos
-- Tabela `teacher_app_logs` já existe. Vou:
-  - Adicionar índice composto `(user_id, created_at desc)` e `(status, created_at desc)`.
-  - Padronizar eventos: `LOGIN_OK`, `LOGIN_FAIL`, `SESSION_REFRESHED`, `SESSION_REFRESH_FAIL`, `UNIT_SWITCH`, `LESSONS_LOAD_OK`, `LESSONS_LOAD_FAIL`, `LESSON_CONFIRM_OK/FAIL`, `REALTIME_CONNECTED`, `REALTIME_DISCONNECTED`, `RECONCILE_RUN`, `REPROCESS_RUN`.
-  - Helper `logTeacherAppEvent` já existe — expandir tipagem com esses literais.
-  - Logar a partir de Login.tsx, AuthContext, TeacherLayout, TeacherLessons, TeacherPayroll e do hook realtime.
-- RLS: admin (ADMIN_MASTER, SUPER_ADMIN) lê tudo; ADMIN_UNIDADE lê só da sua unidade; o próprio professor lê só os seus.
+Novo enum `channel_type`: `WHATSAPP`, `INSTAGRAM`, `LANDING_PAGE`, `EMAIL`, `WEBCHAT`.
+Novo enum `conversation_status`: `open`, `pending`, `closed`, `bot`, `waiting`.
+Novo enum `message_sender_type`: `contact`, `agent`, `bot`, `system`.
+Novo enum `message_type`: `text`, `image`, `audio`, `video`, `document`, `system`.
+Novo enum `agent_presence`: `online`, `offline`, `away`, `reconnecting`.
+Novo enum `integration_provider`: `EVOLUTION_API`, `META_WHATSAPP_CLOUD`, `META_INSTAGRAM`, `LANDING_FORM`.
+Novo enum `automation_trigger`: `message_received`, `conversation_opened`, `keyword_match`, `no_reply_timeout`, `tag_added`.
 
-### 2.2. Reconciliação automática diária (edge function + pg_cron)
-- Nova edge function `reconcile-teachers` (service_role):
-  - Detecta e corrige:
-    1. `school_teachers.profile_id` apontando para `auth.users` inexistente → log `WARN`.
-    2. Professor ativo sem nenhuma role `PROFESSOR` em `user_roles` → insere a role.
-    3. Aulas (`school_lessons`) com `teacher_id` inativo → log `WARN`.
-    4. Aulas com `unit_id` ≠ `school_teachers.unit_id` do mesmo `teacher_id` → log `WARN`.
-    5. Conflitos de horário: duas aulas do mesmo professor com `tsrange` sobreposto → log `WARN`.
-    6. Fechamentos (`school_payroll_closures`) com `total_value` divergente da soma das aulas validadas → recalcula via `recalc_school_payroll_closure`.
-    7. Vínculo duplicado `(profile_id, unit_id)` ativo → mantém o mais recente.
-  - Cada inconsistência grava em `teacher_app_logs` com `event='RECONCILE_FINDING'` + `details`.
-  - Resumo final gravado como `event='RECONCILE_RUN'` com contagens.
-- Agendar via `pg_cron` diariamente às 04:00 UTC.
+Tabelas (todas com `company_id` + `unit_id` para isolamento SaaS, `created_at/updated_at`, RLS + GRANTs):
 
-### 2.3. Botão "Reprocessar dados do professor"
-- Nova edge function `reprocess-teacher` que aceita `{ teacher_id?, unit_id?, all?: boolean }`:
-  - Recalcula `computed_value` das aulas (trigger já cuida, mas força UPDATE de toque).
-  - Roda `recalc_school_payroll_closure` para todos os closures do(s) professor(es).
-  - Garante role `PROFESSOR` no `user_roles` se houver vínculo ativo.
-  - Reinvoca `react-query` invalidations via realtime (UPDATE toque em uma linha sentinela do professor).
-  - Retorna relatório `{ teachers_processed, closures_recalculated, lessons_touched, findings: [...] }`.
-- UI nova: `src/pages/admin/school/AdminSchoolHealth.tsx` (rota `/admin/escola/saude`):
-  - Lista professores com botões "Reprocessar" individual.
-  - Botões "Reprocessar unidade inteira" e "Reprocessar todos".
-  - Tabela com últimos 50 registros de `teacher_app_logs` (status=ERROR/WARN), com filtros por unidade e severidade.
-  - Botão "Rodar reconciliação agora" → invoca `reconcile-teachers`.
-- Link no menu admin escolar.
+- **`omni_contacts`** — nome, phone_e164, instagram_handle, email, tags[], origin (channel_type), notes, profile_id (opcional, vínculo Responsável), avatar_url, metadata jsonb. UNIQUE parcial (`unit_id`, `phone_e164`) e (`unit_id`, `instagram_handle`).
+- **`omni_integrations`** — provider, channel, status (`connected|disconnected|qr_pending|error`), display_name, credentials jsonb (criptografado nivel app), webhook_secret, last_sync_at, last_event_at, qr_code (text), session_started_at, error_message.
+- **`omni_integration_logs`** — integration_id, event, direction (`inbound|outbound`), payload jsonb, response jsonb, http_status, error_message.
+- **`omni_queues`** — nome (Comercial/Financeiro/Pedagógico/Suporte — seed inicial por unidade), color, max_concurrent_per_agent, active.
+- **`omni_conversations`** — channel, contact_id, integration_id, queue_id, assigned_to (profile id), status, priority (1-5), last_message_preview, last_message_at, unread_count, opened_at, closed_at, closed_by, tags[], metadata jsonb. Index em (`unit_id`,`status`,`last_message_at desc`).
+- **`omni_messages`** — conversation_id, sender_type, sender_id (nullable; profile id quando agent), message_type, content (text), media_url, media_mime, is_read, read_at, external_id (id da Evolution/Meta para dedupe — UNIQUE parcial com integration_id), reply_to_id, metadata jsonb. Index em (`conversation_id`,`created_at desc`).
+- **`omni_message_attachments`** — message_id, url, mime, size, filename, thumbnail_url.
+- **`omni_conversation_assignments`** — histórico: conversation_id, from_agent, to_agent, by_agent, reason, created_at.
+- **`omni_conversation_tags`** — tag catálogo por unidade (nome, color).
+- **`omni_typing_status`** — conversation_id, agent_id, started_at (ttl 10s via realtime — heartbeat).
+- **`omni_agent_status`** — profile_id, unit_id, presence, current_load (int), max_load, last_seen_at, socket_id.
+- **`omni_automation_rules`** — name, trigger, channel, conditions jsonb, actions jsonb (send_message, assign_queue, add_tag, move_pipeline, create_lead), priority, active.
+- **`omni_automation_runs`** — rule_id, conversation_id, status, result jsonb (log de execução).
+- **`omni_ai_prompts`** — name, system_prompt, model, temperature, tools jsonb, active.
+- **`omni_ai_contexts`** — conversation_id, summary, memory jsonb, last_compacted_at.
+- **`omni_ai_sessions`** — conversation_id, prompt_id, status (`bot|handoff_requested|handoff_done`), started_at, ended_at, tokens_in, tokens_out, cost.
+- **`omni_ai_training`** — unit_id, source (manual/conversation), content, embedding_status (preparado p/ futuro pgvector).
 
----
+**RLS** (todas tabelas): SUPER_ADMIN bypass; ADMIN_MASTER vê tudo do `company_id`; ADMIN_UNIDADE vê tudo do `unit_id`; agentes (RESPONSAVEL não — apenas Colaboradores/Admins) veem conversas atribuídas a eles ou sem atribuição na sua unidade. Helpers: reaproveita `has_role`, `get_user_company_id`, `get_user_unit_id`.
 
-## Detalhes Técnicos
+**Triggers**:
+- `omni_messages` after insert → atualiza `last_message_preview/last_message_at/unread_count` da conversa; chama executor de automações via `pg_notify`.
+- `omni_conversations` update assigned_to → grava `omni_conversation_assignments`.
+- `omni_integrations` update status → log em `omni_integration_logs`.
 
-### Migrações SQL
-1. Atualizar `resolve_auth_email` para considerar `school_teachers.cpf`.
-2. Índices em `teacher_app_logs`.
-3. RLS adicional em `teacher_app_logs` para ADMIN_UNIDADE/PROFESSOR.
-4. `pg_cron` job diário para `reconcile-teachers`.
+**Realtime**: `ALTER PUBLICATION supabase_realtime ADD TABLE` em `omni_messages`, `omni_conversations`, `omni_typing_status`, `omni_agent_status`, `omni_integrations`.
 
-### Arquivos novos
-- `src/contexts/TeacherUnitContext.tsx`
-- `src/hooks/useTeacherRealtime.ts`
-- `src/hooks/useSessionGuard.ts`
-- `src/pages/admin/school/AdminSchoolHealth.tsx`
-- `supabase/functions/reconcile-teachers/index.ts`
-- `supabase/functions/reprocess-teacher/index.ts`
-
-### Arquivos editados
-- `src/contexts/AuthContext.tsx` (refresh resiliente)
-- `src/pages/Login.tsx` (bloqueio multiunidade + logging detalhado)
-- `src/components/layouts/TeacherLayout.tsx` (seletor de unidade, session guard)
-- `src/pages/teacher/TeacherLessons.tsx` (usa contexto + hook realtime)
-- `src/pages/teacher/TeacherPayroll.tsx` (idem)
-- `src/lib/teacher-app-logger.ts` (eventos tipados)
-- `src/App.tsx` (rota nova admin)
-- `src/components/layouts/AdminLayout.tsx` (item de menu "Saúde Escolar")
-
-### O que NÃO entra agora (próxima rodada, após validação)
-- Painel de "professores online" em tempo real
-- Alertas WhatsApp/e-mail
-- Health check externo de APIs
-- Dashboard visual do professor com KPIs
+**Seeds**: 4 filas padrão (`Comercial`, `Financeiro`, `Pedagógico`, `Suporte`) inseridas por trigger ao criar `unit` (ou backfill na migration).
 
 ---
 
-## Validação
-Ao final, vou:
-- Conferir build limpo
-- Rodar `supabase/linter`
-- Smoke test via `read_query`: contagem de vínculos ativos, professores sem role, closures divergentes — antes e depois do reconcile.
-- Testar manualmente: login por CPF de professor multiunidade, troca de unidade sem logout, confirmação de aula refletindo em tempo real, reprocessar individual e em lote.
+## 2. Edge Functions (estrutura real, prontas p/ APIs)
+
+Criadas em `supabase/functions/`:
+
+- **`omni-evolution-webhook`** (`verify_jwt=false`) — recebe eventos da Evolution API: `messages.upsert`, `messages.update`, `connection.update`, `qrcode.updated`. Valida `webhook_secret` via header. Cria/atualiza contato + conversa + mensagem. Loga tudo em `omni_integration_logs`. Idempotente via `external_id`.
+- **`omni-meta-webhook`** (`verify_jwt=false`) — handler Meta Cloud (WhatsApp + Instagram): GET para `hub.challenge`, POST para eventos. Valida `x-hub-signature-256` (HMAC-SHA256 com `app_secret`).
+- **`omni-landing-webhook`** (`verify_jwt=false`) — recebe leads de landing pages com `x-uplay-key` por integração.
+- **`omni-send-message`** — autenticado, roteia outbound conforme `integration.provider` (Evolution/Meta). Cria mensagem local imediatamente (status `pending`), faz a chamada externa, atualiza `external_id`/erro.
+- **`omni-integration-test`** — autenticado, faz ping no provider configurado (Evolution `/instance/connectionState`, Meta `/me`). Retorna status + latência.
+- **`omni-integration-qr`** — autenticado, chama Evolution `/instance/connect` e retorna QR; atualiza `qr_code` e `status='qr_pending'`.
+- **`omni-automation-runner`** — invocada via `pg_net` no trigger de nova mensagem; avalia regras ativas e executa ações.
+- **`omni-ai-reply`** — preparado para IA: usa `LOVABLE_API_KEY` (Lovable AI Gateway, modelo padrão `google/gemini-2.5-flash`); recebe `conversation_id`, monta contexto (últimas N mensagens + `omni_ai_contexts.memory`), gera resposta, registra `omni_ai_sessions`. Suporta handoff humano quando confidence < threshold.
+
+Config `supabase/config.toml`: adicionar `verify_jwt = false` para os 3 webhooks.
+
+Endpoints públicos (Supabase Functions URL) ficam disponíveis para colar no Evolution/Meta:
+- `/functions/v1/omni-evolution-webhook`
+- `/functions/v1/omni-meta-webhook`
+- `/functions/v1/omni-landing-webhook`
+
+---
+
+## 3. Frontend — UI Dark Profissional
+
+Estrutura modular em `src/pages/admin/omni/` + `src/components/omni/` + `src/hooks/omni/`.
+
+### Páginas (rotas em `AdminLayout`)
+- `/admin/omni` — **Inbox** (layout 3 colunas: lista conversas | thread | painel contato).
+- `/admin/omni/contatos` — CRUD de contatos unificados.
+- `/admin/omni/automacoes` — listagem + editor de regras (sem fluxo visual; form estruturado com triggers/condições/ações).
+- `/admin/omni/integracoes` — cards por canal (WhatsApp Evolution, WhatsApp Meta, Instagram, Landing). Modal QR Code, teste de conexão, logs recentes.
+- `/admin/omni/dashboard` — KPIs (mensagens hoje, tempo médio resposta, atendentes online, conversões, leads por canal, mensagens por unidade, fila de espera).
+- `/admin/omni/logs` — tabela paginada `omni_integration_logs` com filtros.
+- `/admin/omni/ia` — config de prompts, modelos, limites (preparada — UI funcional mesmo sem execução real ativada).
+
+### Componentes-chave
+- `ConversationList` — virtualizada, filtros (unidade/canal/atendente/status/fila), busca, ordenação por `last_message_at`, badge unread.
+- `ConversationThread` — scroll reverso, paginação infinita por `created_at`, render por `message_type` (texto/imagem/áudio com player/vídeo/documento/system), agrupamento por dia, indicador “digitando…”, status de leitura.
+- `MessageComposer` — textarea, anexos (upload p/ bucket `omni-media`), emoji picker (componente leve), gravação de áudio (MediaRecorder API), envio via `omni-send-message`.
+- `ContactPanel` — info do contato, tags, histórico, atribuir atendente/fila, alterar status/prioridade.
+- `QrConnectModal` — polling do status da integração, timer de sessão, retry.
+- `AgentPresenceIndicator` — usa `omni_agent_status`.
+- `TypingIndicator` — heartbeat de 3s em `omni_typing_status`.
+
+### Hooks
+- `useOmniRealtime(conversationId)` — subscribe em `omni_messages` filtrado.
+- `useOmniInbox(filters)` — react-query + realtime patch da lista.
+- `useAgentPresence()` — heartbeat de 20s; marca offline em `beforeunload`.
+- `useTypingBroadcast(conversationId)`.
+- `useOmniIntegrationStatus(integrationId)`.
+
+### Storage
+- Bucket `omni-media` (privado) com RLS: agentes da unidade podem upload/download; contatos não acessam diretamente (URLs assinadas).
+
+### Design tokens
+- Mantém dark atual. Adiciona em `index.css`:
+  - `--omni-glow`, `--omni-bubble-in`, `--omni-bubble-out`, gradients sutis para header da conversa.
+  - Animações: `pulse-online`, `fade-in-message`, skeleton shimmer para lista.
+
+---
+
+## 4. Sistema de Atribuição e Filas
+
+- Atribuição manual: dropdown no `ContactPanel`.
+- Atribuição automática (via automation `actions.assign_queue` + estratégia `round_robin` ou `least_loaded` baseado em `omni_agent_status.current_load`).
+- Transferência: cria registro em `omni_conversation_assignments` (histórico auditável).
+- Limite por agente: `omni_agent_status.max_load` respeitado pelo runner.
+- Filas: select em cada conversa, prioridade 1-5 com indicador visual.
+
+---
+
+## 5. Logs e Observabilidade
+
+- Tela `/admin/omni/logs` com filtros (integração, status, evento, data), payload colapsável (JSON viewer).
+- Cada chamada outbound/inbound registra entrada — base para debug de Evolution/Meta.
+- Health badges nas integrações: `last_event_at < 5min ✅`, `< 1h ⚠️`, `> 1h ❌`.
+
+---
+
+## 6. Preparação para IA (sem ativar)
+
+- Tabelas criadas (`omni_ai_prompts`, `omni_ai_contexts`, `omni_ai_sessions`, `omni_ai_training`).
+- Edge `omni-ai-reply` deployada mas só dispara se houver `omni_ai_prompts.active` + integração com flag `ai_enabled` (campo em `omni_integrations`).
+- UI em `/admin/omni/ia` permite criar prompts, definir modelo (lista de modelos Lovable AI), temperatura, ferramentas (handoff_human, create_lead, schedule_visit), limite de tokens/dia.
+
+---
+
+## 7. Segurança e Isolamento
+
+- 100% RLS por `unit_id`/`company_id`.
+- Credenciais de integração (API keys Evolution, tokens Meta) salvas em `omni_integrations.credentials` jsonb — leitura restrita via função `get_omni_integration_secrets(_id)` (SECURITY DEFINER, mesma lógica de `get_unit_secrets`).
+- Webhooks validam assinatura/secret.
+- GRANTs explícitos por tabela conforme padrão do projeto.
+
+---
+
+## 8. O que NÃO entra agora
+
+- Conexão real Evolution/Meta (apenas estrutura + UI para colar credenciais).
+- Pipeline visual de automações (form simples agora; editor visual depois).
+- Execução real da IA em produção (deployada mas desligada por flag).
+- Templates HSM Meta / catálogo de mensagens (próxima fase).
+
+---
+
+## 9. Ordem de Implementação
+
+1. Migration única com enums, tabelas, índices, GRANTs, RLS, triggers, realtime publication, seeds de filas.
+2. Bucket `omni-media` + policies.
+3. Edge functions (7 funções) + config.toml.
+4. Hooks + tipos compartilhados.
+5. Inbox (lista + thread + composer) — núcleo.
+6. Integrações + QR modal + teste de conexão.
+7. Contatos, Filas, Atribuição.
+8. Automações (CRUD + runner).
+9. Dashboard + Logs.
+10. IA (UI + função preparada).
+11. Item de menu no `AdminLayout` + rotas em `App.tsx`.
+12. Smoke test: criar integração, simular webhook via curl no `omni-evolution-webhook`, ver mensagem aparecer em tempo real no Inbox.
+
+---
+
+## 10. Validação Final
+
+- `supabase--linter` sem novos warnings críticos.
+- Build limpo.
+- Curl no webhook gera conversa + mensagem visível em realtime.
+- Envio via composer cria registro local e tenta outbound (com erro esperado até a API real ser plugada — log correto).
 
 Posso prosseguir com a implementação?

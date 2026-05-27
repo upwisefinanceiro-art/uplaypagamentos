@@ -41,6 +41,14 @@ import AdminSchoolClasses from "./pages/admin/school/AdminSchoolClasses";
 import AdminSchoolCalendar from "./pages/admin/school/AdminSchoolCalendar";
 import AdminSchoolValidation from "./pages/admin/school/AdminSchoolValidation";
 import AdminSchoolPayroll from "./pages/admin/school/AdminSchoolPayroll";
+import OmniInbox from "./pages/admin/omni/OmniInbox";
+import OmniIntegrations from "./pages/admin/omni/OmniIntegrations";
+import OmniContacts from "./pages/admin/omni/OmniContacts";
+import OmniAutomations from "./pages/admin/omni/OmniAutomations";
+import OmniDashboard from "./pages/admin/omni/OmniDashboard";
+import OmniLogs from "./pages/admin/omni/OmniLogs";
+import OmniAi from "./pages/admin/omni/OmniAi";
+
 
 import TeacherLayout from "./components/layouts/TeacherLayout";
 import TeacherLessons from "./pages/teacher/TeacherLessons";
@@ -126,7 +134,16 @@ const App = () => {
                 <Route path="escola/calendario" element={<AdminSchoolCalendar />} />
                 <Route path="escola/validacao" element={<AdminSchoolValidation />} />
                 <Route path="escola/folha" element={<AdminSchoolPayroll />} />
-                
+
+                {/* Omnichannel */}
+                <Route path="omni" element={<OmniInbox />} />
+                <Route path="omni/integracoes" element={<OmniIntegrations />} />
+                <Route path="omni/contatos" element={<OmniContacts />} />
+                <Route path="omni/automacoes" element={<OmniAutomations />} />
+                <Route path="omni/dashboard" element={<OmniDashboard />} />
+                <Route path="omni/logs" element={<OmniLogs />} />
+                <Route path="omni/ia" element={<OmniAi />} />
+
                 <Route path="alterar-senha" element={<AppChangePassword />} />
               </Route>
 
