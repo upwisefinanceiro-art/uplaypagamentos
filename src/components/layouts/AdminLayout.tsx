@@ -31,6 +31,12 @@ import CompanyBlockedOverlay from "@/components/admin/CompanyBlockedOverlay";
 const baseMenuItems = [
   { path: "/admin", icon: LayoutDashboard, label: "Dashboard", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
   { path: "/admin/omni", icon: MessageSquare, label: "Atendimento Omni", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
+  { path: "/admin/omni/integracoes", icon: MessageSquare, label: "Omni · Integrações", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
+  { path: "/admin/omni/automacoes", icon: MessageSquare, label: "Omni · Automações", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
+  { path: "/admin/omni/contatos", icon: MessageSquare, label: "Omni · Contatos", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
+  { path: "/admin/omni/dashboard", icon: MessageSquare, label: "Omni · Dashboard", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
+  { path: "/admin/omni/logs", icon: MessageSquare, label: "Omni · Logs", roles: ["ADMIN_MASTER", "ADMIN_UNIDADE"] },
+  { path: "/admin/omni/ia", icon: MessageSquare, label: "Omni · IA", roles: ["ADMIN_MASTER"] },
   { path: "/admin/empresa", icon: Building2, label: "Minha Empresa", roles: ["ADMIN_MASTER"] },
   { path: "/admin/administradores", icon: ShieldCheck, label: "Administradores", roles: ["ADMIN_MASTER"] },
   { path: "/admin/unidades", icon: Building2, label: "Unidades", roles: ["ADMIN_MASTER"] },
