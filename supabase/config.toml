@@ -14,3 +14,12 @@ verify_jwt = false
 
 [functions.register-asaas-webhooks]
 verify_jwt = false
+
+[functions.omni-evolution-webhook]
+verify_jwt = false
+
+[functions.omni-meta-webhook]
+verify_jwt = false
+
+[functions.omni-landing-webhook]
+verify_jwt = false
